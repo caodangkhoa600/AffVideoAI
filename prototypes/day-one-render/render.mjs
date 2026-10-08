@@ -6,6 +6,7 @@
 
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 const W = 1080;
@@ -16,7 +17,6 @@ const CROSSFADE = 0.4;
 const SCENE_SHARES = [0.15, 0.25, 0.35, 0.25]; // hook, reveal, facts, closing
 
 const FONT = {
-  regular: '/fonts/BeVietnamPro-Regular.ttf',
   semibold: '/fonts/BeVietnamPro-SemiBold.ttf',
   bold: '/fonts/BeVietnamPro-Bold.ttf',
 };
@@ -29,7 +29,13 @@ const root = '/work';
 const useSample = process.argv.includes('--sample');
 const inputDir = path.join(root, useSample ? 'sample' : 'input');
 const outputDir = path.join(root, 'output');
-const tmpDir = fs.mkdtempSync(path.join(root, 'tmp-'));
+// Inside the container, so nothing is left on the host if the run is killed.
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'day-one-'));
+
+// The photo's RGB is converted to BT.709 explicitly and the files are tagged to
+// match, so players show the product's colours as they are in the photo.
+const TO_BT709 = 'scale=out_color_matrix=bt709:out_range=tv';
+const BT709_TAGS = ['-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv'];
 
 function run(cmd, args) {
   const r = spawnSync(cmd, args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
@@ -50,14 +56,17 @@ function probe(file) {
 const even = (n) => Math.max(2, Math.round(n / 2) * 2);
 
 // drawtext does not wrap, so lines are broken here. Width is estimated from the
-// font size; Be Vietnam Pro averages a little over half an em per character.
+// font size; Be Vietnam Pro averages a little over half an em per character,
+// and capitals run wider.
+const textUnits = (s) => [...s].reduce((n, ch) => n + (/\p{Lu}/u.test(ch) ? 1.25 : 1), 0);
+
 function wrap(text, fontSize, maxLines) {
   const breakAt = (maxChars) => {
     const lines = [];
     let line = '';
     for (const word of text.trim().split(/\s+/)) {
       const next = line ? `${line} ${word}` : word;
-      if (next.length > maxChars && line) {
+      if (textUnits(next) > maxChars && line) {
         lines.push(line);
         line = word;
       } else {
@@ -68,13 +77,13 @@ function wrap(text, fontSize, maxLines) {
     return lines;
   };
   for (let size = fontSize; size >= 36; size -= 4) {
-    const maxChars = Math.floor(TEXT_ZONE.maxW / (size * 0.58));
+    const maxChars = Math.floor(TEXT_ZONE.maxW / (size * 0.6));
     let lines = breakAt(maxChars);
-    if (lines.length > maxLines || lines.some((l) => l.length > maxChars)) continue;
+    if (lines.length > maxLines || lines.some((l) => textUnits(l) > maxChars)) continue;
     // Narrow the limit while the line count holds, so no line is left with one word.
     for (let limit = maxChars - 1; limit > 0; limit--) {
       const tighter = breakAt(limit);
-      if (tighter.length !== lines.length || tighter.some((l) => l.length > limit)) break;
+      if (tighter.length !== lines.length || tighter.some((l) => textUnits(l) > limit)) break;
       lines = tighter;
     }
     return { size, lines };
@@ -84,8 +93,8 @@ function wrap(text, fontSize, maxLines) {
 
 let textFileCount = 0;
 
-// Text goes to ffmpeg through a file, never through the filter string, so no
-// user text needs escaping.
+// Text goes to ffmpeg through a file, never through the filter string, and
+// expansion is off so "%" and "\" in a fact are drawn as written.
 function drawText({ text, font, size, y, appearAt, color = 'white', box = false }) {
   const file = path.join(tmpDir, `text-${textFileCount++}.txt`);
   fs.writeFileSync(file, text, 'utf8');
@@ -93,6 +102,7 @@ function drawText({ text, font, size, y, appearAt, color = 'white', box = false 
   const opts = [
     `fontfile=${font}`,
     `textfile=${file}`,
+    'expansion=none',
     `fontsize=${size}`,
     `fontcolor=${color}`,
     `x=(w-text_w)/2`,
@@ -111,14 +121,16 @@ function drawText({ text, font, size, y, appearAt, color = 'white', box = false 
 function textBlock(entries) {
   const filters = [];
   let y = TEXT_ZONE.top;
+  let bottom = y;
   for (const e of entries) {
     for (const [i, line] of e.lines.entries()) {
       filters.push(drawText({ ...e, text: line, y, appearAt: e.appearAt + i * 0.12 }));
       y += Math.round(e.size * 1.3);
     }
+    bottom = y;
     y += e.gapAfter ?? 0;
   }
-  if (y > TEXT_ZONE.bottom + 40) {
+  if (bottom > TEXT_ZONE.bottom) {
     throw new Error('Too much text for one scene; shorten the hook, name or facts.');
   }
   return filters;
@@ -203,7 +215,7 @@ function renderScene({ still, gradient, seconds, motion, text, file }) {
   const frames = Math.round(seconds * FPS);
   const m = motion(frames);
   const graph = [
-    `[0:v]zoompan=z='${m.z}':x='${m.x}':y='${m.y}':d=${frames}:s=${W}x${H}:fps=${FPS}[z]`,
+    `[0:v]${TO_BT709},format=yuv444p,zoompan=z='${m.z}':x='${m.x}':y='${m.y}':d=${frames}:s=${W}x${H}:fps=${FPS}[z]`,
     `[z][1:v]overlay=0:0[g]`,
     `[g]${[...text, 'format=yuv420p'].join(',')}[out]`,
   ].join(';');
@@ -212,6 +224,7 @@ function renderScene({ still, gradient, seconds, motion, text, file }) {
     '-filter_complex', graph, '-map', '[out]',
     '-frames:v', String(frames), '-r', String(FPS),
     '-c:v', 'libx264', '-preset', 'medium', '-crf', '14', '-pix_fmt', 'yuv420p',
+    ...BT709_TAGS,
     file,
   ]);
 }
@@ -229,6 +242,11 @@ function joinScenes(clips, durations, total, file) {
     );
     previous = label;
   }
+  // Output options alone do not carry the primaries and transfer tags through.
+  steps[steps.length - 1] = steps[steps.length - 1].replace(
+    /\[v\]$/,
+    ',setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv[v]',
+  );
   ffmpeg([
     ...inputs,
     '-f', 'lavfi', '-t', String(total), '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
@@ -236,6 +254,7 @@ function joinScenes(clips, durations, total, file) {
     '-map', '[v]', '-map', `${clips.length}:a`,
     '-c:v', 'libx264', '-profile:v', 'high', '-preset', 'medium', '-crf', '18',
     '-pix_fmt', 'yuv420p', '-r', String(FPS),
+    ...BT709_TAGS,
     '-c:a', 'aac', '-b:a', '128k',
     '-t', String(total), '-movflags', '+faststart',
     file,
@@ -245,6 +264,7 @@ function joinScenes(clips, durations, total, file) {
 function main() {
   const product = JSON.parse(fs.readFileSync(path.join(inputDir, 'product.json'), 'utf8'));
   const total = product.durationSeconds ?? 20;
+  if (!(total >= 15 && total <= 30)) throw new Error('"durationSeconds" must be between 15 and 30.');
   if (!product.name || !product.hook || !product.facts?.length) {
     throw new Error('product.json needs "name", "hook" and at least one entry in "facts".');
   }
@@ -272,8 +292,18 @@ function main() {
   const hook = wrap(product.hook, 92, 3);
   const name = wrap(product.name, 84, 2);
   const cta = wrap(product.cta ?? 'Xem chi tiết sản phẩm', 48, 1);
-  const facts = product.facts.map((f) => wrap(f, 56, 2));
-  const factSize = Math.min(...facts.map((f) => f.size));
+  // Facts share one size: the largest at which the whole list fits the text zone.
+  const FACT_GAP = 26;
+  let facts;
+  let factSize = 56;
+  for (; factSize >= 36; factSize -= 4) {
+    facts = product.facts.map((f) => wrap(f, factSize, 2));
+    if (facts.some((f) => f.size < factSize)) continue;
+    const lineCount = facts.reduce((n, f) => n + f.lines.length, 0);
+    const height = lineCount * Math.round(factSize * 1.3) + (facts.length - 1) * FACT_GAP;
+    if (height <= TEXT_ZONE.bottom - TEXT_ZONE.top) break;
+  }
+  if (factSize < 36) throw new Error('Too many or too long facts to fit on screen.');
   const factStep = (durations[2] - 1.2) / facts.length;
 
   const scenes = [
@@ -293,7 +323,7 @@ function main() {
           size: factSize,
           font: FONT.semibold,
           appearAt: 0.5 + i * factStep,
-          gapAfter: 26,
+          gapAfter: FACT_GAP,
         })),
       ),
     },
@@ -324,11 +354,18 @@ function main() {
   });
 
   fs.mkdirSync(outputDir, { recursive: true });
-  const slug = product.name.normalize('NFD').replace(/[^\w]+/g, '-').replace(/^-|-$/g, '').toLowerCase();
-  const output = path.join(outputDir, `${slug || 'video'}.mp4`);
+  const slug =
+    product.name
+      .normalize('NFD')
+      .replace(/\p{M}/gu, '')
+      .replace(/[đĐ]/g, 'd')
+      .replace(/[^\w]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .toLowerCase() || 'video';
+  const output = path.join(outputDir, `${slug}.mp4`);
   joinScenes(clips, durations, total, output);
 
-  // A frame from the middle of each scene, for a quick look without a player.
+  // A frame from late in each scene, once all its text is on screen, for a quick look without a player.
   let at = 0;
   durations.forEach((d, i) => {
     ffmpeg([

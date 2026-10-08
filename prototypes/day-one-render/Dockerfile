@@ -7,7 +7,7 @@ RUN apt-get update \
 
 # Be Vietnam Pro: SIL Open Font License, full Vietnamese diacritic coverage.
 RUN mkdir -p /fonts \
- && for w in Regular SemiBold Bold; do \
+ && for w in SemiBold Bold; do \
       curl -fsSL -o /fonts/BeVietnamPro-$w.ttf \
         https://raw.githubusercontent.com/google/fonts/main/ofl/bevietnampro/BeVietnamPro-$w.ttf; \
     done
