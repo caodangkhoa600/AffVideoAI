@@ -11,6 +11,8 @@
 - [ ] Generated text uses only Confirmed Facts; Proposed and Withdrawn Facts never appear
 - [ ] Each Scene records the Facts it used, including a copy of their text
 - [ ] Scene durations sum exactly to the Project's target duration
+- [ ] Each Scene records which layout of the creative template it uses, so the renderer needs only the Storyboard version and the Product's assets
+- [ ] Generation fails with a clear reason when the Hook or a Fact is too long for its layout, including a Hook too long to be fully on screen within two seconds
 - [ ] In Product Lock only static image, image motion and text animation are assigned
 - [ ] Generation fails with a clear reason when the Product has no Confirmed Facts or no usable image
 - [ ] The Storyboard is labelled as produced by the mock planner, in the data and on screen

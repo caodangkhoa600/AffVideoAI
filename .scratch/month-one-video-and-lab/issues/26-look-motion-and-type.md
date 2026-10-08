@@ -4,7 +4,7 @@
 
 **Blocked by:** 25
 
-**Status:** ready-for-human
+**Status:** done
 
 - [x] Each of the four Scenes has its own layout; no two share the "Product in the middle, text underneath" arrangement
 - [x] The Hook fills a large part of the frame and is fully readable within the first two seconds
@@ -13,9 +13,9 @@
 - [x] The same video is built two ways for comparison: with FFmpeg filters alone, and with Remotion, unless the first attempt in one of them already makes the other pointless, in which case that is stated with the reason
 - [x] For each way, these are recorded: render time for 20 seconds, what it adds to the worker image, how hard a new creative template would be to write, and its licence terms for commercial use checked against the vendor's current published terms
 - [x] The output is 1080x1920, H.264, AAC, about 20 seconds, with correct Vietnamese diacritics and BT.709 colour
-- [ ] The founder has watched it on a phone and given the verdict: good enough to post, or not
-- [ ] The choice of rendering approach is recorded as an ADR, and the spec and tickets 02, 08, 09 and 14 are updated to match it
-- [ ] If the verdict is still "not good enough" after the week, work stops and the fallback (a paid image-to-video provider in place of the Affiliate Lab) is put to the founder before anything else is built
+- [x] The founder has watched it on a phone and given the verdict: good enough to post, or not
+- [x] The choice of rendering approach is recorded as an ADR, and the spec and tickets 02, 08, 09 and 14 are updated to match it
+- [x] If the verdict is still "not good enough" after the week, work stops and the fallback (a paid image-to-video provider in place of the Affiliate Lab) is put to the founder before anything else is built (did not apply: the verdict was good enough)
 
 ## Comments
 
@@ -46,3 +46,4 @@
   - In FFmpeg: `drawtext` with `y_align=baseline` keeps words on one baseline whatever their diacritics. `scale` and `rotate` with `eval=frame` animate a layer. Scene clips encoded with the same settings join with the concat demuxer and `-c copy`, with no second encode.
   - In Remotion: pass `--color-space bt709` and `--enforce-audio-track`; both were passed here and the file came out tagged BT.709 with an AAC track. Load the typeface from a file with `delayRender` before measuring any text. The render ran with the network off.
 - Not checked: nobody has watched either video play. The frames were looked at, in the middle of the moves as well as at rest; smoothness and rhythm are for the founder's eye. Only the founder's Product and the placeholder were rendered, each with short text; a long Hook or long Facts were not tried. Words arrive 0.12 s apart, so a Hook of about 13 words or more would not be fully on screen by two seconds, and nothing checks that. Text too long for its box stops the run with a message. A Product wider than 0.86 of its height is shown smaller so that it stays in the frame; that path ran only on the placeholder's card, if at all.
+- 2026-10-08: The founder watched the videos and gave the verdict: **good enough to post**, and chose **Remotion**. Recorded as ADR 0002 (`docs/adr/0002-remotion-draws-scenes-ffmpeg-joins-them.md`). The spec and tickets 02, 08, 09 and 14 are updated to match. The fallback was not needed.

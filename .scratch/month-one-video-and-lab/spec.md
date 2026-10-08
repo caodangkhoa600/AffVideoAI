@@ -131,13 +131,13 @@ The month starts with a one-day throwaway render of a real Product so I can judg
 
 - One repository rooted at this directory, named AffiVideo in code. Three deployables: a Next.js web app, an ASP.NET Core API on .NET 10, and a .NET Worker Service. They share domain, application, infrastructure and contracts libraries. It is a modular monolith; no microservices.
 - PostgreSQL through Entity Framework Core with explicit migrations. S3-compatible object storage, MinIO locally. Everything runs through Docker Compose on the developer's machine; there is no server deployment this month.
-- FFmpeg and ffprobe exist only inside the worker's container image. Nothing depends on them being installed on the host.
+- FFmpeg, ffprobe, Node, Remotion and its Chrome Headless Shell exist only inside the worker's container image. Nothing depends on them being installed on the host.
 - Web stack: App Router, strict TypeScript, Tailwind, shadcn/ui, TanStack Query, React Hook Form and Zod. Light mode only. UI copy is English; video content is Vietnamese.
 - The API is REST under a versioned prefix, documents itself with OpenAPI, returns problem-details errors, and supports pagination and filtering on list endpoints. The web app's client types are generated from the OpenAPI description.
 
 ### Day-one render test
 
-- A throwaway script outside the application renders one real Product to MP4 using the same FFmpeg approach the renderer will use. It is a prototype: judged by eye, then discarded, with only the filter-graph learning carried forward.
+- A throwaway script outside the application renders one real Product to MP4 with FFmpeg. It is a prototype: judged by eye, then discarded, with only the learning carried forward. The look work that followed it (tickets 25 and 26) changed how Scenes are drawn; see Rendering.
 - If the founder judges the look too weak, up to a week goes to background cut-out, generated backgrounds and motion-graphics templates before the foundation, and the Affiliate Lab scope shrinks to fit. A paid image-to-video provider is the fallback only if that week does not get there.
 
 ### Identity and tenancy
@@ -160,7 +160,7 @@ The month starts with a one-day throwaway render of a real Product so I can judg
 
 - Provider interfaces exist for the language model, video generation, text-to-speech, image processing, rendering, object storage, publishing and analytics import. This month only the mock language model, the local renderer and object storage have implementations.
 - The mock planner is deterministic: for a given Product, Confirmed Facts, creative template, Hook and duration it always produces the same Storyboard, by slotting Fact text into Vietnamese sentence patterns belonging to the creative template. It does no translation. Its output is labelled as mock in the data and on screen. There is no silent fallback from a real provider to the mock.
-- A creative template defines the Scene structure, the proportion of the duration each Scene gets, typography, motion and transitions. Three exist: Luxury Cinematic, Product Showcase and Problem–Solution. Templates and prompt texts are versioned.
+- A creative template defines the Scene structure, the proportion of the duration each Scene gets, and a layout, typography and motion for each Scene. Its look is a set of Remotion components (ADR 0002), with a different layout in each Scene. Three exist: Luxury Cinematic, Product Showcase and Problem–Solution. Templates and prompt texts are versioned.
 - The planning engine is a rules-based function from (available assets, creative template, duration, Render Mode) to a Technique per Scene. In Product Lock it may only choose static image, image motion and text animation. Hybrid exists as a value but selects nothing generative until a real provider is added.
 - A Storyboard version is immutable. Any edit, reorder, duration change or Scene regeneration creates the next version. Validation rejects a Storyboard whose Scene durations do not sum to the target, that references an asset the Product does not have, or whose generated text cites a Fact that is not Confirmed.
 - Editing a Scene's text sets Manually Edited on that Scene. Manually Edited text is not checked against Facts.
@@ -168,8 +168,11 @@ The month starts with a one-day throwaway render of a real Product so I can judg
 
 ### Rendering
 
-- Output is 1080x1920, H.264 video, AAC audio, MP4, 15–30 seconds. Each Scene is rendered to an intermediate clip and the clips are joined with transitions; an intermediate clip is cached under a key derived from everything that affects it, so only changed Scenes are re-rendered.
-- FFmpeg is invoked with an argument list built by the application. No user-supplied text is ever interpolated into a command line or a filter expression without escaping, and no shell is involved.
+- Output is 1080x1920, H.264 video, AAC audio, MP4, 15–30 seconds, in BT.709 colour and tagged as such.
+- Remotion draws each Scene and FFmpeg joins the Scenes, adds audio and probes the result (ADR 0002). Each Scene is rendered to an intermediate file, cached under a key derived from everything that affects it, so only changed Scenes are re-rendered. The Product carries on from where the previous Scene left it, so that key includes the pose the Scene starts from.
+- The Product is cut out of its photo by a model that runs locally in the worker, with no paid service, and stands on a soft shadow on the light studio backdrop the founder chose. A cut-out that fails its checks is not used; the photo goes uncut onto a card instead. Only the photo's transparency is decided: the Product's own pixels are never repainted, and a template may only scale, move, rotate and fade it.
+- The Hook is fully on screen within the first two seconds.
+- Remotion and FFmpeg are each started with an argument list built by the application, with no shell. User-supplied text reaches a template as input data, never as code, and is never interpolated into a command line or a filter expression without escaping. Members cannot supply template code.
 - A typeface with full Vietnamese diacritic coverage and an open licence is bundled in the worker image.
 - With no audio supplied, the video carries a silent audio track. A member may attach an uploaded narration and an uploaded music track after attesting to holding the rights; audio is loudness-normalised and mixed at a chosen music volume.
 - Temporary files are removed when a job ends, whether it succeeds, fails or is cancelled.
@@ -233,5 +236,6 @@ A good test here drives the system the way a member does and asserts on what a m
 - Vocabulary follows `CONTEXT.md`. In particular: Fact states are Proposed, Confirmed and Withdrawn; a Variant is a creative template plus a Hook; Render Mode is Product Lock or Hybrid and Technique is per Scene.
 - The work stops for the founder at two points: after the day-one render test, and when the one-image-to-MP4 workflow runs end to end.
 - The day-one test needs two or three photos of a real Product and its name and three or four Facts in Vietnamese, supplied by the founder. AirBeat X1 remains as fictional seed and test data.
+- Second verdict, 2026-10-08, on the ticket 26 render: good enough to post. Scenes are drawn with Remotion (ADR 0002). Remotion is free for a company of up to 3 people; beyond that it costs $0.01 per render with a $100 a month minimum.
 - Day-one verdict, 2026-10-08: improve the look. Up to a week goes to product cut-out, designed backgrounds, and motion, layout and type, before the foundation. User stories 69, 70 and 79 and the parts of the Affiliate Lab decisions that describe CSV import and estimated profit are deferred.
 - Two details were decided while writing this spec and not discussed beforehand: download requires approval (preview does not), and the application's interface is in English while video content is Vietnamese.

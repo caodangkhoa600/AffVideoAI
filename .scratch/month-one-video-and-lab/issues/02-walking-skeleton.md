@@ -2,14 +2,16 @@
 
 **What to build:** One command starts PostgreSQL, object storage, the API, the worker and the web app locally, and the web app shows a status page proving it can talk to the API, which in turn can reach the database and object storage. The test harness for the HTTP seam exists and has its first passing test.
 
-**Blocked by:** 26 (the founder's verdict was to improve the look first; the rendering approach chosen there decides what the worker image contains).
+**Blocked by:** 26 (done: Remotion draws the Scenes and FFmpeg joins them, ADR 0002, which decides what the worker image contains).
 
 **Status:** ready-for-agent
 
 - [ ] The repository is initialised with git at this directory, with AffiVideo as the name in code
 - [ ] A single Docker Compose command starts all five services, each with a health check
 - [ ] The first database migration is applied by an explicit command, never automatically at startup
-- [ ] The worker image contains FFmpeg, ffprobe and a typeface with full Vietnamese diacritics and an open licence
+- [ ] The worker image contains FFmpeg, ffprobe, Node, Remotion with its Chrome Headless Shell, and a typeface with full Vietnamese diacritics and an open licence
+- [ ] The Remotion version is pinned with a committed lock file
+- [ ] Inside the worker container, with the network off, Remotion renders a frame that uses the typeface
 - [ ] The web app's API types are generated from the API's OpenAPI description
 - [ ] The status page shows the API, database and object storage as reachable
 - [ ] An integration test starts the API against real PostgreSQL and object storage in containers and passes
