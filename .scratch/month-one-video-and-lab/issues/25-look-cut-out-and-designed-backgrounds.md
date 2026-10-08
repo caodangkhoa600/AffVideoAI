@@ -4,7 +4,7 @@
 
 **Blocked by:** 01
 
-**Status:** ready-for-human
+**Status:** done
 
 - [x] The Product is cut out of each photo by a tool that runs locally in the container, with no paid service
 - [x] The cut-out only removes background: the Product's own pixels, colours, logo and edges are not repainted, and a side-by-side with the original photo shows this
@@ -12,7 +12,7 @@
 - [x] Three background styles are produced without generative AI, for example a studio gradient, a soft coloured light taken from the Product's own colour, and a dark premium style
 - [x] The Product sits on a soft shadow so it does not look pasted on
 - [x] Stills of the founder's Product on each of the three styles are written to the output folder
-- [ ] The founder has picked one or two styles to carry into ticket 26
+- [x] The founder has picked one or two styles to carry into ticket 26
 - [x] What was learned (tool, model size, time per photo, failure cases) is written into this ticket's comments
 
 ## Comments
@@ -36,3 +36,4 @@
   - Backgrounds are gradients and soft lights drawn with numpy, with a little noise added before rounding; without it the gradients band. They are drawn around where the Product stands, so the floor line and the light follow it.
   - The colour for `colour-light` is the most common saturated colour of the cut-out. Behind a light Product it is used dark, behind a dark one pale, or the Product disappears into it. A yellow-green used dark turns olive.
   - The shadow is two layers: a wide blurred copy of the cut-out's alpha shifted down, and a tight one under whatever touches the lowest rows. The tight one is what makes the Product stand on the floor; with two objects in one photo it follows each.
+- 2026-10-08: The founder picked **`studio`** (the light seamless backdrop) to carry into ticket 26. `colour-light` and `dark-premium` are not taken forward.
