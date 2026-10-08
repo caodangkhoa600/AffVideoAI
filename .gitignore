@@ -1,0 +1,7 @@
+# Day-one render test: the founder's photos and all render output stay local
+prototypes/day-one-render/input/*
+!prototypes/day-one-render/input/product.example.json
+prototypes/day-one-render/output/
+prototypes/day-one-render/tmp-*/
+
+.env
