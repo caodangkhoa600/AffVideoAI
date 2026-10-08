@@ -1,0 +1,65 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "AffiVideo.Api | v1",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/status": {
+      "get": {
+        "tags": [
+          "Status"
+        ],
+        "summary": "Whether the API can reach its database and object storage.",
+        "operationId": "GetStatus",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "DependencyStatusResponse": {
+        "required": [
+          "reachable"
+        ],
+        "type": "object",
+        "properties": {
+          "reachable": {
+            "type": "boolean"
+          }
+        }
+      },
+      "StatusResponse": {
+        "required": [
+          "database",
+          "objectStorage"
+        ],
+        "type": "object",
+        "properties": {
+          "database": {
+            "$ref": "#/components/schemas/DependencyStatusResponse"
+          },
+          "objectStorage": {
+            "$ref": "#/components/schemas/DependencyStatusResponse"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Status"
+    }
+  ]
+}

@@ -1,0 +1,112 @@
+# AffiVideo on one machine:  docker compose up --build --wait
+# Every variable comes from .env (copy .env.example). See README.md.
+name: affivideo
+
+x-app-environment: &app-environment
+  ConnectionStrings__Database: Host=postgres;Port=5432;Database=${POSTGRES_DB:?};Username=${POSTGRES_USER:?};Password=${POSTGRES_PASSWORD:?}
+  Storage__Endpoint: http://minio:9000
+  Storage__AccessKey: ${MINIO_ROOT_USER:?}
+  Storage__SecretKey: ${MINIO_ROOT_PASSWORD:?}
+  Storage__Bucket: ${STORAGE_BUCKET:?}
+
+x-app-depends-on: &app-depends-on
+  postgres:
+    condition: service_healthy
+  minio:
+    condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?}
+      POSTGRES_USER: ${POSTGRES_USER:?}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - 127.0.0.1:${POSTGRES_PORT:?}:5432
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # MinIO no longer publishes its own images; this is Chainguard's build of it,
+  # pinned by digest because that registry only offers the "latest" tag.
+  # tests/AffiVideo.Api.Tests/AffiVideoApp.cs runs the same digest.
+  minio:
+    image: cgr.dev/chainguard/minio@sha256:59667194421209c2c1eacbe761e24787e047985c5dfa96b15da9b59fe9b55cd0
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?}
+    volumes:
+      - minio-data:/data
+    ports:
+      - 127.0.0.1:${MINIO_PORT:?}:9000
+      - 127.0.0.1:${MINIO_CONSOLE_PORT:?}:9001
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    image: affivideo-api
+    build:
+      context: .
+      dockerfile: src/AffiVideo.Api/Dockerfile
+    environment: *app-environment
+    depends_on: *app-depends-on
+    ports:
+      - 127.0.0.1:${API_PORT:?}:8080
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  worker:
+    image: affivideo-worker
+    build:
+      context: .
+      dockerfile: src/AffiVideo.Worker/Dockerfile
+    environment: *app-environment
+    depends_on: *app-depends-on
+    healthcheck:
+      # The worker touches this file while it can reach the database and object storage.
+      test: ["CMD-SHELL", "find /tmp/affivideo-worker.heartbeat -mmin -1 | grep -q ."]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  web:
+    image: affivideo-web
+    build:
+      context: web
+    environment:
+      API_INTERNAL_URL: http://api:8080
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - 127.0.0.1:${WEB_PORT:?}:3000
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Not started by `up`. Applies database migrations and creates the storage bucket:
+  #   docker compose run --rm migrate
+  migrate:
+    image: affivideo-api
+    profiles: ["tools"]
+    command: ["migrate"]
+    environment: *app-environment
+    depends_on: *app-depends-on
+
+volumes:
+  postgres-data:
+  minio-data:

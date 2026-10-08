@@ -6,3 +6,12 @@ prototypes/day-one-render/output/
 .env
 
 __pycache__/
+
+# .NET
+bin/
+obj/
+*.user
+.vs/
+
+# Node
+node_modules/
