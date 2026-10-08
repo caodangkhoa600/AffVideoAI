@@ -4,3 +4,5 @@ prototypes/day-one-render/input/*
 prototypes/day-one-render/output/
 
 .env
+
+__pycache__/

@@ -42,3 +42,23 @@ For each photo, `output/look/` receives:
 A photo that already has a transparent background goes through the same checks, and is used as it is when it passes and cut again by the model when it does not. A cut-out that fails the checks (parts of the Product missing, background left around the edge) is not used, and the photo goes uncut onto a card instead. If a cut-out passes the checks but looks wrong in `…-compare.png`, force the card with `--card 2.png`.
 
 Other options: `--sample` (placeholder photo), `--ignore-alpha` (run the model even on a photo that is already cut out), `--model u2net` (another model; it must be in the image, see the Dockerfile, or the run needs network access to fetch it).
+
+## Look test 2: motion, layout and type (ticket 26)
+
+`motion.py` renders the Product in `input/` as a 20-second video with a different layout in each of its four Scenes, on the `studio` backdrop. It builds the same video twice so the two can be compared: once with FFmpeg filters alone, and once with Remotion (the template in `remotion/src`). Rebuild the image first; it now also holds Remotion and its browser.
+
+```
+docker build -t affivideo-day-one prototypes/day-one-render
+docker run --rm --network none --entrypoint /opt/look/bin/python -v "${PWD}\prototypes\day-one-render:/work" affivideo-day-one /work/motion.py
+```
+
+`output/motion/` receives, for each build:
+
+- `…-ffmpeg.mp4`, `…-remotion.mp4`: the videos. These are the ones to watch, on a phone.
+- `…-ffmpeg-frames.png`, `…-remotion-frames.png`: the frame at two seconds, where the Hook must already be readable, and a late frame of each other Scene.
+
+The run prints how long each build took and checks each MP4 with ffprobe (1080x1920, H.264, AAC, 20 seconds, BT.709).
+
+Options: `--sample` (placeholder photo), `--only ffmpeg` or `--only remotion` (one build).
+
+The Scenes use the first two photos in file-name order: the first for the Hook, the reveal and the closing, the second for the Facts. With one photo, it is used throughout.

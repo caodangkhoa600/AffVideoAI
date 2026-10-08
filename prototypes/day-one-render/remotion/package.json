@@ -1,0 +1,18 @@
+{
+  "name": "affivideo-look-motion",
+  "private": true,
+  "description": "Throwaway Remotion build of the ticket 26 look test. Not part of the application.",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.534",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "remotion": "4.0.534"
+  },
+  "devDependencies": {
+    "@types/react": "19.0.0",
+    "typescript": "5.8.3"
+  }
+}
