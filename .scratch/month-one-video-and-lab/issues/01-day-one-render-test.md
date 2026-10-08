@@ -4,15 +4,15 @@
 
 **Blocked by:** None (can start immediately). Needs from the founder: two or three photos of the Product, its name, and three or four Facts in Vietnamese.
 
-**Status:** needs-info
+**Status:** done
 
 - [x] The MP4 is produced with FFmpeg running in a container, not on the host
 - [x] ffprobe reports 1080x1920, H.264 video, an AAC track, and about 20 seconds
 - [x] Vietnamese text with diacritics renders correctly
-- [ ] The Product's appearance is unchanged from the photos
-- [ ] The founder has watched it and given a verdict: proceed, or spend up to a week on the look first
+- [x] The Product's appearance is unchanged from the photos
+- [x] The founder has watched it and given a verdict: proceed, or spend up to a week on the look first
 - [x] What was learned about the filter graph, fonts and motion is written into the ticket's comments for ticket 09
-- [ ] If the verdict is "improve the look", new tickets are added for that work and the Affiliate Lab tickets are re-scoped
+- [x] If the verdict is "improve the look", new tickets are added for that work and the Affiliate Lab tickets are re-scoped
 
 ## Comments
 
@@ -27,3 +27,4 @@
   - A silent `anullsrc` input encoded as AAC gives a valid audio track.
   - Debian trixie's FFmpeg 7.1 has everything needed. Be Vietnam Pro (SIL Open Font License) covers Vietnamese.
   - Text width is estimated from character count, which is crude. The real renderer should measure text.
+- 2026-10-08: The founder rendered a real Product and gave the verdict: **improve the look**. The Product was unaltered, but all four Scenes share one layout, the blurred background is murky, the Hook is too small to stop a scroll, and the type is timid. Tickets 25 and 26 were added ahead of ticket 02. To make room, ticket 21 (CSV import) is deferred and ticket 23 (dashboard) is reduced.

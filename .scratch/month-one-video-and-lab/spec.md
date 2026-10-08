@@ -225,6 +225,7 @@ A good test here drives the system the way a member does and asserts on what a m
 - Deployment to a server, a production reverse proxy, and web sockets.
 - Languages other than Vietnamese for video content.
 - Business documents other than the affiliate experiment plan.
+- CSV import of Performance Snapshots, and charts, production cost and estimated profit on the Affiliate Lab dashboard. These were removed after the day-one verdict to make room for work on the look.
 - A full timeline video editor.
 
 ## Further Notes
@@ -232,4 +233,5 @@ A good test here drives the system the way a member does and asserts on what a m
 - Vocabulary follows `CONTEXT.md`. In particular: Fact states are Proposed, Confirmed and Withdrawn; a Variant is a creative template plus a Hook; Render Mode is Product Lock or Hybrid and Technique is per Scene.
 - The work stops for the founder at two points: after the day-one render test, and when the one-image-to-MP4 workflow runs end to end.
 - The day-one test needs two or three photos of a real Product and its name and three or four Facts in Vietnamese, supplied by the founder. AirBeat X1 remains as fictional seed and test data.
+- Day-one verdict, 2026-10-08: improve the look. Up to a week goes to product cut-out, designed backgrounds, and motion, layout and type, before the foundation. User stories 69, 70 and 79 and the parts of the Affiliate Lab decisions that describe CSV import and estimated profit are deferred.
 - Two details were decided while writing this spec and not discussed beforehand: download requires approval (preview does not), and the application's interface is in English while video content is Vietnamese.

@@ -2,7 +2,7 @@
 
 **What to build:** One command starts PostgreSQL, object storage, the API, the worker and the web app locally, and the web app shows a status page proving it can talk to the API, which in turn can reach the database and object storage. The test harness for the HTTP seam exists and has its first passing test.
 
-**Blocked by:** 01 (the founder's verdict decides whether this starts now or after work on the look).
+**Blocked by:** 26 (the founder's verdict was to improve the look first; the rendering approach chosen there decides what the worker image contains).
 
 **Status:** ready-for-agent
 

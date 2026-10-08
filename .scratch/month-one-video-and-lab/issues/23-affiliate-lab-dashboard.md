@@ -1,8 +1,8 @@
 # 23: Affiliate Lab dashboard
 
-**What to build:** A Lab member compares performance by Product, creative template, Hook and Campaign, and sees Commission, production cost and estimated profit per Product and per Campaign. The dashboard is honest about missing data and small samples.
+**What to build:** A Lab member compares performance by Product, creative template, Hook and Campaign, and sees Commission per Product and per Campaign. It is a set of plain tables, with no charts. The dashboard is honest about missing data and small samples.
 
-**Blocked by:** 16, 20, 22
+**Blocked by:** 20, 22
 
 **Status:** ready-for-agent
 
@@ -12,6 +12,10 @@
 - [ ] Unknown metrics are shown as unknown, never as zero
 - [ ] Groups below a configurable minimum number of posts or views are marked as too small to compare
 - [ ] Nothing is labelled a winner or as better than another group
-- [ ] Commission, production cost and estimated profit are shown per Product and per Campaign, with estimated profit being Commission minus production cost
-- [ ] Every figure shows whether it came from manual entry or CSV import
+- [ ] Commission is shown per Product and per Campaign
+- [ ] Every figure shows its source
 - [ ] Tests at the HTTP seam check the figures for a seeded set of posts, including the missing-data and small-sample cases
+
+## Comments
+
+- 2026-10-08: Reduced to make room for the look work (tickets 25 and 26): tables only, and production cost and estimated profit are left out because every video this month is rendered locally at a cost of zero.
