@@ -40,6 +40,41 @@ object storage as reachable.
 If a port is taken, change it in `.env`. `docker compose down` stops everything
 and keeps the data; `docker compose down -v` also deletes it.
 
+## Run the apps on the host
+
+For working on the code, run only the database and storage in Docker and the
+three apps on the host:
+
+```sh
+docker compose up -d --wait postgres minio
+dotnet run --project src/AffiVideo.Api -- migrate
+dotnet run --project src/AffiVideo.Api        # http://localhost:5080
+dotnet run --project src/AffiVideo.Worker
+npm --prefix web run dev                      # http://localhost:3000/status
+```
+
+Their settings come from files, so nothing has to be typed:
+
+- `src/AffiVideo.Api/appsettings.Development.json` and the same file in
+  `src/AffiVideo.Worker` hold the database and storage settings. The values
+  match `.env.example`.
+- `Properties/launchSettings.json` in each project sets the Development
+  environment, and the API's port.
+- `web/.env.development` tells the web app where the API is.
+
+If your `.env` differs from `.env.example` (a changed port or password), set
+the same value for the API and worker on this machine only. Both read one
+user-secrets store:
+
+```sh
+dotnet user-secrets set "ConnectionStrings:Database" "Host=localhost;Port=5433;Database=affivideo;Username=affivideo;Password=local-only-change-me" --project src/AffiVideo.Api
+```
+
+For the web app, put overrides in `web/.env.local`.
+
+The Compose services do not read these files: containers run in the
+Production environment and take everything from `.env`.
+
 ## Test
 
 ```sh

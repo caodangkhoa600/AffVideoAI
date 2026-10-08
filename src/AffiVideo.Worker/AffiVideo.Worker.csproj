@@ -1,5 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk.Worker">
 
+  <PropertyGroup>
+    <!-- One store for both: `dotnet user-secrets set` overrides appsettings.Development.json on this machine only. -->
+    <UserSecretsId>affivideo-local</UserSecretsId>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\AffiVideo.Application\AffiVideo.Application.csproj" />
     <ProjectReference Include="..\AffiVideo.Infrastructure\AffiVideo.Infrastructure.csproj" />

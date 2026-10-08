@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
+    <!-- `dotnet user-secrets set` overrides appsettings.Development.json on this machine only; the worker shares the store. -->
+    <UserSecretsId>affivideo-local</UserSecretsId>
     <!-- Every build writes the API's OpenAPI description to openapi/openapi.json
          at the repository root; the web app's types are generated from that file. -->
     <OpenApiDocumentsDirectory>$(MSBuildProjectDirectory)/../../openapi</OpenApiDocumentsDirectory>
