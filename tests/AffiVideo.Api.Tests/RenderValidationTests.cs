@@ -58,16 +58,29 @@ public sealed class RenderValidationTests
     }
 
     [Theory]
-    [InlineData(CreativeTemplate.LuxuryCinematic, RenderMode.ProductLock)]
-    [InlineData(CreativeTemplate.ProblemSolution, RenderMode.ProductLock)]
-    [InlineData(CreativeTemplate.ProductShowcase, RenderMode.Hybrid)]
-    public void Only_Product_Showcase_in_Product_Lock_can_be_rendered(CreativeTemplate template, RenderMode renderMode)
+    [InlineData(CreativeTemplate.LuxuryCinematic)]
+    [InlineData(CreativeTemplate.ProductShowcase)]
+    [InlineData(CreativeTemplate.ProblemSolution)]
+    public void A_Storyboard_of_any_creative_template_can_be_rendered_in_Product_Lock_and_none_in_Hybrid(CreativeTemplate template)
     {
         var photo = Asset();
 
-        var problems = StoryboardRules.RenderProblems(Storyboard([NewScene(1, photo.Id)], template, renderMode), [photo]);
+        var locked = StoryboardRules.RenderProblems(Storyboard([NewScene(1, photo.Id)], template), [photo]);
+        var hybrid = StoryboardRules.RenderProblems(Storyboard([NewScene(1, photo.Id)], template, RenderMode.Hybrid), [photo]);
 
-        Assert.Contains("Product Showcase", Assert.Single(problems));
+        Assert.Empty(locked);
+        Assert.Contains("Product Lock", Assert.Single(hybrid));
+    }
+
+    [Fact]
+    public void A_Scene_whose_layout_its_creative_template_does_not_draw_is_not_rendered()
+    {
+        var photo = Asset();
+        var solution = new Scene(1, SceneLayout.Solution, Technique.ImageMotion, 5000, ["Giải pháp", "Lumo 500"], "", [photo.Id], []);
+
+        var problems = StoryboardRules.RenderProblems(Storyboard([solution], CreativeTemplate.LuxuryCinematic), [photo]);
+
+        Assert.Contains("Solution", Assert.Single(problems));
     }
 
     [Fact]

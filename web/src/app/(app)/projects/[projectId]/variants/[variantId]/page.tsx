@@ -22,6 +22,7 @@ const LAYOUTS: Record<SceneLayout, string> = {
   Reveal: "Reveal",
   Facts: "Facts",
   Closing: "Closing",
+  Solution: "Solution",
 };
 
 /** How a Scene is produced (Technique in the domain), as a member reads it. */

@@ -1633,7 +1633,7 @@
         "tags": [
           "Storyboards"
         ],
-        "summary": "Plans the Variant's next Storyboard version in Product Lock from the Product's Confirmed Facts and photos, with the mock planner and no AI. Answers 409 with the reason when it cannot: no Confirmed Fact, no usable photo, a creative template other than Product Showcase, or a Hook, Fact or Product name too long for its layout.",
+        "summary": "Plans the Variant's next Storyboard version in Product Lock from the Product's Confirmed Facts and photos, with the mock planner and no AI. Answers 409 with the reason when it cannot: no Confirmed Fact, no usable photo, or a Hook, Fact or Product name too long for its layout in the Variant's creative template.",
         "operationId": "GenerateStoryboard",
         "parameters": [
           {
@@ -3630,7 +3630,8 @@
           "Hook",
           "Reveal",
           "Facts",
-          "Closing"
+          "Closing",
+          "Solution"
         ]
       },
       "SceneResponse": {

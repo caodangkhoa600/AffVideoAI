@@ -345,6 +345,139 @@ public sealed partial class RenderTests(AffiVideoApp app)
         }
     }
 
+    [Fact]
+    public async Task Each_creative_template_renders_to_a_video_that_passes_the_checks_of_a_Rendered_Video()
+    {
+        var rendered = await RenderedTemplatesAsync(app);
+
+        // The worker keeps a file only once ffprobe has found it to be what a Rendered Video must be.
+        Assert.Equal(Enum.GetValues<CreativeTemplate>(), rendered.Videos.Keys.Order());
+        Assert.All(rendered.Videos.Values, video =>
+        {
+            Assert.Equal(RenderedVideoState.ReadyForReview, video.Video.State);
+            Assert.Equal(15_000, video.Video.DurationMs);
+            Assert.Equal(video.Storyboard.Scenes.Select(scene => scene.Position), video.Video.DrawnScenePositions);
+            Assert.Empty(video.Video.UncutAssetIds);
+        });
+    }
+
+    [Theory]
+    // The rows the Hook's type is set in: under the Product, and filling the frame.
+    [InlineData(CreativeTemplate.LuxuryCinematic, 1230, 1540, 0.005)]
+    [InlineData(CreativeTemplate.ProblemSolution, 180, 1300, 0.02)]
+    public async Task Every_Scene_of_a_creative_template_has_a_layout_of_its_own_and_its_Hook_is_whole_before_two_seconds(
+        CreativeTemplate template, int top, int bottom, double leastType)
+    {
+        var (storyboard, _, mp4) = (await RenderedTemplatesAsync(app)).Videos[template];
+        var starts = storyboard.Scenes.Select((_, index) => storyboard.Scenes.Take(index).Sum(scene => scene.DurationMs)).ToList();
+        var late = storyboard.Scenes.Select((scene, index) => (starts[index] + scene.DurationMs * 0.8) / 1000).ToList();
+
+        var frames = new List<SKBitmap>();
+        try
+        {
+            foreach (var at in late.Prepend(2.0))
+            {
+                frames.Add(await FrameAsync(mp4, at));
+            }
+
+            for (var a = 1; a < frames.Count; a++)
+            {
+                for (var b = a + 1; b < frames.Count; b++)
+                {
+                    Assert.True(Different(frames[a], frames[b]) > 0.10, $"Scenes {a} and {b} of {template} look alike.");
+                }
+            }
+            // At two seconds the Hook's type is as it is late in its Scene: every word has arrived.
+            Assert.True(Different(frames[0], frames[1], top, bottom) < 0.002, $"The Hook of {template} is still arriving at two seconds.");
+            // And there is type there to have arrived: white, on the dark.
+            Assert.True(Bright(frames[0], top, bottom) > leastType, $"There is no type where {template} sets its Hook.");
+        }
+        finally
+        {
+            frames.ForEach(frame => frame.Dispose());
+        }
+    }
+
+    [Fact]
+    public async Task Three_Variants_of_one_Product_one_for_each_creative_template_are_visibly_different_when_rendered()
+    {
+        var rendered = await RenderedTemplatesAsync(app);
+        CreativeTemplate[] templates = [.. rendered.Videos.Keys.Order()];
+
+        // The opening, the middle and the closing of the 15 seconds.
+        foreach (var at in new[] { 2.0, 7.5, 13.5 })
+        {
+            var frames = new List<SKBitmap>();
+            try
+            {
+                foreach (var template in templates) frames.Add(await FrameAsync(rendered.Videos[template].Mp4, at));
+
+                for (var a = 0; a < frames.Count; a++)
+                {
+                    for (var b = a + 1; b < frames.Count; b++)
+                    {
+                        Assert.True(
+                            Different(frames[a], frames[b]) > 0.10, $"{templates[a]} and {templates[b]} look alike {at} seconds in.");
+                    }
+                }
+            }
+            finally
+            {
+                frames.ForEach(frame => frame.Dispose());
+            }
+        }
+    }
+
+    /// <summary>
+    /// Three Variants of one Product, one for each creative template, with the same
+    /// Hook and from the same Confirmed Facts, each rendered by the worker to a
+    /// 15-second video. The Product's two photos came already cut out.
+    /// </summary>
+    internal static Task<RenderedTemplates> RenderedTemplatesAsync(AffiVideoApp app) => app.OnceAsync(async () =>
+    {
+        await app.WorkerAsync();
+        var organization = await app.CreateOrganizationAsync();
+        using var member = await app.SignedInAsync(organization.Owner);
+        var product = await StoryboardTests.NewProductAsync(member, "Bình giữ nhiệt Lumo 500");
+        // The same picture twice is still two photos: a Scene that shows the other does not carry the first on.
+        await ProductAssetTests.UploadedAsync(member, product, ProductAssetKind.Photo, Bottle(onBackdrop: false));
+        await ProductAssetTests.UploadedAsync(member, product, ProductAssetKind.Photo, Bottle(onBackdrop: false));
+        await StoryboardTests.ConfirmedFactAsync(member, product, "Giữ lạnh suốt 24 giờ");
+        await StoryboardTests.ConfirmedFactAsync(member, product, "Thép không gỉ, không ám mùi");
+        var project = await ProjectTests.CreateAsync(member, ProjectTests.Valid(product) with { TargetDurationSeconds = 15 });
+
+        var jobs = new List<(StoryboardResponse Storyboard, RenderJobResponse Job)>();
+        foreach (var template in Enum.GetValues<CreativeTemplate>())
+        {
+            var variant = await VariantTests.AddAsync(member, project.Id, new VariantRequest(template, Hook));
+            var storyboard = await StoryboardTests.GeneratedAsync(member, variant);
+            jobs.Add((storyboard, await SubmittedAsync(member, variant, storyboard.Version)));
+        }
+
+        var videos = new Dictionary<CreativeTemplate, (StoryboardResponse, RenderedVideoResponse, byte[])>();
+        foreach (var (storyboard, submitted) in jobs)
+        {
+            var job = await EndedAsync(member, submitted);
+            Assert.True(
+                job.State == RenderJobState.Completed,
+                $"The {storyboard.CreativeTemplate} render ended {job.State}: {job.Failure?.Message}\n{await app.WorkerLogAsync()}");
+            var video = await member.GetAsync<RenderedVideoResponse>($"/api/v1/rendered-videos/{job.RenderedVideoId}");
+            var content = await member.GetAsync($"/api/v1/rendered-videos/{video.Id}/content");
+            content.EnsureSuccessStatusCode();
+            var mp4 = await content.Content.ReadAsByteArrayAsync(Cancellation);
+            // To watch what the tests rendered: AFFIVIDEO_TEST_VIDEO=some/file.mp4 dotnet test
+            if (Environment.GetEnvironmentVariable("AFFIVIDEO_TEST_VIDEO") is { Length: > 0 } keep)
+            {
+                await File.WriteAllBytesAsync(Path.ChangeExtension(keep, $".{storyboard.CreativeTemplate}.mp4"), mp4, Cancellation);
+            }
+            videos[storyboard.CreativeTemplate] = (storyboard, video, mp4);
+        }
+        return new RenderedTemplates(videos);
+    });
+
+    internal sealed record RenderedTemplates(
+        IReadOnlyDictionary<CreativeTemplate, (StoryboardResponse Storyboard, RenderedVideoResponse Video, byte[] Mp4)> Videos);
+
     // Renders the version and waits for its Rendered Video and the MP4 the API serves for it.
     private async Task<(RenderedVideoResponse Video, byte[] Mp4)> VideoAsync(Browser member, VariantResponse variant, int version)
     {
@@ -564,6 +697,21 @@ public sealed partial class RenderTests(AffiVideoApp app)
             }
         }
         return (double)dark / ((bottom - top) * frame.Width);
+    }
+
+    // The share of pixels, within these rows, bright enough to be white type on a dark ground.
+    private static double Bright(SKBitmap frame, int top, int bottom)
+    {
+        var bright = 0;
+        for (var y = top; y < bottom; y++)
+        {
+            for (var x = 0; x < frame.Width; x++)
+            {
+                var pixel = frame.GetPixel(x, y);
+                if (pixel.Red + pixel.Green + pixel.Blue > 600) bright++;
+            }
+        }
+        return (double)bright / ((bottom - top) * frame.Width);
     }
 
     private static async Task<T> ReadAsync<T>(HttpResponseMessage response) =>

@@ -450,7 +450,7 @@ export interface paths {
         /** The Variant's Storyboard versions, newest first. */
         get: operations["ListStoryboards"];
         put?: never;
-        /** Plans the Variant's next Storyboard version in Product Lock from the Product's Confirmed Facts and photos, with the mock planner and no AI. Answers 409 with the reason when it cannot: no Confirmed Fact, no usable photo, a creative template other than Product Showcase, or a Hook, Fact or Product name too long for its layout. */
+        /** Plans the Variant's next Storyboard version in Product Lock from the Product's Confirmed Facts and photos, with the mock planner and no AI. Answers 409 with the reason when it cannot: no Confirmed Fact, no usable photo, or a Hook, Fact or Product name too long for its layout in the Variant's creative template. */
         post: operations["GenerateStoryboard"];
         delete?: never;
         options?: never;
@@ -993,7 +993,7 @@ export interface components {
             text: string;
         };
         /** @enum {unknown} */
-        SceneLayout: "Hook" | "Reveal" | "Facts" | "Closing";
+        SceneLayout: "Hook" | "Reveal" | "Facts" | "Closing" | "Solution";
         SceneResponse: {
             /** Format: int32 */
             position: number;

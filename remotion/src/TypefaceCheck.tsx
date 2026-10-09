@@ -13,7 +13,7 @@ const SAMPLES = [
 export const TypefaceCheck = () => {
   useTypeface();
   return (
-    <AbsoluteFill style={{ background: '#f4f2ee', color: '#141416', fontFamily: FAMILY, padding: 80, gap: 70, justifyContent: 'center' }}>
+    <AbsoluteFill style={{ background: '#f4f2ee', color: '#141416', fontFamily: FAMILY, padding: 80, gap: 40, justifyContent: 'center' }}>
       {Object.entries(WEIGHTS).map(([name, weight]) => (
         <div key={name} style={{ fontWeight: weight }}>
           <div style={{ fontSize: 36, opacity: 0.6 }}>{name}</div>

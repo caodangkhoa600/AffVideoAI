@@ -6,18 +6,13 @@
 // draw their own interface.
 
 import type { ReactNode } from 'react';
-import { AbsoluteFill, Easing, Img, staticFile, useVideoConfig } from 'remotion';
-import { BACK, IN, INOUT, Product, Type, between, fit, mix, move, useSeconds, words, type Pose } from './motion';
-import { HEIGHT, WIDTH, type Layer, type Layout, type SceneInput } from './scene';
+import { AbsoluteFill, Easing, Img, staticFile } from 'remotion';
+import { BACK, IN, INOUT, Product, Type, between, carried, fit, leftBehind, mix, move, narrowed, useDuration, useSeconds, words, type Pose } from './motion';
+import { HEIGHT, WIDTH, type Layer, type Layout, type Layouts, type SceneInput } from './scene';
 import { FAMILY } from './typeface';
 
 const LEFT = 80; // left edge of left-aligned type
 const EDGE = 900; // top of the Facts panel, which the Product stands on
-
-// The height given, or less for a Product too wide to be shown that tall inside the frame.
-const MAX_ASPECT = 0.86;
-const narrowed = (layer: Layer, height: number) =>
-  Math.round(height * Math.min(1, (MAX_ASPECT * layer.productHeight) / layer.productWidth));
 
 /** Where each layout leaves the Product at the end of its Scene. The next Scene starts from here. */
 const rest = (layout: Layout, layer: Layer): Pose => {
@@ -30,19 +25,9 @@ const rest = (layout: Layout, layer: Layer): Pose => {
       const height = narrowed(layer, 700);
       return { cx: 770, cy: EDGE - height / 2, height, rot: 0 };
     }
-    case 'Closing':
+    default:
       return { cx: 540, cy: 700, height: narrowed(layer, 860), rot: 0 };
   }
-};
-
-// The pose this Scene's Product starts from when it is the photo the Scene before
-// was showing: the same image carries on. Null when the Product has to come in.
-const carried = ({ previous, product }: SceneInput) =>
-  previous && previous.product.file === product.file ? rest(previous.layout, previous.product) : null;
-
-const useDuration = () => {
-  const { durationInFrames, fps } = useVideoConfig();
-  return durationInFrames / fps;
 };
 
 // The backdrop, and on it whatever the Scene before left that this one does not
@@ -51,7 +36,7 @@ const Stage = ({ scene, children }: { scene: SceneInput; children: ReactNode }) 
   const t = useSeconds();
   const { previous } = scene;
   const fromFacts = previous?.layout === 'Facts' && scene.layout !== 'Facts';
-  const leaving = previous && !carried(scene) ? rest(previous.layout, previous.product) : null;
+  const leaving = leftBehind(scene, rest);
   const gone = move(t, 0, fromFacts ? 0.4 : 0.45, IN);
   return (
     <AbsoluteFill style={{ background: 'white' }}>
@@ -83,7 +68,7 @@ const Hook = ({ scene }: { scene: SceneInput }) => {
   const firstWords = words(first.join(' ')).length;
 
   const to = rest('Hook', scene.product);
-  const from = carried(scene);
+  const from = carried(scene, rest);
   const pose = from
     ? between(from, to, move(t, 0, 0.7, INOUT))
     : {
@@ -122,7 +107,7 @@ const Reveal = ({ scene }: { scene: SceneInput }) => {
   const text = `${name}  ·  `.repeat(4);
 
   const to = rest('Reveal', scene.product);
-  const from = carried(scene) ?? { ...to, cy: HEIGHT + to.height };
+  const from = carried(scene, rest) ?? { ...to, cy: HEIGHT + to.height };
   const arrive = move(t, 0, 0.7, INOUT);
   // It arrives a little small and grows for the rest of the Scene.
   const pose = between(from, { ...to, height: to.height - 80 }, arrive);
@@ -148,7 +133,7 @@ const Facts = ({ scene }: { scene: SceneInput }) => {
   const each = (duration - 0.7) / Math.max(1, facts.length);
 
   const to = rest('Facts', scene.product);
-  const from = carried(scene);
+  const from = carried(scene, rest);
   const enter = from ? move(t, 0, 0.7, INOUT) : move(t, 0.15, 0.6);
   const pose = between(from ?? { ...to, cx: 1700, rot: 8 }, to, enter);
   for (let i = 1; i < facts.length; i++) {
@@ -185,7 +170,7 @@ const Closing = ({ scene }: { scene: SceneInput }) => {
   const { size, lines } = fit(name.toUpperCase(), 'Bold', { width: 900, height: 230, maxSize: 104, minSize: 40 });
 
   const to = rest('Closing', scene.product);
-  const from = carried(scene);
+  const from = carried(scene, rest);
   const enter = move(t, 0.15, 0.65);
   const pose = from
     ? between(from, to, move(t, 0, 0.7, INOUT))
@@ -245,4 +230,4 @@ const Closing = ({ scene }: { scene: SceneInput }) => {
   );
 };
 
-export const ProductShowcase: Record<Layout, (props: { scene: SceneInput }) => ReactNode> = { Hook, Reveal, Facts, Closing };
+export const ProductShowcase: Layouts = { Hook, Reveal, Facts, Closing };

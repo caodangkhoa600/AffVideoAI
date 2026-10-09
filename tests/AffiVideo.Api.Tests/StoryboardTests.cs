@@ -335,21 +335,134 @@ public sealed class StoryboardTests(AffiVideoApp app)
         Assert.Equal(0, (await ListAsync(member, variant)).Total);
     }
 
+    [Fact]
+    public async Task Luxury_Cinematic_plans_three_long_Scenes_with_little_text_and_its_own_wording()
+    {
+        using var member = await SignedInToNewOrganizationAsync();
+        var product = await NewProductAsync(member, "Lumo 500");
+        var front = await UploadPhotoAsync(member, product);
+        var side = await UploadPhotoAsync(member, product);
+        var battery = await ConfirmedFactAsync(member, product, "Pin dùng liên tục 30 giờ");
+        var noise = await ConfirmedFactAsync(member, product, "Chống ồn chủ động.");
+        await ConfirmedFactAsync(member, product, "Bluetooth 5.3");
+        var variant = await NewVariantAsync(member, product, creativeTemplate: CreativeTemplate.LuxuryCinematic);
+
+        var storyboard = await GeneratedAsync(member, variant);
+
+        Assert.Equal(CreativeTemplate.LuxuryCinematic, storyboard.CreativeTemplate);
+        Assert.Equal(CreativeTemplates.Find(CreativeTemplate.LuxuryCinematic)!.Version, storyboard.TemplateVersion);
+        Assert.Equal([SceneLayout.Hook, SceneLayout.Facts, SceneLayout.Closing], storyboard.Scenes.Select(scene => scene.Layout));
+        Assert.Equal([6000, 8000, 6000], storyboard.Scenes.Select(scene => scene.DurationMs));
+        Assert.Equal(
+            [Technique.ImageMotion, Technique.TextAnimation, Technique.ImageMotion], storyboard.Scenes.Select(scene => scene.Technique));
+        Assert.Equal([front.Id, side.Id, front.Id], storyboard.Scenes.Select(scene => Assert.Single(scene.AssetIds)));
+
+        var (hook, facts, closing) = (storyboard.Scenes[0], storyboard.Scenes[1], storyboard.Scenes[2]);
+        Assert.Equal([Hook], hook.OnScreenText);
+        Assert.Equal(Hook, hook.NarrationText);
+        // Two Facts at the most, however many are Confirmed.
+        Assert.Equal(["Pin dùng liên tục 30 giờ", "Chống ồn chủ động."], facts.OnScreenText);
+        Assert.Equal("Pin dùng liên tục 30 giờ. Chống ồn chủ động.", facts.NarrationText);
+        Assert.Equal([battery.Id, noise.Id], facts.Facts.Select(fact => fact.FactId));
+        Assert.Equal(["Lumo 500", "Khám phá ngay"], closing.OnScreenText);
+        Assert.Equal("Lumo 500. Khám phá ngay hôm nay.", closing.NarrationText);
+        Assert.DoesNotContain("Bluetooth 5.3", AllText(storyboard));
+    }
+
+    [Fact]
+    public async Task Problem_Solution_opens_with_the_problem_and_answers_it_with_the_Product_and_only_its_Confirmed_Facts()
+    {
+        using var member = await SignedInToNewOrganizationAsync();
+        const string problem = "Nước nguội sau một giờ?";
+        var product = await NewProductAsync(member, "Lumo 500");
+        var front = await UploadPhotoAsync(member, product);
+        var side = await UploadPhotoAsync(member, product);
+        var cold = await ConfirmedFactAsync(member, product, "Giữ lạnh suốt 24 giờ");
+        await FactTests.AddAsync(member, product, new FactRequest("Chống nước IPX7", "vi", null));
+        var steel = await ConfirmedFactAsync(member, product, "Thép không gỉ");
+        var variant = await NewVariantAsync(member, product, creativeTemplate: CreativeTemplate.ProblemSolution, hook: problem);
+
+        var storyboard = await GeneratedAsync(member, variant);
+
+        Assert.Equal(CreativeTemplate.ProblemSolution, storyboard.CreativeTemplate);
+        Assert.Equal(CreativeTemplates.Find(CreativeTemplate.ProblemSolution)!.Version, storyboard.TemplateVersion);
+        Assert.Equal(
+            [SceneLayout.Hook, SceneLayout.Solution, SceneLayout.Facts, SceneLayout.Closing], storyboard.Scenes.Select(scene => scene.Layout));
+        Assert.Equal([4000, 4000, 7000, 5000], storyboard.Scenes.Select(scene => scene.DurationMs));
+        // The problem is type alone: the Product is the answer, and comes with the solution.
+        Assert.Equal(
+            [Technique.TextAnimation, Technique.ImageMotion, Technique.TextAnimation, Technique.ImageMotion],
+            storyboard.Scenes.Select(scene => scene.Technique));
+        Assert.Equal([front.Id, front.Id, side.Id, front.Id], storyboard.Scenes.Select(scene => Assert.Single(scene.AssetIds)));
+
+        var (hook, solution, facts, closing) = (storyboard.Scenes[0], storyboard.Scenes[1], storyboard.Scenes[2], storyboard.Scenes[3]);
+        Assert.Equal([problem], hook.OnScreenText);
+        Assert.Equal(problem, hook.NarrationText);
+        Assert.Equal(["Giải pháp", "Lumo 500"], solution.OnScreenText);
+        Assert.Equal("Giải pháp: Lumo 500.", solution.NarrationText);
+        Assert.Equal(["Giữ lạnh suốt 24 giờ", "Thép không gỉ"], facts.OnScreenText);
+        Assert.Equal("Giữ lạnh suốt 24 giờ. Thép không gỉ.", facts.NarrationText);
+        Assert.Equal([cold.Id, steel.Id], facts.Facts.Select(fact => fact.FactId));
+        Assert.Equal(["Lumo 500", "Xem giải pháp ngay"], closing.OnScreenText);
+        Assert.Equal("Lumo 500. Xem giải pháp ngay hôm nay.", closing.NarrationText);
+        // Nothing but the Confirmed Facts says what the Product does.
+        Assert.All(storyboard.Scenes.Where(scene => scene.Layout != SceneLayout.Facts), scene => Assert.Empty(scene.Facts));
+        Assert.DoesNotContain("Chống nước IPX7", AllText(storyboard));
+    }
+
+    [Fact]
+    public async Task Three_Variants_of_one_Product_one_for_each_creative_template_are_planned_differently_from_the_same_Facts()
+    {
+        using var member = await SignedInToNewOrganizationAsync();
+        var product = await NewProductAsync(member);
+        await UploadPhotoAsync(member, product);
+        await ConfirmedFactAsync(member, product, "Pin dùng liên tục 30 giờ");
+        var project = await ProjectTests.CreateAsync(member, ProjectTests.Valid(product));
+
+        var storyboards = new List<StoryboardResponse>();
+        foreach (var template in Enum.GetValues<CreativeTemplate>())
+        {
+            storyboards.Add(await GeneratedAsync(member, await VariantTests.AddAsync(member, project.Id, new VariantRequest(template, Hook))));
+        }
+
+        Assert.Equal(Enum.GetValues<CreativeTemplate>(), storyboards.Select(storyboard => storyboard.CreativeTemplate));
+        Assert.All(storyboards, storyboard =>
+        {
+            Assert.Equal(CreativeTemplates.Find(storyboard.CreativeTemplate)!.Version, storyboard.TemplateVersion);
+            Assert.Equal(20_000, storyboard.Scenes.Sum(scene => scene.DurationMs));
+            // Each Scene has a layout of its own, the Hook opens, and every one says the same Fact.
+            Assert.Equal(storyboard.Scenes.Count, storyboard.Scenes.Select(scene => scene.Layout).Distinct().Count());
+            Assert.Equal([Hook], storyboard.Scenes[0].OnScreenText);
+            Assert.Equal(["Pin dùng liên tục 30 giờ"], storyboard.Scenes.Single(scene => scene.Layout == SceneLayout.Facts).OnScreenText);
+        });
+        // No two share a Scene structure or the words they close on.
+        Assert.Equal(3, storyboards.Select(storyboard => string.Join(",", storyboard.Scenes.Select(scene => (scene.Layout, scene.DurationMs)))).Distinct().Count());
+        Assert.Equal(3, storyboards.Select(storyboard => storyboard.Scenes[^1].NarrationText).Distinct().Count());
+    }
+
     [Theory]
     [InlineData(CreativeTemplate.LuxuryCinematic)]
     [InlineData(CreativeTemplate.ProblemSolution)]
-    public async Task Generation_fails_with_the_reason_for_a_creative_template_that_cannot_be_planned_yet(CreativeTemplate creativeTemplate)
+    public async Task A_Scene_of_either_creative_template_is_edited_and_regenerated_within_its_own_layouts(CreativeTemplate creativeTemplate)
     {
         using var member = await SignedInToNewOrganizationAsync();
         var product = await NewProductAsync(member);
         await UploadPhotoAsync(member, product);
         await ConfirmedFactAsync(member, product, "Pin dùng liên tục 30 giờ");
         var variant = await NewVariantAsync(member, product, creativeTemplate: creativeTemplate);
+        var first = await GeneratedAsync(member, variant);
+        var last = first.Scenes.Count;
 
-        var response = await GenerateAsync(member, variant);
+        var edited = await StoryboardEditTests.EditedAsync(
+            member, variant, first.Version, StoryboardEditTests.Changing(first, new SceneEditRequest(last, OnScreenText: ["Lumo", "Mua ngay"])));
+        var regenerated = await member.PostAsync($"{Storyboards(variant)}/{edited.Version}/scenes/{last}/regenerate", new { });
 
-        Assert.Contains("Only Product Showcase", await ReasonAsync(response));
-        Assert.Equal(0, (await ListAsync(member, variant)).Total);
+        Assert.Equal(["Lumo", "Mua ngay"], edited.Scenes[^1].OnScreenText);
+        Assert.Equal(HttpStatusCode.Created, regenerated.StatusCode);
+        var third = await ReadAsync<StoryboardResponse>(regenerated);
+        Assert.Equal((creativeTemplate, first.TemplateVersion), (third.CreativeTemplate, third.TemplateVersion));
+        Assert.Equal(first.Scenes[^1].OnScreenText, third.Scenes[^1].OnScreenText);
+        Assert.False(third.Scenes[^1].ManuallyEdited);
     }
 
     [Fact]

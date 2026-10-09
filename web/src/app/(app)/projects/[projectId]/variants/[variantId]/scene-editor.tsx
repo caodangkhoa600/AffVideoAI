@@ -14,6 +14,7 @@ const LINES: Record<SceneLayout, { labels: string[]; most: number }> = {
   Reveal: { labels: ["Name"], most: 1 },
   Facts: { labels: [], most: 3 },
   Closing: { labels: ["Name", "Call to action"], most: 2 },
+  Solution: { labels: ["Label", "Name"], most: 2 },
 };
 
 /** A Scene as it is being edited. `position` stays the Scene's place in the version being edited. */

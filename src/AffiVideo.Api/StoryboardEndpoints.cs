@@ -31,7 +31,7 @@ internal static class StoryboardEndpoints
             .WithSummary(
                 "Plans the Variant's next Storyboard version in Product Lock from the Product's Confirmed Facts and photos, " +
                 "with the mock planner and no AI. Answers 409 with the reason when it cannot: no Confirmed Fact, no usable photo, " +
-                "a creative template other than Product Showcase, or a Hook, Fact or Product name too long for its layout.");
+                "or a Hook, Fact or Product name too long for its layout in the Variant's creative template.");
 
         group.MapGet("/{version:int}", async Task<Results<Ok<StoryboardResponse>, NotFound>> (
                 Guid projectId, Guid variantId, int version, IStoryboards storyboards, CancellationToken cancellationToken) =>

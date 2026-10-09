@@ -5,7 +5,7 @@ import { cancelRender, continueRender, delayRender, staticFile } from 'remotion'
 // in the worker image, so a render needs no network.
 export const FAMILY = 'Be Vietnam Pro';
 
-export const WEIGHTS = { SemiBold: 600, Bold: 700, ExtraBold: 800 } as const;
+export const WEIGHTS = { Light: 300, SemiBold: 600, Bold: 700, ExtraBold: 800 } as const;
 
 export type Weight = keyof typeof WEIGHTS;
 

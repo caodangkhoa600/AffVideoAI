@@ -289,7 +289,7 @@ public static class StoryboardRules
         var (fewest, most) = scene.Layout switch
         {
             SceneLayout.Facts => (1, template.MaxFacts),
-            SceneLayout.Closing => (2, 2),
+            SceneLayout.Closing or SceneLayout.Solution => (2, 2),
             _ => (1, 1),
         };
         if (lines.Length < fewest || lines.Length > most)
@@ -310,6 +310,12 @@ public static class StoryboardRules
                 [
                     .. Exceeded(template.NameLimit, $"{name}'s name", lines[0]),
                     .. Exceeded(template.CallToActionLimit, $"{name}'s call to action", lines[1]),
+                ];
+            case SceneLayout.Solution:
+                return
+                [
+                    .. template.LabelLimit is { } label ? Exceeded(label, $"{name}'s label", lines[0]) : [],
+                    .. Exceeded(template.NameLimit, $"{name}'s name", lines[1]),
                 ];
             default:
                 var problems = lines.SelectMany((line, index) => Exceeded(template.FactLimit, $"{name}'s line {index + 1}", line)).ToList();
@@ -337,9 +343,9 @@ public static class StoryboardRules
     /// <param name="assets">Those of the assets the Scenes show that the Product still has.</param>
     public static IReadOnlyList<string> RenderProblems(Storyboard storyboard, IReadOnlyCollection<ProductAsset> assets)
     {
-        if (storyboard.CreativeTemplate != CreativeTemplate.ProductShowcase || storyboard.RenderMode != RenderMode.ProductLock)
+        if (CreativeTemplates.Find(storyboard.CreativeTemplate) is not { } template || storyboard.RenderMode != RenderMode.ProductLock)
         {
-            return ["Only a Product Showcase Storyboard in Product Lock can be rendered so far."];
+            return ["Only a Storyboard in Product Lock can be rendered so far."];
         }
         if (storyboard.Scenes.Count == 0) return ["The Storyboard has no Scenes."];
 
@@ -355,6 +361,10 @@ public static class StoryboardRules
             if (!storyboard.RenderMode.Allows(scene.Technique))
             {
                 problems.Add($"{name} is planned as {scene.Technique}, which {storyboard.RenderMode} does not allow.");
+            }
+            if (template.Scenes.All(slot => slot.Layout != scene.Layout))
+            {
+                problems.Add($"{name} has the {scene.Layout} layout, which its creative template does not draw.");
             }
 
             if (scene.AssetIds.Length != 1)

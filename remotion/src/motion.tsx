@@ -4,7 +4,7 @@
 
 import type { CSSProperties } from 'react';
 import { Easing, Img, interpolate, staticFile, useCurrentFrame, useVideoConfig } from 'remotion';
-import type { Layer } from './scene';
+import type { Layer, Layout, SceneInput } from './scene';
 import { FAMILY, WEIGHTS, type Weight } from './typeface';
 
 export const OUT = Easing.out(Easing.cubic);
@@ -20,6 +20,12 @@ export const mix = (from: number, to: number, p: number) => from + (to - from) *
 
 /** Seconds since the Scene began. */
 export const useSeconds = () => useCurrentFrame() / useVideoConfig().fps;
+
+/** How long the Scene lasts, in seconds. */
+export const useDuration = () => {
+  const { durationInFrames, fps } = useVideoConfig();
+  return durationInFrames / fps;
+};
 
 let canvas: CanvasRenderingContext2D | null = null;
 const measure = (text: string, weight: Weight, size: number) => {
@@ -66,6 +72,27 @@ export const between = (from: Pose, to: Pose, p: number): Pose => ({
   height: mix(from.height, to.height, p),
   rot: mix(from.rot, to.rot, p),
 });
+
+// A Product wider than this share of its height is shown less tall, so that it stays inside the frame.
+const MAX_ASPECT = 0.86;
+
+/** The height given, or less for a Product too wide to be shown that tall inside the frame. */
+export const narrowed = (layer: Layer, height: number) =>
+  Math.round(height * Math.min(1, (MAX_ASPECT * layer.productHeight) / layer.productWidth));
+
+/** Where a template's layout leaves the Product at the end of its Scene. Null when it leaves none on screen. */
+export type Rest = (layout: Layout, layer: Layer) => Pose | null;
+
+/**
+ * The pose this Scene's Product starts from when it is the photo the Scene before
+ * was showing: the same image carries on. Null when the Product has to come in.
+ */
+export const carried = ({ previous, product }: SceneInput, rest: Rest) =>
+  previous && previous.product.file === product.file ? rest(previous.layout, previous.product) : null;
+
+/** Where the Scene before left a photo that this Scene does not show, and which has to leave. Null when there is none. */
+export const leftBehind = ({ previous, product }: SceneInput, rest: Rest) =>
+  previous && previous.product.file !== product.file ? rest(previous.layout, previous.product) : null;
 
 export const Product = ({ layer, pose, opacity }: { layer: Layer; pose: Pose; opacity?: number }) => (
   <Img

@@ -26,8 +26,7 @@ internal sealed class ScopedStoryboards(
 
         if (CreativeTemplates.Find(variant.CreativeTemplate) is not { } template)
         {
-            return StoryboardGeneration.Refuse(
-                "Only Product Showcase can be planned so far. Add a Variant with that creative template to generate a Storyboard.");
+            return StoryboardGeneration.Refuse("This Variant's creative template cannot be planned.");
         }
 
         var material = await MaterialAsync(project, cancellationToken);

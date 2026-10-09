@@ -202,11 +202,12 @@ walking skeleton (ticket 02), sign in and Organizations (ticket 03),
 Products (ticket 04), Product assets (ticket 05), Facts (ticket 06),
 Projects and Variants (ticket 07), Storyboard generation (ticket 08),
 render and preview (ticket 09), job reliability (ticket 10), approve,
-download and the library (ticket 11), Storyboard editing (ticket 12) and
-flagging work built on Withdrawn Facts (ticket 13).
+download and the library (ticket 11), Storyboard editing (ticket 12),
+flagging work built on Withdrawn Facts (ticket 13) and the Luxury Cinematic
+and Problem–Solution templates (ticket 14).
 
-Next: the Luxury and Problem/Solution templates (ticket 14) and the Affiliate
-Lab and Campaigns (ticket 18).
+Next: uploaded narration and music (ticket 15) and the Affiliate Lab and
+Campaigns (ticket 18).
 
 Notes from the walking skeleton:
 
@@ -294,10 +295,11 @@ Notes from Storyboard generation:
   planner. It is the only implementation of `ILanguageModel`; the video
   generation, text-to-speech and image-processing interfaces beside it in
   `AffiVideo.Application/Providers` have none.
-- Only Product Showcase can be planned. Its four Scenes (Hook, Reveal, Facts,
-  Closing) share the target duration as 3 : 5 : 7 : 5, in tenths of a second,
-  and always sum to it exactly. The definition is `CreativeTemplates` in the
-  domain, and its version is recorded on each Storyboard.
+- Product Showcase has four Scenes (Hook, Reveal, Facts, Closing) that share
+  the target duration as 3 : 5 : 7 : 5, in tenths of a second, and always sum
+  to it exactly. The definition is `CreativeTemplates` in the domain, and its
+  version is recorded on each Storyboard. The other two creative templates are
+  described under their own notes below.
 - A Storyboard uses the oldest Confirmed Facts in the Project's language: up
   to three, and fewer when three could not each be read in the time a shorter
   video gives them (three Facts of twelve words fit 20 seconds, two fit 15).
@@ -308,11 +310,11 @@ Notes from Storyboard generation:
   assigns only static image, image motion and text animation. Hybrid exists as
   a value and chooses nothing else until there is a provider to generate with.
 - When a Storyboard cannot be planned the answer is 409 with the reason: no
-  Confirmed Fact in the language, no usable photo, another creative template,
-  a Fact with too many words to be read even alone, or a Hook, Fact or Product
-  name too long for its layout. A Hook holds at most
-  13 words (more would not all be on screen within two seconds) and 60
-  characters; a Fact 120 characters.
+  Confirmed Fact in the language, no usable photo, a Fact with too many words
+  to be read even alone, or a Hook, Fact or Product name too long for its
+  layout. In Product Showcase a Hook holds at most 13 words (more would not
+  all be on screen within two seconds) and 60 characters; a Fact 120
+  characters.
 - Deleting a Project deletes its Variants' Storyboards with them.
 
 Notes from render and preview:
@@ -341,10 +343,10 @@ Notes from render and preview:
   on from there) and FFmpeg joins the clips without encoding the video again,
   under a silent AAC track. Both are started with a list of arguments and no
   shell. No text a member typed reaches FFmpeg at all.
-- The look is the Product Showcase creative template in
-  `remotion/src/ProductShowcase.tsx`. The image build type-checks and bundles
-  it; a job renders from its own copy of the bundle in a folder under
-  `/tmp/affivideo-render`, which is deleted when the job ends.
+- The look of each creative template is a file of Remotion components in
+  `remotion/src`, such as `ProductShowcase.tsx`. The image build type-checks
+  and bundles them; a job renders from its own copy of the bundle in a folder
+  under `/tmp/affivideo-render`, which is deleted when the job ends.
 - The finished file is checked with ffprobe before it is kept: 1080 by 1920,
   H.264 tagged BT.709, AAC, MP4, and as long as its Scenes.
 - A Rendered Video is stored at
@@ -416,6 +418,41 @@ Notes from approve, download and the library:
   the worker held over 13 GB while a photo was cut, and Docker's virtual
   machine killed it; it now peaks near 5 GB. Give Docker at least 8 GB.
 
+Notes from the Luxury Cinematic and Problem–Solution templates:
+
+- All three creative templates can be planned and rendered. Each is a
+  definition in `CreativeTemplates` in the domain (its Scenes, their shares of
+  the duration, how many Facts it shows and how much text each layout holds),
+  the sentence patterns the mock planner fills for it, and a file of Remotion
+  components named after it in `remotion/src`.
+- Luxury Cinematic is three long Scenes, Hook, Facts and Closing, as
+  6 : 8 : 6. The Hook is set small under the Product, which is lit out of the
+  dark; one or two Facts of at most 90 characters fade in under the Product
+  seen close; the closing sets it on a pale plinth over its name. Nothing
+  arrives faster than a fade. The Hook's words fade in closer together the
+  more of them there are, so it is whole before two seconds whatever its
+  length, and has no limit on its number of words.
+- Problem–Solution is four Scenes, Hook, Solution, Facts and Closing, as
+  4 : 4 : 7 : 5. The Hook is the customer's problem, alone in capitals on a
+  dark frame: its Technique is text animation, and the Product is not seen
+  until the solution. The Solution Scene is a layout only this template has,
+  with two lines: a label (`Giải pháp`, at most 20 characters) and the
+  Product's name. Up to three Facts of at most 100 characters are ticked off
+  one under another and stay.
+- What says something about the Product is only ever a Confirmed Fact placed
+  whole. The patterns around the Facts differ by template (the label, and the
+  call to action each closes on) and say nothing about the Product.
+- A creative template's version (`Version` in its definition) is recorded on
+  each Storyboard as `templateVersion` and kept by every version edited or
+  regenerated from it. All three are at version 1. The components are not
+  kept by version: a Storyboard is drawn with the components the worker has.
+- A Scene's layout has to be one its creative template draws, or the render
+  fails while validating, with the reason.
+- The Light weight of Be Vietnam Pro is bundled beside the others, for Luxury
+  Cinematic.
+- In a Product whose colour is grey, Luxury Cinematic's dark and coloured
+  grounds are close to one another; the layouts still differ.
+
 Notes from flagging work built on Withdrawn Facts:
 
 - A Storyboard version is Flagged for Review while a Scene of it lists a Fact
@@ -466,7 +503,7 @@ Notes from Storyboard editing:
   the target duration; a photo the Product does not have, or an image that is
   the logo or under 400 pixels a side; a Scene that still rests on a Fact which
   is no longer Confirmed; the Hook's Scene anywhere but first; a Scene shorter
-  than its layout needs (2 seconds, 2.5 for the closing); more or fewer lines
+  than its layout needs (2 seconds, 2.5 for the closing, in Product Showcase); more or fewer lines
   than the layout sets (one, two for the closing, one to three Facts); a line
   too long for its layout; Facts given too little time to be read; narration
   over 500 characters; or an edit that changes nothing. The limits are

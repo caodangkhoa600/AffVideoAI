@@ -8,10 +8,11 @@ namespace AffiVideo.Domain;
 /// layout looks is the Remotion component of the same name (ADR 0002).
 /// </summary>
 /// <param name="Version">Goes up whenever the Scenes, shares or limits change, and is recorded on each Storyboard.</param>
-/// <param name="MaxFacts">The most Facts the template shows, one at a time.</param>
+/// <param name="MaxFacts">The most Facts the template shows, one after another.</param>
 /// <param name="FactPacing">How the Facts layout spends its Scene's time.</param>
 /// <param name="NameLimit">The limit on the Product's name, which the template sets in type.</param>
 /// <param name="CallToActionLimit">The limit on the call to action, which is set on one line.</param>
+/// <param name="LabelLimit">The limit on the label of a Solution Scene, which is set on one line. Null for a template with no such Scene.</param>
 public sealed record CreativeTemplateDefinition(
     CreativeTemplate Template,
     int Version,
@@ -21,7 +22,8 @@ public sealed record CreativeTemplateDefinition(
     TextLimit HookLimit,
     TextLimit FactLimit,
     TextLimit NameLimit,
-    TextLimit CallToActionLimit)
+    TextLimit CallToActionLimit,
+    TextLimit? LabelLimit = null)
 {
     /// <summary>The duration of each Scene in milliseconds, in order, summing exactly to the target.</summary>
     public IReadOnlyList<int> SceneDurations(int targetDurationSeconds) =>
@@ -68,7 +70,7 @@ public sealed record CreativeTemplateDefinition(
 
 /// <summary>How the Facts layout spends its Scene's time, in milliseconds.</summary>
 /// <param name="LeadInMs">Before the first Fact, while the layout arrives.</param>
-/// <param name="AroundEachFactMs">Of each Fact's time, what is not spent on words arriving: the first word settling, the hold once all are in, and the fade out.</param>
+/// <param name="AroundEachFactMs">Of each Fact's time, what is not spent on words arriving: the first word settling, the hold once all are in, and the fade out where the Fact leaves.</param>
 /// <param name="WordStepMs">Between one word starting to arrive and the next.</param>
 public sealed record FactPacing(int LeadInMs, int AroundEachFactMs, int WordStepMs);
 
@@ -97,11 +99,14 @@ public enum SceneLayout
     /// <summary>The Product large, with its name. One line: the Product's name.</summary>
     Reveal,
 
-    /// <summary>Facts shown one at a time beside the Product. One line for each Fact.</summary>
+    /// <summary>Facts shown in turn beside the Product. One line for each Fact.</summary>
     Facts,
 
     /// <summary>The Product, its name and the call to action. Two lines: the name, then the call to action.</summary>
     Closing,
+
+    /// <summary>The Product arriving as the answer to the problem the Hook stated. Two lines: a label, then the Product's name.</summary>
+    Solution,
 }
 
 public enum ScenePhoto
@@ -180,7 +185,71 @@ public static class CreativeTemplates
         // One line in a pill, in type that is not made smaller to fit.
         CallToActionLimit: new TextLimit(MaxCharacters: 30, MaxWordCharacters: 24));
 
-    /// <summary>Null for a creative template that cannot be planned yet.</summary>
-    public static CreativeTemplateDefinition? Find(CreativeTemplate template) =>
-        template == CreativeTemplate.ProductShowcase ? ProductShowcase : null;
+    /// <summary>
+    /// Three long Scenes and little text: the Hook under the Product, one or two
+    /// Facts under it seen close, and the closing, as 6, 8 and 6 seconds of a
+    /// 20-second video. Nothing arrives faster than a fade.
+    /// </summary>
+    private static readonly CreativeTemplateDefinition LuxuryCinematic = new(
+        CreativeTemplate.LuxuryCinematic,
+        Version: 1,
+        Scenes:
+        [
+            // The shortest each can be made: the Hook's last word has faded in by 1.9 seconds whatever
+            // its length, and the longest name and call to action by about 2.7, each to be read for a moment after.
+            new SceneSlot(SceneLayout.Hook, Share: 6, [Technique.ImageMotion, Technique.StaticImage], MinDurationMs: 2500),
+            new SceneSlot(SceneLayout.Facts, Share: 8, [Technique.TextAnimation], MinDurationMs: 2000, ScenePhoto.Last),
+            new SceneSlot(SceneLayout.Closing, Share: 6, [Technique.ImageMotion, Technique.StaticImage], MinDurationMs: 3000),
+        ],
+        MaxFacts: 2,
+        // The Scene takes 0.8 seconds to settle. Within a Fact's time its first word takes 0.8 seconds
+        // to fade in, each further word follows 0.15 seconds later, and the Fact fades over its last
+        // 0.3 seconds. 0.4 seconds is the least it is held complete before that.
+        FactPacing: new FactPacing(LeadInMs: 800, AroundEachFactMs: 800 + 400 + 300, WordStepMs: 150),
+        // The Hook's words fade in closer together the more of them there are, so there is no limit on their number.
+        HookLimit: new TextLimit(MaxCharacters: 60, MaxWordCharacters: 16),
+        FactLimit: new TextLimit(MaxCharacters: 90, MaxWordCharacters: 20),
+        NameLimit: new TextLimit(MaxCharacters: 60, MaxWordCharacters: 20),
+        // One line of widely spaced capitals over a rule.
+        CallToActionLimit: new TextLimit(MaxCharacters: 30, MaxWordCharacters: 24));
+
+    /// <summary>
+    /// The Hook is a customer's problem, alone on the screen. The Product arrives
+    /// as its solution, the Facts are ticked off one under another, and the
+    /// closing asks for the click: 4, 4, 7 and 5 seconds of a 20-second video.
+    /// </summary>
+    private static readonly CreativeTemplateDefinition ProblemSolution = new(
+        CreativeTemplate.ProblemSolution,
+        Version: 1,
+        Scenes:
+        [
+            // The problem is type alone, timed as Product Showcase's Hook is: the thirteenth word is in
+            // place at 1.92 seconds. It fades over the Scene's last 0.2 seconds, so the Scene is longer than
+            // that by enough to read it. The solution's name is in by about 1.5, and the call to action at 1.85.
+            new SceneSlot(SceneLayout.Hook, Share: 4, [Technique.TextAnimation], MinDurationMs: 2500),
+            new SceneSlot(SceneLayout.Solution, Share: 4, [Technique.ImageMotion, Technique.StaticImage], MinDurationMs: 2000),
+            new SceneSlot(SceneLayout.Facts, Share: 7, [Technique.TextAnimation], MinDurationMs: 2000, ScenePhoto.Last),
+            new SceneSlot(SceneLayout.Closing, Share: 5, [Technique.ImageMotion, Technique.StaticImage], MinDurationMs: 2500),
+        ],
+        MaxFacts: 3,
+        // The list takes 0.6 seconds to arrive. Within a Fact's time its first word starts 0.1 seconds
+        // in and takes 0.4 to settle, and each further word follows 0.06 seconds later. A Fact stays once
+        // it is ticked; half a second is the least it is held complete before the next is.
+        FactPacing: new FactPacing(LeadInMs: 600, AroundEachFactMs: 100 + 400 + 500, WordStepMs: 60),
+        HookLimit: new TextLimit(MaxCharacters: 60, MaxWordCharacters: 12, MaxWords: 13),
+        // Three share the list, so each holds less than Product Showcase's.
+        FactLimit: new TextLimit(MaxCharacters: 100, MaxWordCharacters: 20),
+        NameLimit: new TextLimit(MaxCharacters: 60, MaxWordCharacters: 24),
+        CallToActionLimit: new TextLimit(MaxCharacters: 30, MaxWordCharacters: 24),
+        // One line on a tag, in type that is not made smaller to fit.
+        LabelLimit: new TextLimit(MaxCharacters: 20, MaxWordCharacters: 20));
+
+    /// <summary>Null for a value that is not a creative template.</summary>
+    public static CreativeTemplateDefinition? Find(CreativeTemplate template) => template switch
+    {
+        CreativeTemplate.LuxuryCinematic => LuxuryCinematic,
+        CreativeTemplate.ProductShowcase => ProductShowcase,
+        CreativeTemplate.ProblemSolution => ProblemSolution,
+        _ => null,
+    };
 }
