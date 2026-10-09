@@ -587,6 +587,192 @@
           }
         }
       }
+    },
+    "/api/v1/products/{productId}/assets": {
+      "get": {
+        "tags": [
+          "Product assets"
+        ],
+        "summary": "The Product's photos and logo, oldest first.",
+        "operationId": "ListProductAssets",
+        "parameters": [
+          {
+            "name": "productId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProductAssetResponse"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Product assets"
+        ],
+        "summary": "Adds a photo, or sets the logo, from a JPEG, PNG or WebP file. The file is decoded and kept as a PNG; a new logo takes the place of the old one.",
+        "operationId": "UploadProductAsset",
+        "parameters": [
+          {
+            "name": "productId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "required": [
+                  "kind"
+                ],
+                "type": "object",
+                "allOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "$ref": "#/components/schemas/ProductAssetKind"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "file": {
+                        "$ref": "#/components/schemas/IFormFile"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductAssetResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/products/{productId}/assets/{assetId}/content": {
+      "get": {
+        "tags": [
+          "Product assets"
+        ],
+        "summary": "The image, as a PNG.",
+        "operationId": "GetProductAssetContent",
+        "parameters": [
+          {
+            "name": "productId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "404": {
+            "description": "Not Found"
+          },
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v1/products/{productId}/assets/{assetId}": {
+      "delete": {
+        "tags": [
+          "Product assets"
+        ],
+        "summary": "Removes a photo or the logo, and its file.",
+        "operationId": "RemoveProductAsset",
+        "parameters": [
+          {
+            "name": "productId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -716,6 +902,10 @@
           }
         }
       },
+      "IFormFile": {
+        "type": "string",
+        "format": "binary"
+      },
       "MemberResponse": {
         "required": [
           "id",
@@ -842,6 +1032,53 @@
           "total": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "ProductAssetKind": {
+        "enum": [
+          "Photo",
+          "Logo"
+        ]
+      },
+      "ProductAssetResponse": {
+        "required": [
+          "id",
+          "productId",
+          "kind",
+          "width",
+          "height",
+          "sizeInBytes",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "productId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ProductAssetKind"
+          },
+          "width": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "height": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sizeInBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -1059,6 +1296,9 @@
     },
     {
       "name": "Products"
+    },
+    {
+      "name": "Product assets"
     }
   ]
 }

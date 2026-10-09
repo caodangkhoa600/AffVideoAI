@@ -1,6 +1,7 @@
 using AffiVideo.Application;
 using AffiVideo.Application.Organizations;
 using AffiVideo.Application.Products;
+using AffiVideo.Application.Storage;
 using AffiVideo.Application.SystemStatus;
 using AffiVideo.Infrastructure.Identity;
 using AffiVideo.Infrastructure.Organizations;
@@ -24,6 +25,7 @@ public static class InfrastructureSetup
             options.UseNpgsql(configuration.GetConnectionString("Database")));
         services.Configure<StorageOptions>(configuration.GetSection(StorageOptions.Section));
         services.AddSingleton<S3ObjectStorage>();
+        services.AddSingleton<IObjectStorage>(provider => provider.GetRequiredService<S3ObjectStorage>());
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<ISystemStatusReader, SystemStatusReader>();
 
@@ -45,6 +47,7 @@ public static class InfrastructureSetup
         services.AddScoped<IOrganizations, ScopedOrganizations>();
         services.AddScoped<IOrganizationProvisioner, OrganizationProvisioner>();
         services.AddScoped<IProducts, ScopedProducts>();
+        services.AddScoped<IProductAssets, ScopedProductAssets>();
         services.AddScoped<DemonstrationSeed>();
         return services;
     }

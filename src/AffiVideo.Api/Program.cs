@@ -68,6 +68,7 @@ v1.MapStatus();
 v1.MapSession();
 v1.MapOrganizations();
 v1.MapProducts();
+v1.MapProductAssets();
 
 app.Run();
 

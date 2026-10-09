@@ -180,10 +180,10 @@ it is a deliberate act that includes re-reading the licence (ADR 0002).
 
 Done: the look prototypes (tickets 01, 25, 26, in `prototypes/`), the affiliate
 experiment plan (ticket 24, `docs/business/affiliate-experiment.md`), the
-walking skeleton (ticket 02), sign in and Organizations (ticket 03) and
-Products (ticket 04).
+walking skeleton (ticket 02), sign in and Organizations (ticket 03),
+Products (ticket 04) and Product assets (ticket 05).
 
-Next: Product assets (ticket 05) and Facts (ticket 06).
+Next: Facts (ticket 06).
 
 Notes from the walking skeleton:
 
@@ -212,3 +212,18 @@ Notes from Products:
   brings one back yet.
 - A 400 names each field as the request does (`originalUrl`), and the web
   app shows the message next to that field.
+
+Notes from Product assets:
+
+- An upload is a JPEG, PNG or WebP of at most 20 MB and 6000 pixels on each
+  side. It is judged by decoding it; its name and declared type are ignored.
+- What is stored is a PNG of the decoded pixels, turned upright, in the
+  photo's own colour space. Nothing else of the file is kept, so where and
+  with what a photo was taken is left behind.
+- A file's key in object storage starts with `organizations/{id}/`. The
+  bucket is private and the API never hands out a storage address: a file is
+  read at `GET /api/v1/products/{productId}/assets/{assetId}/content`, which
+  authorises every request.
+- A Product has at most 30 photos and one logo. A new logo replaces the old.
+- Images are decoded with SkiaSharp (MIT licence), whose native library ships
+  in the NuGet package for both Windows and the Linux containers.

@@ -38,6 +38,10 @@ _Avoid_: Item, listing, SKU
 The state of a Product that is out of the way of day-to-day work. It is kept, with everything made from it.
 _Avoid_: Deleted, inactive, hidden
 
+**Asset**:
+A photo or the logo of a Product, kept as the image a member's upload decodes to. A Product has several photos and at most one logo.
+_Avoid_: Media, attachment
+
 **Fact**:
 A single statement about a Product, written in one language, that a script may use only once it is Confirmed.
 _Avoid_: Claim, feature, verified fact

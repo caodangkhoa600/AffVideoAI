@@ -49,6 +49,21 @@ public sealed record ProductResponse(
     DateTimeOffset UpdatedAt);
 
 /// <summary>
+/// A photo or the logo of a Product. The image itself is at
+/// <c>/api/v1/products/{productId}/assets/{id}/content</c>, always as a PNG.
+/// </summary>
+/// <param name="Width">In pixels, as stored: a photo taken sideways has been turned upright.</param>
+/// <param name="SizeInBytes">Of the stored PNG, not of the file that was sent.</param>
+public sealed record ProductAssetResponse(
+    Guid Id,
+    Guid ProductId,
+    ProductAssetKind Kind,
+    int Width,
+    int Height,
+    long SizeInBytes,
+    DateTimeOffset CreatedAt);
+
+/// <summary>
 /// An absolute http or https address. It is only checked for shape, never requested.
 /// A blank one is no address at all, which is for [Required] to refuse.
 /// </summary>

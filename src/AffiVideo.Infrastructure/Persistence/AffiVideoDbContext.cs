@@ -27,6 +27,8 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
 
     public DbSet<Product> Products => Set<Product>();
 
+    public DbSet<ProductAsset> ProductAssets => Set<ProductAsset>();
+
     /// <summary>The keys that protect session cookies and anti-forgery tokens, kept here so sessions outlive a restart of the API.</summary>
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
@@ -77,6 +79,19 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
             product.Property(p => p.TargetAudience).HasMaxLength(Product.TargetAudienceMaxLength);
             product.Property(p => p.Status).HasConversion<string>().HasMaxLength(20);
             product.HasIndex(p => new { p.OrganizationId, p.Name });
+        });
+
+        builder.Entity<ProductAsset>(asset =>
+        {
+            asset.HasOne<Organization>().WithMany().HasForeignKey(a => a.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            asset.HasOne<Product>().WithMany().HasForeignKey(a => a.ProductId).OnDelete(DeleteBehavior.Restrict);
+            asset.Property(a => a.Kind).HasConversion<string>().HasMaxLength(20);
+            asset.Ignore(a => a.StorageKey);
+            asset.HasIndex(a => new { a.ProductId, a.CreatedAt });
+            // A Product has at most one logo, even when two are uploaded at the same moment.
+            asset.HasIndex(a => a.ProductId, "IX_ProductAssets_OneLogoPerProduct")
+                .IsUnique()
+                .HasFilter($"\"{nameof(ProductAsset.Kind)}\" = '{nameof(ProductAssetKind.Logo)}'");
         });
 
         var filter = typeof(AffiVideoDbContext).GetMethod(nameof(FilterToCallerOrganization), BindingFlags.NonPublic | BindingFlags.Instance)!;

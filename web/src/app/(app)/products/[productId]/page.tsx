@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { api, type Product } from "@/lib/api/client";
+import { ProductAssets } from "./product-assets";
 import { ProductMissing } from "./product-missing";
 import { useProduct } from "../use-product";
 
@@ -72,6 +73,7 @@ function ProductDetails({ product }: { product: Product }) {
           {product.tags.length > 0 ? product.tags.join(", ") : <span className="text-muted-foreground">None</span>}
         </Detail>
       </dl>
+      <ProductAssets productId={product.id} />
     </>
   );
 }

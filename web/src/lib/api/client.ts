@@ -10,6 +10,8 @@ export type Member = components["schemas"]["MemberResponse"];
 export type Product = components["schemas"]["ProductResponse"];
 export type ProductRequest = components["schemas"]["ProductRequest"];
 export type ProductStatus = components["schemas"]["ProductStatus"];
+export type ProductAsset = components["schemas"]["ProductAssetResponse"];
+export type ProductAssetKind = components["schemas"]["ProductAssetKind"];
 
 const CHANGES_STATE = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 

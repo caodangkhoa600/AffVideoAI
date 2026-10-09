@@ -91,6 +91,36 @@ public sealed class OrganizationIsolationTests(AffiVideoApp app)
     }
 
     [Fact]
+    public async Task A_member_of_one_Organization_is_refused_the_assets_and_files_of_a_Product_of_another()
+    {
+        var theirs = await app.CreateOrganizationAsync();
+        var mine = await app.CreateOrganizationAsync();
+        using var me = await app.SignedInAsync(mine.Owner);
+        using var them = await app.SignedInAsync(theirs.Owner);
+        var image = ProductAssetTests.Image(SkiaSharp.SKEncodedImageFormat.Png, 8, 8);
+        var theirProduct = (await ProductTests.CreateAsync(them, ProductTests.Valid(name: "Theirs"))).Id;
+        var theirAsset = await ProductAssetTests.UploadedAsync(them, theirProduct, Domain.ProductAssetKind.Photo, image);
+        var myProduct = (await ProductTests.CreateAsync(me, ProductTests.Valid(name: "Mine"))).Id;
+
+        var list = await me.GetAsync(ProductAssetTests.Assets(theirProduct));
+        var file = await me.GetAsync(ProductAssetTests.Content(theirProduct, theirAsset.Id));
+        var fileUnderMyProduct = await me.GetAsync(ProductAssetTests.Content(myProduct, theirAsset.Id));
+        var upload = await ProductAssetTests.UploadAsync(me, theirProduct, Domain.ProductAssetKind.Photo, image);
+        var remove = await me.DeleteAsync($"{ProductAssetTests.Assets(theirProduct)}/{theirAsset.Id}");
+        var removeUnderMyProduct = await me.DeleteAsync($"{ProductAssetTests.Assets(myProduct)}/{theirAsset.Id}");
+
+        Assert.Equal(HttpStatusCode.NotFound, list.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, file.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, fileUnderMyProduct.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, upload.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, remove.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, removeUnderMyProduct.StatusCode);
+        Assert.Equal([theirAsset.Id], (await them.GetAsync<ProductAssetResponse[]>(ProductAssetTests.Assets(theirProduct))).Select(a => a.Id));
+        Assert.Equal(HttpStatusCode.OK, (await them.GetAsync(ProductAssetTests.Content(theirProduct, theirAsset.Id))).StatusCode);
+        Assert.Empty(await app.StoredKeysAsync($"organizations/{mine.Id}/"));
+    }
+
+    [Fact]
     public async Task A_Product_list_and_its_categories_hold_only_what_belongs_to_that_Organization()
     {
         var theirs = await app.CreateOrganizationAsync();

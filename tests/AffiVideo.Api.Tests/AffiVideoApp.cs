@@ -4,6 +4,9 @@ using AffiVideo.Api.Tests;
 using AffiVideo.Application.Organizations;
 using AffiVideo.Contracts;
 using AffiVideo.Infrastructure;
+using Amazon.Runtime;
+using Amazon.S3;
+using Amazon.S3.Model;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -28,6 +31,8 @@ public sealed class AffiVideoApp : IAsyncLifetime
 
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder(PostgresImage).Build();
     private readonly MinioContainer _minio = new MinioBuilder(MinioImage).Build();
+    private const string Bucket = "affivideo-test";
+
     private WebApplicationFactory<Program>? _factory;
 
     /// <summary>How the API writes JSON: camelCase names, enums by name.</summary>
@@ -89,6 +94,20 @@ public sealed class AffiVideoApp : IAsyncLifetime
         return browser;
     }
 
+    /// <summary>The keys of the files in object storage that start with this, read from the storage itself.</summary>
+    public async Task<string[]> StoredKeysAsync(string prefix)
+    {
+        using var storage = new AmazonS3Client(
+            new BasicAWSCredentials(_minio.GetAccessKey(), _minio.GetSecretKey()),
+            new AmazonS3Config { ServiceURL = _minio.GetConnectionString(), ForcePathStyle = true, AuthenticationRegion = "us-east-1" });
+        var listed = await storage.ListObjectsV2Async(
+            new ListObjectsV2Request { BucketName = Bucket, Prefix = prefix }, TestContext.Current.CancellationToken);
+        return listed.S3Objects?.Select(stored => stored.Key).ToArray() ?? [];
+    }
+
+    /// <summary>Where a file would be for someone who went to the object storage directly, around the API.</summary>
+    public Uri StorageAddress(string key) => new($"{_minio.GetConnectionString().TrimEnd('/')}/{Bucket}/{key}");
+
     /// <summary>Another instance of the API with some settings replaced, for tests about a broken environment.</summary>
     public WebApplicationFactory<Program> With(Dictionary<string, string> settings)
     {
@@ -98,7 +117,7 @@ public sealed class AffiVideoApp : IAsyncLifetime
             ["Storage:Endpoint"] = _minio.GetConnectionString(),
             ["Storage:AccessKey"] = _minio.GetAccessKey(),
             ["Storage:SecretKey"] = _minio.GetSecretKey(),
-            ["Storage:Bucket"] = "affivideo-test",
+            ["Storage:Bucket"] = Bucket,
         };
         foreach (var (key, value) in settings) all[key] = value;
 

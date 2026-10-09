@@ -1,11 +1,14 @@
+using System.Net;
+using AffiVideo.Application.Storage;
 using Amazon.Runtime;
 using Amazon.S3;
+using Amazon.S3.Model;
 using Microsoft.Extensions.Options;
 
 namespace AffiVideo.Infrastructure.Storage;
 
 /// <summary>The application's bucket on S3-compatible object storage (MinIO locally).</summary>
-internal sealed class S3ObjectStorage : IDisposable
+internal sealed class S3ObjectStorage : IObjectStorage, IDisposable
 {
     private readonly StorageOptions _options;
     private readonly Lazy<AmazonS3Client> _client;
@@ -28,6 +31,34 @@ internal sealed class S3ObjectStorage : IDisposable
             await _client.Value.PutBucketAsync(_options.Bucket, cancellationToken);
         }
     }
+
+    public async Task PutAsync(string key, Stream content, string contentType, CancellationToken cancellationToken) =>
+        await _client.Value.PutObjectAsync(
+            new PutObjectRequest
+            {
+                BucketName = _options.Bucket,
+                Key = key,
+                InputStream = content,
+                ContentType = contentType,
+                // The stream is the caller's to dispose.
+                AutoCloseStream = false,
+            },
+            cancellationToken);
+
+    public async Task<Stream?> OpenAsync(string key, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return (await _client.Value.GetObjectAsync(_options.Bucket, key, cancellationToken)).ResponseStream;
+        }
+        catch (AmazonS3Exception exception) when (exception.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+    }
+
+    public async Task DeleteAsync(string key, CancellationToken cancellationToken) =>
+        await _client.Value.DeleteObjectAsync(_options.Bucket, key, cancellationToken);
 
     private AmazonS3Client CreateClient()
     {
