@@ -182,5 +182,51 @@ public static class StoryboardRules
         return problems;
     }
 
+    /// <summary>
+    /// Everything that stops a Storyboard version being rendered as it stands now, in
+    /// words for the member. A version never changes, but what it was planned from
+    /// can: a photo it shows may since have been removed. Empty when it can be rendered.
+    /// </summary>
+    /// <param name="assets">Those of the assets the Scenes show that the Product still has.</param>
+    public static IReadOnlyList<string> RenderProblems(Storyboard storyboard, IReadOnlyCollection<ProductAsset> assets)
+    {
+        if (storyboard.CreativeTemplate != CreativeTemplate.ProductShowcase || storyboard.RenderMode != RenderMode.ProductLock)
+        {
+            return ["Only a Product Showcase Storyboard in Product Lock can be rendered so far."];
+        }
+        if (storyboard.Scenes.Count == 0) return ["The Storyboard has no Scenes."];
+
+        var problems = new List<string>();
+        var removed = false;
+        foreach (var scene in storyboard.Scenes)
+        {
+            var name = $"Scene {scene.Position}";
+            if (scene.DurationMs <= 0 || scene.DurationMs % SceneDurations.StepMilliseconds != 0)
+            {
+                problems.Add($"{name} lasts {Seconds(scene.DurationMs)} seconds. A Scene lasts a whole number of tenths of a second, and at least one.");
+            }
+            if (!storyboard.RenderMode.Allows(scene.Technique))
+            {
+                problems.Add($"{name} is planned as {scene.Technique}, which {storyboard.RenderMode} does not allow.");
+            }
+
+            if (scene.AssetIds.Length != 1)
+            {
+                problems.Add($"{name} shows {scene.AssetIds.Length} photos. A Scene of this creative template shows exactly one.");
+            }
+            else if (assets.FirstOrDefault(asset => asset.Id == scene.AssetIds[0]) is not { } photo)
+            {
+                problems.Add($"{name} shows a photo that has since been removed from the Product.");
+                removed = true;
+            }
+            else if (!photo.IsUsableInVideo)
+            {
+                problems.Add($"{name} shows an image that cannot be shown in a video.");
+            }
+        }
+        if (removed) problems.Add("Generate the Storyboard again, then render that version.");
+        return problems;
+    }
+
     private static string Seconds(int milliseconds) => (milliseconds / 1000m).ToString("0.###", CultureInfo.InvariantCulture);
 }

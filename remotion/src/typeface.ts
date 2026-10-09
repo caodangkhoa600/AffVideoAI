@@ -7,9 +7,13 @@ export const FAMILY = 'Be Vietnam Pro';
 
 export const WEIGHTS = { SemiBold: 600, Bold: 700, ExtraBold: 800 } as const;
 
+export type Weight = keyof typeof WEIGHTS;
+
 // Holds the render until every weight is loaded, and fails it if one is
-// missing: a frame is never drawn in a fallback typeface.
+// missing: a frame is never drawn in a fallback typeface. Answers whether the
+// typeface is in, so that nothing is measured before it is.
 export const useTypeface = () => {
+  const [ready, setReady] = useState(false);
   const [handle] = useState(() => delayRender('typeface'));
   useEffect(() => {
     Promise.all(
@@ -20,8 +24,12 @@ export const useTypeface = () => {
         document.fonts.add(await face.load());
       }),
     ).then(
-      () => continueRender(handle),
+      () => {
+        setReady(true);
+        continueRender(handle);
+      },
       (error) => cancelRender(error),
     );
   }, [handle]);
+  return ready;
 };

@@ -109,6 +109,41 @@
         }
       }
     },
+    "/api/v1/render-jobs/{jobId}": {
+      "get": {
+        "tags": [
+          "Rendering"
+        ],
+        "summary": "One render job and the state it is in.",
+        "operationId": "GetRenderJob",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenderJobResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
     "/api/v1/organizations/{organizationId}": {
       "get": {
         "tags": [
@@ -1245,7 +1280,7 @@
         "tags": [
           "Projects"
         ],
-        "summary": "Deletes a Project and its Variants. The Product is kept.",
+        "summary": "Deletes a Project with its Variants and their Storyboards. The Product is kept. Answers 409 when a Rendered Video was made from one of its Storyboards.",
         "operationId": "DeleteProject",
         "parameters": [
           {
@@ -1264,6 +1299,16 @@
           },
           "404": {
             "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -1641,6 +1686,189 @@
           },
           "404": {
             "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/variants/{variantId}/storyboards/{version}/renders": {
+      "post": {
+        "tags": [
+          "Rendering"
+        ],
+        "summary": "Queues a job that renders this Storyboard version in Product Lock. The worker renders it; ask for the job to see its state.",
+        "operationId": "SubmitRender",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "variantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenderJobResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Rendering"
+        ],
+        "summary": "The jobs that render this Storyboard version, newest first.",
+        "operationId": "ListRenderJobs",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "variantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResponseOfRenderJobResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/rendered-videos/{videoId}": {
+      "get": {
+        "tags": [
+          "Rendered Videos"
+        ],
+        "summary": "One Rendered Video.",
+        "operationId": "GetRenderedVideo",
+        "parameters": [
+          {
+            "name": "videoId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenderedVideoResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/rendered-videos/{videoId}/content": {
+      "get": {
+        "tags": [
+          "Rendered Videos"
+        ],
+        "summary": "The MP4, to preview in the browser.",
+        "operationId": "GetRenderedVideoContent",
+        "parameters": [
+          {
+            "name": "videoId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "404": {
+            "description": "Not Found"
+          },
+          "200": {
+            "description": "OK"
           }
         }
       }
@@ -2082,6 +2310,35 @@
           }
         }
       },
+      "PagedResponseOfRenderJobResponse": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RenderJobResponse"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "PagedResponseOfStoryboardResponse": {
         "required": [
           "items",
@@ -2444,6 +2701,121 @@
           }
         }
       },
+      "RenderedVideoResponse": {
+        "required": [
+          "id",
+          "storyboardId",
+          "renderJobId",
+          "state",
+          "durationMs",
+          "sizeInBytes",
+          "uncutAssetIds",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "storyboardId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "renderJobId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "$ref": "#/components/schemas/RenderedVideoState"
+          },
+          "durationMs": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sizeInBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "uncutAssetIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "RenderedVideoState": {
+        "enum": [
+          "ReadyForReview"
+        ]
+      },
+      "RenderJobResponse": {
+        "required": [
+          "id",
+          "storyboardId",
+          "state",
+          "failureReason",
+          "renderedVideoId",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "storyboardId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "$ref": "#/components/schemas/RenderJobState"
+          },
+          "failureReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "renderedVideoId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "RenderJobState": {
+        "enum": [
+          "Created",
+          "Queued",
+          "Validating",
+          "Planning",
+          "GeneratingAssets",
+          "GeneratingVideo",
+          "Rendering",
+          "QualityReview",
+          "Completed",
+          "Failed",
+          "Cancelled"
+        ]
+      },
       "RenderMode": {
         "enum": [
           "ProductLock",
@@ -2702,6 +3074,9 @@
       "name": "Session"
     },
     {
+      "name": "Rendering"
+    },
+    {
       "name": "Organizations"
     },
     {
@@ -2721,6 +3096,9 @@
     },
     {
       "name": "Storyboards"
+    },
+    {
+      "name": "Rendered Videos"
     }
   ]
 }

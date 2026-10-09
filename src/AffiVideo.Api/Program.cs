@@ -74,6 +74,7 @@ v1.MapFacts();
 v1.MapProjects();
 v1.MapVariants();
 v1.MapStoryboards();
+v1.MapRenders();
 
 app.Run();
 

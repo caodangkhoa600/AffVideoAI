@@ -3,6 +3,7 @@ using AffiVideo.Application.Organizations;
 using AffiVideo.Application.Products;
 using AffiVideo.Application.Projects;
 using AffiVideo.Application.Providers;
+using AffiVideo.Application.Rendering;
 using AffiVideo.Application.Storage;
 using AffiVideo.Application.Storyboards;
 using AffiVideo.Application.SystemStatus;
@@ -12,6 +13,7 @@ using AffiVideo.Infrastructure.Persistence;
 using AffiVideo.Infrastructure.Planning;
 using AffiVideo.Infrastructure.Products;
 using AffiVideo.Infrastructure.Projects;
+using AffiVideo.Infrastructure.Rendering;
 using AffiVideo.Infrastructure.Storage;
 using AffiVideo.Infrastructure.Storyboards;
 using Microsoft.AspNetCore.Identity;
@@ -60,9 +62,17 @@ public static class InfrastructureSetup
         // The only planner there is. A real language model is registered in its place, never beside it.
         services.AddSingleton<ILanguageModel, MockLanguageModel>();
         services.AddScoped<IStoryboards, ScopedStoryboards>();
+        services.AddScoped<IRenders, ScopedRenders>();
         services.AddScoped<DemonstrationSeed>();
         return services;
     }
+
+    /// <summary>
+    /// The render queue as the worker sees it, across Organizations. Only the worker
+    /// asks for this: nothing in the API can claim a job.
+    /// </summary>
+    public static IServiceCollection AddRenderQueue(this IServiceCollection services) =>
+        services.AddScoped<IRenderQueue, RenderQueue>();
 
     /// <summary>
     /// Applies every pending database migration and creates the storage bucket if it

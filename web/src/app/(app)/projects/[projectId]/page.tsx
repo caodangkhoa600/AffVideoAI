@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Suspense, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { api, type Project } from "@/lib/api/client";
+import { api, problemDetail, type Project } from "@/lib/api/client";
 import { ProjectVariants } from "./project-variants";
 
 const LOADING = <p className="text-sm text-muted-foreground">Loading…</p>;
@@ -100,14 +100,14 @@ function Delete({ project }: { project: Project }) {
   const router = useRouter();
   const [asking, setAsking] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<string>();
 
   const remove = async () => {
     setDeleting(true);
-    setFailed(false);
-    const { response } = await api
+    setFailed(undefined);
+    const { error, response } = await api
       .DELETE("/api/v1/projects/{projectId}", { params: { path: { projectId: project.id } } })
-      .catch(() => ({ response: undefined }));
+      .catch(() => ({ error: undefined, response: undefined }));
     // 404 is a Project someone has already deleted: gone, which is what was asked for.
     if (response?.ok || response?.status === 404) {
       // Only the lists: this page's own Project is gone, and asking for it again would say so before the page is left.
@@ -115,7 +115,8 @@ function Delete({ project }: { project: Project }) {
       router.replace("/projects");
       return;
     }
-    setFailed(true);
+    // A 409 says in the API's own words why the Project is kept: it has a Rendered Video.
+    setFailed(problemDetail(error) ?? "The Project could not be deleted.");
     setDeleting(false);
     setAsking(false);
   };
@@ -125,7 +126,7 @@ function Delete({ project }: { project: Project }) {
       <div className="flex items-center gap-3">
         {failed && (
           <span role="alert" className="text-sm text-destructive">
-            The Project could not be deleted.
+            {failed}
           </span>
         )}
         <Button variant="destructive" onClick={() => setAsking(true)}>

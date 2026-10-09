@@ -44,13 +44,21 @@ internal static class ProjectEndpoints
             .WithName("GetProject")
             .WithSummary("One Project.");
 
-        group.MapDelete("/{projectId:guid}", async Task<Results<NoContent, NotFound>> (
+        group.MapDelete("/{projectId:guid}", async Task<Results<NoContent, NotFound, ProblemHttpResult>> (
                 Guid projectId, IProjects projects, CancellationToken cancellationToken) =>
-                await projects.DeleteAsync(projectId, cancellationToken)
-                    ? TypedResults.NoContent()
-                    : TypedResults.NotFound())
+                await projects.DeleteAsync(projectId, cancellationToken) switch
+                {
+                    ProjectDeletion.Deleted => TypedResults.NoContent(),
+                    ProjectDeletion.NotFound => TypedResults.NotFound(),
+                    _ => TypedResults.Problem(
+                        "This Project has a Rendered Video, and a Rendered Video is kept. The Project cannot be deleted.",
+                        statusCode: StatusCodes.Status409Conflict),
+                })
+            .ProducesProblem(StatusCodes.Status409Conflict)
             .WithName("DeleteProject")
-            .WithSummary("Deletes a Project and its Variants. The Product is kept.");
+            .WithSummary(
+                "Deletes a Project with its Variants and their Storyboards. The Product is kept. " +
+                "Answers 409 when a Rendered Video was made from one of its Storyboards.");
     }
 
     private static ProjectResponse ToResponse(ProjectRecord record) => new(

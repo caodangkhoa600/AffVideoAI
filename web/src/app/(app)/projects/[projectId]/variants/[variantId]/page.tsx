@@ -7,6 +7,7 @@ import { Suspense, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { api, problemDetail, type Scene, type SceneLayout, type Storyboard, type Technique, type Variant } from "@/lib/api/client";
 import { creativeTemplateName } from "../../../creative-templates";
+import { StoryboardRender } from "./storyboard-render";
 
 const LOADING = <p className="text-sm text-muted-foreground">Loading…</p>;
 
@@ -189,6 +190,8 @@ function VariantStoryboards({ variant }: { variant: Variant }) {
             </div>
           )}
           <StoryboardVersion storyboard={shown} productId={project.data?.productId} />
+          {/* Keyed by the version, so a job being watched is never shown under another version. */}
+          <StoryboardRender key={shown.id} variant={variant} storyboard={shown} />
         </>
       )}
     </>

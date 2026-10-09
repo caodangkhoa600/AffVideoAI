@@ -1,8 +1,8 @@
 namespace AffiVideo.Application.Providers;
 
 /// <summary>
-/// Prepares a Product's photo for a video. It has no implementation yet; the
-/// first is the cut-out that runs locally in the worker (ticket 09).
+/// Prepares a Product's photo for a video. The implementation is a model that
+/// runs locally in the worker; the API has none.
 /// </summary>
 public interface IImageProcessor
 {

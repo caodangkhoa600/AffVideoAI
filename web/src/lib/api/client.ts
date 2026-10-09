@@ -22,6 +22,9 @@ export type Storyboard = components["schemas"]["StoryboardResponse"];
 export type Scene = components["schemas"]["SceneResponse"];
 export type SceneLayout = components["schemas"]["SceneLayout"];
 export type Technique = components["schemas"]["Technique"];
+export type RenderJob = components["schemas"]["RenderJobResponse"];
+export type RenderJobState = components["schemas"]["RenderJobState"];
+export type RenderedVideo = components["schemas"]["RenderedVideoResponse"];
 
 const CHANGES_STATE = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 

@@ -108,6 +108,17 @@ The Render Mode that allows no generative Techniques, so the Product's appearanc
 The Render Mode that allows generative Techniques within a budget, alongside non-generative ones.
 _Avoid_: AI Video, Enhanced Hybrid, Premium Cinematic
 
+**Render job**:
+The work of rendering one Storyboard version, done by the worker in the background. Its state is the only progress a member is shown.
+_Avoid_: Task, render request
+
+**Cut-out**:
+A Product photo with everything but the Product made transparent. Only transparency is decided; the Product's own pixels are the photo's.
+_Avoid_: Mask, background removal
+
+**Card**:
+A photo shown whole, with rounded corners, because no cut-out of it passed its checks.
+
 ### Affiliate Lab
 
 **Campaign**:

@@ -11,13 +11,13 @@ marketing video. The vocabulary is in [CONTEXT.md](CONTEXT.md), the decisions in
 | ---------- | ------------------------------------------------------- | ------------------------------- |
 | `web`      | Next.js web app (`web/`)                                | http://localhost:3000           |
 | `api`      | ASP.NET Core API (`src/AffiVideo.Api`)                  | http://localhost:8080           |
-| `worker`   | .NET worker with FFmpeg and Remotion (`src/AffiVideo.Worker`, `remotion/`) | none             |
+| `worker`   | .NET worker that renders: FFmpeg, Remotion and the cut-out model (`src/AffiVideo.Worker`, `remotion/`) | none |
 | `postgres` | PostgreSQL 17                                           | localhost:5432                  |
 | `minio`    | S3-compatible object storage                            | http://localhost:9000, console on 9001 |
 
 The only things needed on the host are Docker, and the .NET 10 SDK and Node 22
-for running tests and tools. FFmpeg, Remotion and Chrome Headless Shell exist
-only inside the worker image.
+for running tests and tools. FFmpeg, Remotion, Chrome Headless Shell and the
+model that cuts a Product out of its photo exist only inside the worker image.
 
 ## Start
 
@@ -29,7 +29,8 @@ docker compose run --rm seed
 ```
 
 `up --wait` returns once all five services pass their health checks. The first
-build downloads Chrome Headless Shell and takes a few minutes.
+build downloads Chrome Headless Shell and the cut-out model (224 MB) and takes
+a few minutes.
 
 `migrate` applies the database migrations and creates the storage bucket. It is
 the only thing that changes the schema; nothing does so at startup. Run it again
@@ -60,6 +61,10 @@ dotnet run --project src/AffiVideo.Api        # http://localhost:5080
 dotnet run --project src/AffiVideo.Worker
 npm --prefix web run dev                      # http://localhost:3000
 ```
+
+A worker on the host has nothing to render with, and every job it took would
+fail. To render while working on the API or the web app, leave the worker to
+Docker: `docker compose up -d --build --wait worker`.
 
 Their settings come from files, so nothing has to be typed:
 
@@ -133,6 +138,14 @@ The tests start the API in-process against real PostgreSQL and real object
 storage in containers (Testcontainers), so Docker must be running. They do not
 use the Compose services or `.env`.
 
+The tests that render build the worker image from the code as it is
+(`docker build`, tagged `affivideo-worker:test`) and run it in a container
+beside the other two. The worker renders the jobs the tests queue over HTTP,
+and the MP4 the API serves is inspected with ffprobe inside that container.
+The first build takes a few minutes; a render takes about a minute. To watch
+what they rendered, name a file for it:
+`AFFIVIDEO_TEST_VIDEO=render.mp4 dotnet test`.
+
 ```sh
 cd web
 npm ci
@@ -183,9 +196,11 @@ Done: the look prototypes (tickets 01, 25, 26, in `prototypes/`), the affiliate
 experiment plan (ticket 24, `docs/business/affiliate-experiment.md`), the
 walking skeleton (ticket 02), sign in and Organizations (ticket 03),
 Products (ticket 04), Product assets (ticket 05), Facts (ticket 06),
-Projects and Variants (ticket 07) and Storyboard generation (ticket 08).
+Projects and Variants (ticket 07), Storyboard generation (ticket 08) and
+render and preview (ticket 09).
 
-Next: render and preview (ticket 09).
+Next: job reliability (ticket 10), approve, download and the library
+(ticket 11) and Storyboard editing (ticket 12).
 
 Notes from the walking skeleton:
 
@@ -293,3 +308,45 @@ Notes from Storyboard generation:
   13 words (more would not all be on screen within two seconds) and 60
   characters; a Fact 120 characters.
 - Deleting a Project deletes its Variants' Storyboards with them.
+
+Notes from render and preview:
+
+- `POST /api/v1/projects/{projectId}/variants/{variantId}/storyboards/{version}/renders`
+  queues a job and answers 202 at once. The job is a row in PostgreSQL
+  (`RenderJobs`); the worker takes the one queued longest. Its state is all the
+  progress there is: `GET /api/v1/render-jobs/{id}`, which the web app asks
+  every two seconds. There is no percentage.
+- A job goes queued, validating, planning, generating assets, rendering,
+  quality review, completed, and can fail from any of them with a reason for
+  the member. `RenderJobStates` in the domain is the whole list of allowed
+  changes. Generating video and cancelled exist and nothing enters them yet.
+- The worker renders one job at a time. A job it was rendering when it was
+  stopped stays where it was: picking it up again, retries, cancelling and
+  starting one job for two clicks are ticket 10.
+- The Product is cut out of each photo by BiRefNet (general, lite; MIT
+  licence) run on the CPU by ONNX Runtime in the worker, about 15 seconds a
+  photo, once: the cut-out, on its soft shadow, is kept in object storage
+  beside the photo and removed with it. A photo that came already cut out is
+  used as it is when it passes the same checks.
+- A cut-out is the photo's own pixels with a new transparency, and it is
+  checked before use: something was found, the background did not stay, no
+  large part is half see-through, no rim of background is left, and no pixel
+  that shows was changed. A photo that fails is shown whole, on a card with
+  rounded corners, and the Rendered Video names it (`uncutAssetIds`).
+- Each Scene is drawn on its own by Remotion from a file of data (its text,
+  its photo, and what the Scene before left on screen, so the Product carries
+  on from there) and FFmpeg joins the clips without encoding the video again,
+  under a silent AAC track. Both are started with a list of arguments and no
+  shell. No text a member typed reaches FFmpeg at all.
+- The look is the Product Showcase creative template in
+  `remotion/src/ProductShowcase.tsx`. The image build type-checks and bundles
+  it; a job renders from its own copy of the bundle in a folder under
+  `/tmp/affivideo-render`, which is deleted when the job ends.
+- The finished file is checked with ffprobe before it is kept: 1080 by 1920,
+  H.264 tagged BT.709, AAC, MP4, and as long as its Scenes.
+- A Rendered Video is stored at
+  `organizations/{id}/rendered-videos/{id}.mp4` and previewed at
+  `GET /api/v1/rendered-videos/{id}/content`, which authorises every request.
+  It is ready for review; approving and downloading are ticket 11.
+- A Project that has a Rendered Video cannot be deleted (409). Nothing deletes
+  a Rendered Video yet.

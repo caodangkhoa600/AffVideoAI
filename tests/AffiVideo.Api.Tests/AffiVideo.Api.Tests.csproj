@@ -10,6 +10,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\AffiVideo.Api\AffiVideo.Api.csproj" />
+    <!-- For the pure functions the worker cuts a Product out of its photo with. -->
+    <ProjectReference Include="..\..\src\AffiVideo.Worker\AffiVideo.Worker.csproj" />
   </ItemGroup>
 
   <ItemGroup>

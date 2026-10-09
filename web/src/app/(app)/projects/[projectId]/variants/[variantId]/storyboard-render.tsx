@@ -1,0 +1,144 @@
+"use client";
+
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { api, problemDetail, type RenderJob, type RenderJobState, type Storyboard, type Variant } from "@/lib/api/client";
+
+/** Where a render job is (RenderJobState in the domain), as a member reads it. There is no percentage to show. */
+const STAGES: Record<RenderJobState, string> = {
+  Created: "Queued",
+  Queued: "Queued",
+  Validating: "Validating",
+  Planning: "Planning",
+  GeneratingAssets: "Cutting the Product out of its photos",
+  GeneratingVideo: "Generating video",
+  Rendering: "Rendering",
+  QualityReview: "Checking the video",
+  Completed: "Ready for review",
+  Failed: "Failed",
+  Cancelled: "Cancelled",
+};
+
+const ENDED: RenderJobState[] = ["Completed", "Failed", "Cancelled"];
+
+// How often the job is asked for while it has not ended. The worker renders; this page only asks.
+const POLL_MS = 2000;
+
+/** Rendering one Storyboard version: starting a job, its current stage, and the Rendered Video once there is one. */
+export function StoryboardRender({ variant, storyboard }: { variant: Variant; storyboard: Storyboard }) {
+  const queryClient = useQueryClient();
+  const path = { projectId: variant.projectId, variantId: variant.id, version: storyboard.version };
+  const key = ["projects", "one", variant.projectId, "variants", variant.id, "storyboards", storyboard.version, "renders"];
+  // The newest job of this version. Asking the API again is what brings a member
+  // who left the page back to where the job is now.
+  const newest = useQuery({
+    queryKey: key,
+    queryFn: async (): Promise<RenderJob | null> => {
+      const { data, response } = await api.GET(
+        "/api/v1/projects/{projectId}/variants/{variantId}/storyboards/{version}/renders",
+        { params: { path, query: { pageSize: 1 } } },
+      );
+      if (!data) throw new Error(`The API answered ${response.status}`);
+      return data.items[0] ?? null;
+    },
+    refetchInterval: (query) => (query.state.data && !ENDED.includes(query.state.data.state) ? POLL_MS : false),
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [refused, setRefused] = useState<string>();
+
+  const render = async () => {
+    setSubmitting(true);
+    setRefused(undefined);
+    const { data, error } = await api
+      .POST("/api/v1/projects/{projectId}/variants/{variantId}/storyboards/{version}/renders", { params: { path } })
+      .catch(() => ({ data: undefined, error: undefined }));
+    if (data) {
+      queryClient.setQueryData(key, data);
+    } else {
+      setRefused(problemDetail(error) ?? "The render could not be started.");
+    }
+    setSubmitting(false);
+  };
+
+  const job = newest.data;
+  const running = !!job && !ENDED.includes(job.state);
+
+  return (
+    <section className="flex flex-col gap-3" data-testid="render">
+      <h3 className="text-lg font-semibold tracking-tight">Rendered Video</h3>
+      <p className="text-sm text-muted-foreground">
+        Rendering makes a 1080 by 1920 MP4 of this version in Product Lock: the Product is cut out of its photo and only
+        ever scaled, moved and rotated. It runs in the background, so this page can be left and come back to.
+      </p>
+      <div>
+        <Button onClick={render} disabled={submitting || running || newest.isPending}>
+          {submitting ? "Starting…" : job ? "Render again" : "Render video"}
+        </Button>
+      </div>
+      {refused && (
+        <p role="alert" className="text-sm text-destructive">
+          {refused}
+        </p>
+      )}
+      {newest.isError && (
+        <p role="alert" className="text-sm text-destructive">
+          The render jobs could not be loaded.
+        </p>
+      )}
+      {job && (
+        <p className="text-sm" aria-live="polite">
+          <span className="text-muted-foreground">Stage: </span>
+          <span className="font-medium" data-testid="render-stage">
+            {STAGES[job.state]}
+          </span>
+          <span className="text-muted-foreground"> · started {new Date(job.createdAt).toLocaleString()}</span>
+        </p>
+      )}
+      {job?.state === "Failed" && (
+        <p role="alert" className="text-sm text-destructive" data-testid="render-failure">
+          {job.failureReason ?? "The video could not be rendered."}
+        </p>
+      )}
+      {job?.renderedVideoId && <RenderedVideoPreview videoId={job.renderedVideoId} />}
+    </section>
+  );
+}
+
+function RenderedVideoPreview({ videoId }: { videoId: string }) {
+  const video = useQuery({
+    queryKey: ["rendered-videos", "one", videoId],
+    queryFn: async () => {
+      const { data, response } = await api.GET("/api/v1/rendered-videos/{videoId}", { params: { path: { videoId } } });
+      if (!data) throw new Error(`The API answered ${response.status}`);
+      return data;
+    },
+  });
+  const uncut = video.data?.uncutAssetIds.length ?? 0;
+
+  return (
+    <div className="flex flex-col gap-2">
+      {/* The file comes from the API, which only serves it to a signed-in member of the Organization. */}
+      <video
+        controls
+        playsInline
+        preload="metadata"
+        src={`/api/v1/rendered-videos/${videoId}/content`}
+        className="aspect-[9/16] w-full max-w-xs rounded-lg border bg-black"
+        data-testid="rendered-video"
+      />
+      {video.data && (
+        <p className="text-sm text-muted-foreground">
+          {video.data.durationMs / 1000} s · {(video.data.sizeInBytes / (1024 * 1024)).toFixed(1)} MB · no narration or
+          music, so the audio track is silent
+        </p>
+      )}
+      {uncut > 0 && (
+        <p className="text-sm text-muted-foreground" data-testid="rendered-video-uncut">
+          {uncut === 1 ? "One photo is" : `${uncut} photos are`} shown whole, on a card: the Product could not be cut
+          out cleanly. A photo of the Product alone on a plain background cuts out best.
+        </p>
+      )}
+    </div>
+  );
+}

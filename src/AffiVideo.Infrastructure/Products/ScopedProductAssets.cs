@@ -115,13 +115,17 @@ internal sealed class ScopedProductAssets(
     // it is deleted even if the member has stopped waiting.
     private async Task DeleteFileAsync(ProductAsset asset)
     {
-        try
+        // With it go the files a render made from it, if any did.
+        foreach (var key in new[] { asset.StorageKey, asset.VideoLayerKey, asset.VideoLayerDetailsKey })
         {
-            await storage.DeleteAsync(asset.StorageKey, CancellationToken.None);
-        }
-        catch (Exception exception)
-        {
-            logger.LogWarning(exception, "The file at {StorageKey} could not be deleted and is left behind", asset.StorageKey);
+            try
+            {
+                await storage.DeleteAsync(key, CancellationToken.None);
+            }
+            catch (Exception exception)
+            {
+                logger.LogWarning(exception, "The file at {StorageKey} could not be deleted and is left behind", key);
+            }
         }
     }
 }

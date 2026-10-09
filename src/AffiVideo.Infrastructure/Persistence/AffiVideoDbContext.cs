@@ -37,6 +37,10 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
 
     public DbSet<Storyboard> Storyboards => Set<Storyboard>();
 
+    public DbSet<RenderJob> RenderJobs => Set<RenderJob>();
+
+    public DbSet<RenderedVideo> RenderedVideos => Set<RenderedVideo>();
+
     /// <summary>The keys that protect session cookies and anti-forgery tokens, kept here so sessions outlive a restart of the API.</summary>
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
@@ -95,6 +99,8 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
             asset.HasOne<Product>().WithMany().HasForeignKey(a => a.ProductId).OnDelete(DeleteBehavior.Restrict);
             asset.Property(a => a.Kind).HasConversion<string>().HasMaxLength(20);
             asset.Ignore(a => a.StorageKey);
+            asset.Ignore(a => a.VideoLayerKey);
+            asset.Ignore(a => a.VideoLayerDetailsKey);
             asset.Ignore(a => a.IsUsableInVideo);
             asset.HasIndex(a => new { a.ProductId, a.CreatedAt });
             // A Product has at most one logo, even when two are uploaded at the same moment.
@@ -171,6 +177,31 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
                     fact.HasIndex(f => f.FactId);
                 });
             });
+        });
+
+        builder.Entity<RenderJob>(job =>
+        {
+            job.HasOne<Organization>().WithMany().HasForeignKey(j => j.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            // A job goes with its Storyboard when a Project is deleted. One that made a Rendered Video is held by it, below.
+            job.HasOne<Storyboard>().WithMany().HasForeignKey(j => j.StoryboardId).OnDelete(DeleteBehavior.Cascade);
+            job.Property(j => j.State).HasConversion<string>().HasMaxLength(20);
+            job.Property(j => j.FailureReason).HasMaxLength(RenderJob.FailureReasonMaxLength);
+            // The queue: the worker takes the job that has been queued longest.
+            job.HasIndex(j => new { j.State, j.CreatedAt });
+            job.HasIndex(j => new { j.StoryboardId, j.CreatedAt });
+        });
+
+        builder.Entity<RenderedVideo>(video =>
+        {
+            video.HasOne<Organization>().WithMany().HasForeignKey(v => v.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            // A Rendered Video is kept: its Storyboard, and so its Variant and Project, cannot be deleted from under it.
+            video.HasOne<Storyboard>().WithMany().HasForeignKey(v => v.StoryboardId).OnDelete(DeleteBehavior.Restrict);
+            video.HasOne<RenderJob>().WithMany().HasForeignKey(v => v.RenderJobId).OnDelete(DeleteBehavior.Restrict);
+            video.Property(v => v.State).HasConversion<string>().HasMaxLength(20);
+            video.Ignore(v => v.StorageKey);
+            video.HasIndex(v => new { v.StoryboardId, v.CreatedAt });
+            // A job makes one Rendered Video.
+            video.HasIndex(v => v.RenderJobId).IsUnique();
         });
 
         var filter = typeof(AffiVideoDbContext).GetMethod(nameof(FilterToCallerOrganization), BindingFlags.NonPublic | BindingFlags.Instance)!;

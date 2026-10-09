@@ -221,6 +221,35 @@ public sealed class OrganizationIsolationTests(AffiVideoApp app)
     }
 
     [Fact]
+    public async Task A_member_of_one_Organization_is_refused_the_render_jobs_and_Rendered_Videos_of_another()
+    {
+        var theirs = await RenderTests.RenderedAsync(app);
+        var mine = await app.CreateOrganizationAsync();
+        using var me = await app.SignedInAsync(mine.Owner);
+        using var them = await app.SignedInAsync(theirs.Owner);
+        var myVariant = await StoryboardTests.ReadyVariantAsync(me);
+        await StoryboardTests.GeneratedAsync(me, myVariant);
+        var theirVariantUnderMyProject = $"{VariantTests.Variants(myVariant.ProjectId)}/{theirs.Variant.Id}/storyboards/1/renders";
+
+        var submit = await me.PostAsync(RenderTests.Renders(theirs.Variant, 1), new { });
+        var list = await me.GetAsync(RenderTests.Renders(theirs.Variant, 1));
+        var submitUnderMyProject = await me.PostAsync(theirVariantUnderMyProject, new { });
+        var listUnderMyProject = await me.GetAsync(theirVariantUnderMyProject);
+        var job = await me.GetAsync($"/api/v1/render-jobs/{theirs.Job.Id}");
+        var video = await me.GetAsync($"/api/v1/rendered-videos/{theirs.Video.Id}");
+        var file = await me.GetAsync($"/api/v1/rendered-videos/{theirs.Video.Id}/content");
+
+        Assert.All(
+            [submit, list, submitUnderMyProject, listUnderMyProject, job, video, file],
+            response => Assert.Equal(HttpStatusCode.NotFound, response.StatusCode));
+        // My own version 1 has no job: theirs is not listed under it, and none was queued for them.
+        Assert.Equal(0, (await me.GetAsync<PagedResponse<RenderJobResponse>>(RenderTests.Renders(myVariant, 1))).Total);
+        Assert.Equal(1, (await them.GetAsync<PagedResponse<RenderJobResponse>>(RenderTests.Renders(theirs.Variant, 1))).Total);
+        Assert.Equal(HttpStatusCode.OK, (await them.GetAsync($"/api/v1/rendered-videos/{theirs.Video.Id}/content")).StatusCode);
+        Assert.Empty(await app.StoredKeysAsync($"organizations/{mine.Id}/rendered-videos/"));
+    }
+
+    [Fact]
     public async Task A_Product_list_and_its_categories_hold_only_what_belongs_to_that_Organization()
     {
         var theirs = await app.CreateOrganizationAsync();

@@ -57,6 +57,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/render-jobs/{jobId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One render job and the state it is in. */
+        get: operations["GetRenderJob"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/organizations/{organizationId}": {
         parameters: {
             query?: never;
@@ -347,7 +364,7 @@ export interface paths {
         get: operations["GetProject"];
         put?: never;
         post?: never;
-        /** Deletes a Project and its Variants. The Product is kept. */
+        /** Deletes a Project with its Variants and their Storyboards. The Product is kept. Answers 409 when a Rendered Video was made from one of its Storyboards. */
         delete: operations["DeleteProject"];
         options?: never;
         head?: never;
@@ -433,6 +450,58 @@ export interface paths {
         };
         /** One version of the Variant's Storyboard. */
         get: operations["GetStoryboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/variants/{variantId}/storyboards/{version}/renders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The jobs that render this Storyboard version, newest first. */
+        get: operations["ListRenderJobs"];
+        put?: never;
+        /** Queues a job that renders this Storyboard version in Product Lock. The worker renders it; ask for the job to see its state. */
+        post: operations["SubmitRender"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rendered-videos/{videoId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One Rendered Video. */
+        get: operations["GetRenderedVideo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rendered-videos/{videoId}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The MP4, to preview in the browser. */
+        get: operations["GetRenderedVideoContent"];
         put?: never;
         post?: never;
         delete?: never;
@@ -571,6 +640,15 @@ export interface components {
             /** Format: int32 */
             total: number;
         };
+        PagedResponseOfRenderJobResponse: {
+            items: components["schemas"]["RenderJobResponse"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+            /** Format: int32 */
+            total: number;
+        };
         PagedResponseOfStoryboardResponse: {
             items: components["schemas"]["StoryboardResponse"][];
             /** Format: int32 */
@@ -674,6 +752,40 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
         };
+        RenderedVideoResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            storyboardId: string;
+            /** Format: uuid */
+            renderJobId: string;
+            state: components["schemas"]["RenderedVideoState"];
+            /** Format: int32 */
+            durationMs: number;
+            /** Format: int64 */
+            sizeInBytes: number;
+            uncutAssetIds: string[];
+            /** Format: date-time */
+            createdAt: string;
+        };
+        /** @enum {unknown} */
+        RenderedVideoState: "ReadyForReview";
+        RenderJobResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            storyboardId: string;
+            state: components["schemas"]["RenderJobState"];
+            failureReason: null | string;
+            /** Format: uuid */
+            renderedVideoId: null | string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        /** @enum {unknown} */
+        RenderJobState: "Created" | "Queued" | "Validating" | "Planning" | "GeneratingAssets" | "GeneratingVideo" | "Rendering" | "QualityReview" | "Completed" | "Failed" | "Cancelled";
         /** @enum {unknown} */
         RenderMode: "ProductLock" | "Hybrid";
         SceneFactResponse: {
@@ -848,6 +960,35 @@ export interface operations {
         responses: {
             /** @description No Content */
             204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GetRenderJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RenderJobResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1688,6 +1829,15 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
         };
     };
     ListVariants: {
@@ -1930,6 +2080,127 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["StoryboardResponse"];
                 };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ListRenderJobs: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path: {
+                projectId: string;
+                variantId: string;
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagedResponseOfRenderJobResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    SubmitRender: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                variantId: string;
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RenderJobResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GetRenderedVideo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                videoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RenderedVideoResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GetRenderedVideoContent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                videoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Not Found */
             404: {

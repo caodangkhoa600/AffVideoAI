@@ -3,6 +3,7 @@ using AffiVideo.Application.Projects;
 using AffiVideo.Domain;
 using AffiVideo.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace AffiVideo.Infrastructure.Projects;
 
@@ -45,13 +46,20 @@ internal sealed class ScopedProjects(AffiVideoDbContext database, Caller caller,
             items.Select(ToRecord).ToList(), page.Page, page.PageSize, await all.CountAsync(cancellationToken));
     }
 
-    public async Task<bool> DeleteAsync(Guid projectId, CancellationToken cancellationToken)
+    public async Task<ProjectDeletion> DeleteAsync(Guid projectId, CancellationToken cancellationToken)
     {
         var project = await database.Projects.SingleOrDefaultAsync(p => p.Id == projectId, cancellationToken);
-        if (project is null) return false;
+        if (project is null) return ProjectDeletion.NotFound;
+        var rendered =
+            from video in database.RenderedVideos
+            join storyboard in database.Storyboards on video.StoryboardId equals storyboard.Id
+            join variant in database.Variants on storyboard.VariantId equals variant.Id
+            where variant.ProjectId == projectId
+            select video.Id;
+        if (await rendered.AnyAsync(cancellationToken)) return ProjectDeletion.HasRenderedVideos;
         var member = caller.MemberId ?? throw new InvalidOperationException("Only a member can delete a Project.");
 
-        // The database deletes the Project's Variants with it.
+        // The database deletes the Project's Variants with it, and their Storyboards and render jobs.
         database.Projects.Remove(project);
         database.AuditLog.Add(new AuditLogEntry(
             Guid.CreateVersion7(), project.OrganizationId, member, AuditActions.ProjectDeleted, project.Id, clock.GetUtcNow()));
@@ -62,9 +70,14 @@ internal sealed class ScopedProjects(AffiVideoDbContext database, Caller caller,
         catch (DbUpdateConcurrencyException)
         {
             // Someone else deleted it after it was read. Nothing of this attempt is saved.
-            return false;
+            return ProjectDeletion.NotFound;
         }
-        return true;
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.ForeignKeyViolation })
+        {
+            // A render finished after the check above. The database kept the Project for its Rendered Video.
+            return ProjectDeletion.HasRenderedVideos;
+        }
+        return ProjectDeletion.Deleted;
     }
 
     private IQueryable<ProjectWithProduct> WithProduct(IQueryable<Project> projects) =>

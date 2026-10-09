@@ -1,0 +1,85 @@
+using AffiVideo.Application;
+using AffiVideo.Application.Rendering;
+using AffiVideo.Application.Storage;
+using AffiVideo.Domain;
+using AffiVideo.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Npgsql;
+
+namespace AffiVideo.Infrastructure.Rendering;
+
+// No method names an Organization: the context's filter leaves only the caller's
+// Storyboards, jobs and Rendered Videos, and a file is only ever looked up by
+// the key of a Rendered Video found that way.
+internal sealed class ScopedRenders(
+    AffiVideoDbContext database,
+    IObjectStorage storage,
+    Caller caller,
+    TimeProvider clock,
+    ILogger<ScopedRenders> logger) : IRenders
+{
+    public async Task<RenderJob?> SubmitAsync(Guid projectId, Guid variantId, int version, CancellationToken cancellationToken)
+    {
+        if (await FindStoryboardIdAsync(projectId, variantId, version, cancellationToken) is not { } storyboardId) return null;
+        var organizationId = caller.OrganizationId
+            ?? throw new InvalidOperationException("A render job is queued for the caller's Organization, and there is no caller.");
+
+        var job = new RenderJob(Guid.CreateVersion7(), organizationId, storyboardId, clock.GetUtcNow());
+        database.RenderJobs.Add(job);
+        try
+        {
+            await database.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.ForeignKeyViolation })
+        {
+            // The Project, and the Storyboard with it, was deleted after it was read.
+            return null;
+        }
+        return job;
+    }
+
+    public async Task<Page<RenderJob>?> ListJobsAsync(
+        Guid projectId, Guid variantId, int version, PageRequest page, CancellationToken cancellationToken)
+    {
+        if (await FindStoryboardIdAsync(projectId, variantId, version, cancellationToken) is not { } storyboardId) return null;
+
+        var all = database.RenderJobs.AsNoTracking().Where(j => j.StoryboardId == storyboardId);
+        var items = await all
+            .OrderByDescending(j => j.CreatedAt).ThenByDescending(j => j.Id)
+            .Skip(page.Skip).Take(page.PageSize)
+            .ToListAsync(cancellationToken);
+        return new Page<RenderJob>(items, page.Page, page.PageSize, await all.CountAsync(cancellationToken));
+    }
+
+    public Task<RenderJob?> FindJobAsync(Guid jobId, CancellationToken cancellationToken) =>
+        database.RenderJobs.AsNoTracking().SingleOrDefaultAsync(j => j.Id == jobId, cancellationToken);
+
+    public Task<RenderedVideo?> FindVideoAsync(Guid videoId, CancellationToken cancellationToken) =>
+        database.RenderedVideos.AsNoTracking().SingleOrDefaultAsync(v => v.Id == videoId, cancellationToken);
+
+    public async Task<RenderedVideoContent?> OpenVideoAsync(Guid videoId, CancellationToken cancellationToken)
+    {
+        var video = await FindVideoAsync(videoId, cancellationToken);
+        if (video is null) return null;
+
+        var content = await storage.OpenAsync(video.StorageKey, cancellationToken);
+        if (content is null)
+        {
+            logger.LogError("The file of Rendered Video {VideoId} is missing from storage at {StorageKey}", video.Id, video.StorageKey);
+            return null;
+        }
+        return new RenderedVideoContent(video, content);
+    }
+
+    // The version has to be this Variant's, and the Variant this Project's: an
+    // identifier from one does not work under another.
+    private async Task<Guid?> FindStoryboardIdAsync(Guid projectId, Guid variantId, int version, CancellationToken cancellationToken)
+    {
+        if (!await database.Variants.AnyAsync(v => v.Id == variantId && v.ProjectId == projectId, cancellationToken)) return null;
+        return await database.Storyboards
+            .Where(s => s.VariantId == variantId && s.Version == version)
+            .Select(s => (Guid?)s.Id)
+            .SingleOrDefaultAsync(cancellationToken);
+    }
+}

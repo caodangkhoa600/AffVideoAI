@@ -66,6 +66,15 @@ public sealed class ProductAsset : IOwnedByOrganization
     /// everything one Organization has stored is under one prefix of its own.
     /// </summary>
     public string StorageKey => $"organizations/{OrganizationId}/products/{ProductId}/assets/{Id}.png";
+
+    /// <summary>
+    /// Where the photo is kept as a video shows it: the Product cut out and standing
+    /// on its shadow. Made by the first render that needs it, and removed with the asset.
+    /// </summary>
+    public string VideoLayerKey => $"organizations/{OrganizationId}/products/{ProductId}/assets/{Id}.video-layer.png";
+
+    /// <summary>What is known about <see cref="VideoLayerKey"/>: its measurements and how it was made.</summary>
+    public string VideoLayerDetailsKey => $"organizations/{OrganizationId}/products/{ProductId}/assets/{Id}.video-layer.json";
 }
 
 public enum ProductAssetKind
