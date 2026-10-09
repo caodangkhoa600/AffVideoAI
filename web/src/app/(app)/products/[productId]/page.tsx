@@ -7,6 +7,7 @@ import { Suspense, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { api, type Product } from "@/lib/api/client";
 import { ProductAssets } from "./product-assets";
+import { ProductFacts } from "./product-facts";
 import { ProductMissing } from "./product-missing";
 import { useProduct } from "../use-product";
 
@@ -73,6 +74,7 @@ function ProductDetails({ product }: { product: Product }) {
           {product.tags.length > 0 ? product.tags.join(", ") : <span className="text-muted-foreground">None</span>}
         </Detail>
       </dl>
+      <ProductFacts productId={product.id} />
       <ProductAssets productId={product.id} />
     </>
   );

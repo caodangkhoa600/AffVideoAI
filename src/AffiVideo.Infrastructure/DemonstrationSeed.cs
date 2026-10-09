@@ -29,17 +29,35 @@ internal sealed class DemonstrationSeed(
             DemonstrationOrganization.OwnerEmail,
             DemonstrationOrganization.OwnerPassword,
             cancellationToken);
-        // Not created means its Owner was found, so the Owner is there to say which Organization it is.
-        var organizationId = created
-            ?? (await members.FindByEmailAsync(DemonstrationOrganization.OwnerEmail))?.OrganizationId
+        // Created or found, its Owner is there to say which Organization it is.
+        var owner = await members.FindByEmailAsync(DemonstrationOrganization.OwnerEmail)
             ?? throw new InvalidOperationException("The demonstration Organization's Owner is missing.");
+        var anythingCreated = created is not null;
 
         // The system acts for the demonstration Organization from here on.
-        caller.Identify(organizationId, memberId: null);
-        if (await database.Products.AnyAsync(p => p.Id == DemonstrationProduct.Id, cancellationToken)) return created is not null;
+        caller.Identify(owner.OrganizationId, memberId: null);
+        var now = clock.GetUtcNow();
+        if (!await database.Products.AnyAsync(p => p.Id == DemonstrationProduct.Id, cancellationToken))
+        {
+            database.Products.Add(new Product(DemonstrationProduct.Id, owner.OrganizationId, DemonstrationProduct.Details, now));
+            anythingCreated = true;
+        }
 
-        database.Products.Add(new Product(DemonstrationProduct.Id, organizationId, DemonstrationProduct.Details, clock.GetUtcNow()));
+        // A Fact a member has withdrawn is still there, and so is not added again.
+        var ids = DemonstrationFacts.All.Select(fact => fact.Id).ToArray();
+        var present = await database.Facts.Where(f => ids.Contains(f.Id)).Select(f => f.Id).ToListAsync(cancellationToken);
+        foreach (var (id, details) in DemonstrationFacts.All.Where(fact => !present.Contains(fact.Id)))
+        {
+            // Confirmed in the Owner's name and recorded as such, as if the Owner had done it.
+            var fact = new Fact(id, owner.OrganizationId, DemonstrationProduct.Id, details, now);
+            fact.Confirm(owner.Id, now);
+            database.Facts.Add(fact);
+            database.AuditLog.Add(new AuditLogEntry(
+                Guid.CreateVersion7(), owner.OrganizationId, owner.Id, AuditActions.FactConfirmed, id, now));
+            anythingCreated = true;
+        }
+
         await database.SaveChangesAsync(cancellationToken);
-        return true;
+        return anythingCreated;
     }
 }

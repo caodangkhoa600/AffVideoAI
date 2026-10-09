@@ -121,6 +121,39 @@ public sealed class OrganizationIsolationTests(AffiVideoApp app)
     }
 
     [Fact]
+    public async Task A_member_of_one_Organization_is_refused_reading_and_changing_the_Facts_of_a_Product_of_another()
+    {
+        var theirs = await app.CreateOrganizationAsync();
+        var mine = await app.CreateOrganizationAsync();
+        using var me = await app.SignedInAsync(mine.Owner);
+        using var them = await app.SignedInAsync(theirs.Owner);
+        var theirProduct = (await ProductTests.CreateAsync(them, ProductTests.Valid(name: "Theirs"))).Id;
+        var theirFact = await FactTests.AddAsync(them, theirProduct);
+        var myProduct = (await ProductTests.CreateAsync(me, ProductTests.Valid(name: "Mine"))).Id;
+
+        var list = await me.GetAsync(FactTests.Facts(theirProduct));
+        var read = await me.GetAsync($"{FactTests.Facts(theirProduct)}/{theirFact.Id}");
+        var readUnderMyProduct = await me.GetAsync($"{FactTests.Facts(myProduct)}/{theirFact.Id}");
+        var add = await me.PostAsync(FactTests.Facts(theirProduct), FactTests.Valid());
+        var confirm = await FactTests.ConfirmAsync(me, theirProduct, theirFact.Id);
+        var confirmUnderMyProduct = await FactTests.ConfirmAsync(me, myProduct, theirFact.Id);
+        var withdraw = await FactTests.WithdrawAsync(me, theirProduct, theirFact.Id);
+        var withdrawUnderMyProduct = await FactTests.WithdrawAsync(me, myProduct, theirFact.Id);
+        var replace = await FactTests.ReplaceAsync(me, theirProduct, theirFact.Id, FactTests.Valid());
+        var replaceUnderMyProduct = await FactTests.ReplaceAsync(me, myProduct, theirFact.Id, FactTests.Valid());
+
+        Assert.All(
+            [list, read, readUnderMyProduct, add, confirm, confirmUnderMyProduct, withdraw, withdrawUnderMyProduct, replace, replaceUnderMyProduct],
+            response => Assert.Equal(HttpStatusCode.NotFound, response.StatusCode));
+        var after = Assert.Single((await FactTests.ListAsync(them, theirProduct)).Items);
+        Assert.Equal(theirFact.Id, after.Id);
+        Assert.Equal(Domain.FactState.Proposed, after.State);
+        Assert.Equal(0, (await FactTests.ListAsync(me, myProduct)).Total);
+        Assert.Empty((await me.GetAsync<PagedResponse<AuditLogEntryResponse>>($"/api/v1/organizations/{mine.Id}/audit-log")).Items);
+        Assert.Empty((await them.GetAsync<PagedResponse<AuditLogEntryResponse>>($"/api/v1/organizations/{theirs.Id}/audit-log")).Items);
+    }
+
+    [Fact]
     public async Task A_Product_list_and_its_categories_hold_only_what_belongs_to_that_Organization()
     {
         var theirs = await app.CreateOrganizationAsync();

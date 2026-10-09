@@ -29,6 +29,8 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
 
     public DbSet<ProductAsset> ProductAssets => Set<ProductAsset>();
 
+    public DbSet<Fact> Facts => Set<Fact>();
+
     /// <summary>The keys that protect session cookies and anti-forgery tokens, kept here so sessions outlive a restart of the API.</summary>
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
@@ -92,6 +94,20 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
             asset.HasIndex(a => a.ProductId, "IX_ProductAssets_OneLogoPerProduct")
                 .IsUnique()
                 .HasFilter($"\"{nameof(ProductAsset.Kind)}\" = '{nameof(ProductAssetKind.Logo)}'");
+        });
+
+        builder.Entity<Fact>(fact =>
+        {
+            fact.HasOne<Organization>().WithMany().HasForeignKey(f => f.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            fact.HasOne<Product>().WithMany().HasForeignKey(f => f.ProductId).OnDelete(DeleteBehavior.Restrict);
+            fact.HasOne<Member>().WithMany().HasForeignKey(f => f.ConfirmedByMemberId).OnDelete(DeleteBehavior.Restrict);
+            fact.Property(f => f.Text).HasMaxLength(Fact.TextMaxLength);
+            fact.Property(f => f.Language).HasMaxLength(ContentLanguages.CodeMaxLength);
+            fact.Property(f => f.Source).HasMaxLength(Fact.SourceMaxLength);
+            // A change of state is only saved if the state is still the one that was read,
+            // so two changes made at the same moment cannot both be recorded.
+            fact.Property(f => f.State).HasConversion<string>().HasMaxLength(20).IsConcurrencyToken();
+            fact.HasIndex(f => new { f.ProductId, f.State, f.CreatedAt });
         });
 
         var filter = typeof(AffiVideoDbContext).GetMethod(nameof(FilterToCallerOrganization), BindingFlags.NonPublic | BindingFlags.Instance)!;

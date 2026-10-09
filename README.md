@@ -36,9 +36,9 @@ the only thing that changes the schema; nothing does so at startup. Run it again
 after pulling changes that add a migration.
 
 `seed` creates the demonstration Organization, its Owner and a fictional sample
-Product, the AirBeat X1. It adds only what is missing, so run it again after
-pulling changes that add to the seed; otherwise running it again changes
-nothing.
+Product, the AirBeat X1, with three Confirmed Facts in Vietnamese. It adds only
+what is missing, so run it again after pulling changes that add to the seed;
+otherwise running it again changes nothing.
 
 Then open http://localhost:3000 and sign in (see [Sign in](#sign-in)).
 http://localhost:3000/status needs no sign-in and shows the API, the database
@@ -98,7 +98,8 @@ Members page. Nothing is emailed, so the Owner chooses the Editor's password
 
 An Owner can do everything. An Editor can do all creative work but is refused
 when adding members, changing the Organization's settings or reading the audit
-log. Adding a member is recorded in the audit log, which an Owner reads at
+log. Adding a member, and confirming or withdrawing a Fact, is recorded in the
+audit log, which an Owner reads at
 `GET /api/v1/organizations/{id}/audit-log`; it has no page yet.
 
 The session is a cookie that scripts cannot read (HttpOnly, Secure,
@@ -181,9 +182,9 @@ it is a deliberate act that includes re-reading the licence (ADR 0002).
 Done: the look prototypes (tickets 01, 25, 26, in `prototypes/`), the affiliate
 experiment plan (ticket 24, `docs/business/affiliate-experiment.md`), the
 walking skeleton (ticket 02), sign in and Organizations (ticket 03),
-Products (ticket 04) and Product assets (ticket 05).
+Products (ticket 04), Product assets (ticket 05) and Facts (ticket 06).
 
-Next: Facts (ticket 06).
+Next: Projects and Variants (ticket 07).
 
 Notes from the walking skeleton:
 
@@ -227,3 +228,17 @@ Notes from Product assets:
 - A Product has at most 30 photos and one logo. A new logo replaces the old.
 - Images are decoded with SkiaSharp (MIT licence), whose native library ships
   in the NuGet package for both Windows and the Linux containers.
+
+Notes from Facts:
+
+- A Fact is Proposed, then Confirmed, then Withdrawn; it can also go straight
+  from Proposed to Withdrawn. Any other change is answered 409 with the reason.
+- A Fact's text, language and source never change, and no endpoint changes
+  them. Editing is `POST /api/v1/products/{productId}/facts/{factId}/replace`,
+  which withdraws the Fact and adds a new Proposed one in a single save.
+- A Fact is written in Vietnamese (`vi`) or English (`en`). The list is
+  `ContentLanguages` in the domain.
+- Two changes to one Fact at the same moment cannot both be saved: the second
+  is answered 409 and nothing of it is recorded.
+- The seeded Facts are Confirmed in the demonstration Owner's name, and the
+  audit log says so.

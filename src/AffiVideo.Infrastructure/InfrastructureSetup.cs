@@ -48,6 +48,7 @@ public static class InfrastructureSetup
         services.AddScoped<IOrganizationProvisioner, OrganizationProvisioner>();
         services.AddScoped<IProducts, ScopedProducts>();
         services.AddScoped<IProductAssets, ScopedProductAssets>();
+        services.AddScoped<IFacts, ScopedFacts>();
         services.AddScoped<DemonstrationSeed>();
         return services;
     }
@@ -65,8 +66,8 @@ public static class InfrastructureSetup
     }
 
     /// <summary>
-    /// Creates the demonstration Organization, its Owner and its sample Product,
-    /// each unless it is already there. Only the explicit seed command calls this.
+    /// Creates the demonstration Organization, its Owner, its sample Product and
+    /// that Product's Facts, each unless it is already there. Only the explicit seed command calls this.
     /// </summary>
     /// <returns>Whether anything was created.</returns>
     public static async Task<bool> SeedAsync(this IServiceProvider services, CancellationToken cancellationToken)
