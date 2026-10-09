@@ -21,30 +21,40 @@ internal sealed class RenderJobRunner(
     private readonly RenderingOptions _options = options.Value;
 
     /// <param name="work">A job that has just been claimed, and so is validating.</param>
+    /// <param name="cancellationToken">
+    /// Cancelled when the worker is stopping or the job is no longer its own. The
+    /// work stops there, the programs it started with it, and the job is left as it is.
+    /// </param>
     public async Task RunAsync(RenderWork work, CancellationToken cancellationToken)
     {
-        var jobDirectory = Path.Combine(_options.WorkDirectory, work.Job.Id.ToString("N"));
+        // A folder for this attempt alone: an attempt that is still stopping never shares one with the next.
+        var jobDirectory = Path.Combine(_options.WorkDirectory, $"{work.Job.Id:N}-{work.Job.Attempt}");
         try
         {
             await RenderAsync(work, jobDirectory, cancellationToken);
             logger.LogInformation("Render job {JobId} completed", work.Job.Id);
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (Exception stopped) when (stopped is RenderStoppedException || cancellationToken.IsCancellationRequested)
         {
-            // The worker is stopping. The job is left as it is, not failed.
-            throw;
+            // Cancelled by a member, taken back by the queue, or the worker is stopping. Whatever
+            // was thrown on the way out, it is not a failure of the job's: nothing is recorded.
+            logger.LogInformation("Render job {JobId} was stopped while {State}", work.Job.Id, work.Job.State);
         }
         catch (RenderFailedException refused)
         {
             logger.LogWarning("Render job {JobId} failed while {State}: {Reason}", work.Job.Id, work.Job.State, refused.Message);
-            await queue.FailAsync(work, refused.Message, cancellationToken);
+            await queue.FailAsync(work, RenderFailureCategory.InvalidInput, refused.Message, detail: null, cancellationToken);
         }
         catch (Exception exception)
         {
-            // The member is told which stage it was; what went wrong inside it is for the log.
-            logger.LogError(exception, "Render job {JobId} failed while {State}", work.Job.Id, work.Job.State);
+            // The member is told which stage it was; what went wrong inside it is kept beside that, for whoever looks into it.
+            logger.LogError(exception, "Render job {JobId} failed while {State}, attempt {Attempt}", work.Job.Id, work.Job.State, work.Job.Attempt);
+            var (category, what) = exception is TimeoutException
+                ? (RenderFailureCategory.Timeout, "it took too long")
+                : (RenderFailureCategory.Internal, "something went wrong");
             await queue.FailAsync(
-                work, $"The video could not be rendered: something went wrong while {Doing(work.Job.State)}. Try rendering again.", cancellationToken);
+                work, category, $"The video could not be rendered: {what} while {Doing(work.Job.State)}. Try rendering again.",
+                exception.ToString(), cancellationToken);
         }
         finally
         {

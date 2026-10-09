@@ -184,8 +184,18 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
             job.HasOne<Organization>().WithMany().HasForeignKey(j => j.OrganizationId).OnDelete(DeleteBehavior.Restrict);
             // A job goes with its Storyboard when a Project is deleted. One that made a Rendered Video is held by it, below.
             job.HasOne<Storyboard>().WithMany().HasForeignKey(j => j.StoryboardId).OnDelete(DeleteBehavior.Cascade);
-            job.Property(j => j.State).HasConversion<string>().HasMaxLength(20);
-            job.Property(j => j.FailureReason).HasMaxLength(RenderJob.FailureReasonMaxLength);
+            // A job is only written by whoever still has it as it was read: a worker that
+            // has lost its lease, or whose job a member has cancelled, saves nothing.
+            job.Property(j => j.State).HasConversion<string>().HasMaxLength(20).IsConcurrencyToken();
+            job.Property(j => j.LeaseId).IsConcurrencyToken();
+            job.Ignore(j => j.RetryAt);
+            job.Property(j => j.IdempotencyKey).HasMaxLength(RenderJob.IdempotencyKeyMaxLength);
+            job.Property(j => j.FailureStage).HasConversion<string>().HasMaxLength(20);
+            job.Property(j => j.FailureCategory).HasConversion<string>().HasMaxLength(20);
+            job.Property(j => j.FailureMessage).HasMaxLength(RenderJob.FailureMessageMaxLength);
+            job.Property(j => j.FailureDetail).HasMaxLength(RenderJob.FailureDetailMaxLength);
+            // One job for one click, even when the click arrives twice at the same moment.
+            job.HasIndex(j => new { j.StoryboardId, j.IdempotencyKey }).IsUnique();
             // The queue: the worker takes the job that has been queued longest.
             job.HasIndex(j => new { j.State, j.CreatedAt });
             job.HasIndex(j => new { j.StoryboardId, j.CreatedAt });

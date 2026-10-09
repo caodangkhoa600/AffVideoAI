@@ -144,6 +144,51 @@
         }
       }
     },
+    "/api/v1/render-jobs/{jobId}/cancel": {
+      "post": {
+        "tags": [
+          "Rendering"
+        ],
+        "summary": "Cancels a job that is queued or running. The worker stops what it is doing and keeps nothing of it. Cancelling a cancelled job changes nothing.",
+        "operationId": "CancelRenderJob",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenderJobResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/organizations/{organizationId}": {
       "get": {
         "tags": [
@@ -1695,7 +1740,7 @@
         "tags": [
           "Rendering"
         ],
-        "summary": "Queues a job that renders this Storyboard version in Product Lock. The worker renders it; ask for the job to see its state.",
+        "summary": "Queues a job that renders this Storyboard version in Product Lock. The worker renders it; ask for the job to see its state. A request repeated with the same Idempotency-Key is answered 200 with the job the first one queued.",
         "operationId": "SubmitRender",
         "parameters": [
           {
@@ -1724,6 +1769,13 @@
               "type": "integer",
               "format": "int32"
             }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1733,6 +1785,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RenderJobResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenderJobResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
                 }
               }
             }
@@ -2755,12 +2827,48 @@
           "ReadyForReview"
         ]
       },
+      "RenderFailureCategory": {
+        "enum": [
+          "InvalidInput",
+          "Internal",
+          "Timeout",
+          "WorkerLost"
+        ]
+      },
+      "RenderFailureResponse": {
+        "required": [
+          "stage",
+          "category",
+          "message",
+          "detail"
+        ],
+        "type": "object",
+        "properties": {
+          "stage": {
+            "$ref": "#/components/schemas/RenderJobState"
+          },
+          "category": {
+            "$ref": "#/components/schemas/RenderFailureCategory"
+          },
+          "message": {
+            "type": "string"
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "RenderJobResponse": {
         "required": [
           "id",
           "storyboardId",
           "state",
-          "failureReason",
+          "attempt",
+          "retryAt",
+          "failure",
           "renderedVideoId",
           "createdAt",
           "updatedAt"
@@ -2778,10 +2886,25 @@
           "state": {
             "$ref": "#/components/schemas/RenderJobState"
           },
-          "failureReason": {
+          "attempt": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "retryAt": {
             "type": [
               "null",
               "string"
+            ],
+            "format": "date-time"
+          },
+          "failure": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RenderFailureResponse"
+              }
             ]
           },
           "renderedVideoId": {

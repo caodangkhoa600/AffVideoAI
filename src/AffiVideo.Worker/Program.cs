@@ -6,7 +6,7 @@ using AffiVideo.Worker.Rendering;
 var builder = Host.CreateApplicationBuilder(args);
 
 builder.Services.AddInfrastructure(builder.Configuration);
-builder.Services.AddRenderQueue();
+builder.Services.AddRenderQueue(builder.Configuration);
 builder.Services.AddHostedService<Heartbeat>();
 
 builder.Services.Configure<RenderingOptions>(builder.Configuration.GetSection(RenderingOptions.Section));

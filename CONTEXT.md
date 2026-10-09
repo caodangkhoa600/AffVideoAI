@@ -109,8 +109,16 @@ The Render Mode that allows generative Techniques within a budget, alongside non
 _Avoid_: AI Video, Enhanced Hybrid, Premium Cinematic
 
 **Render job**:
-The work of rendering one Storyboard version, done by the worker in the background. Its state is the only progress a member is shown.
+The work of rendering one Storyboard version, done by a worker in the background. Its state is the only progress a member is shown.
 _Avoid_: Task, render request
+
+**Attempt**:
+One taking of a Render job by a worker. A job whose attempt fails for a reason that might pass, or whose worker stops, is tried again after a wait, a limited number of times.
+_Avoid_: Retry count, run
+
+**Lease**:
+A worker's time-limited hold on a Render job, which it renews while it works. A job whose lease runs out goes back to the queue.
+_Avoid_: Lock, claim
 
 **Cut-out**:
 A Product photo with everything but the Product made transparent. Only transparency is decided; the Product's own pixels are the photo's.

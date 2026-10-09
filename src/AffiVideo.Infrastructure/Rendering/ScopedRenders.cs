@@ -19,13 +19,15 @@ internal sealed class ScopedRenders(
     TimeProvider clock,
     ILogger<ScopedRenders> logger) : IRenders
 {
-    public async Task<RenderJob?> SubmitAsync(Guid projectId, Guid variantId, int version, CancellationToken cancellationToken)
+    public async Task<SubmittedRender?> SubmitAsync(
+        Guid projectId, Guid variantId, int version, string idempotencyKey, CancellationToken cancellationToken)
     {
         if (await FindStoryboardIdAsync(projectId, variantId, version, cancellationToken) is not { } storyboardId) return null;
         var organizationId = caller.OrganizationId
             ?? throw new InvalidOperationException("A render job is queued for the caller's Organization, and there is no caller.");
+        if (await FindByKeyAsync(storyboardId, idempotencyKey, cancellationToken) is { } already) return new SubmittedRender(already, Queued: false);
 
-        var job = new RenderJob(Guid.CreateVersion7(), organizationId, storyboardId, clock.GetUtcNow());
+        var job = new RenderJob(Guid.CreateVersion7(), organizationId, storyboardId, idempotencyKey, clock.GetUtcNow());
         database.RenderJobs.Add(job);
         try
         {
@@ -36,7 +38,15 @@ internal sealed class ScopedRenders(
             // The Project, and the Storyboard with it, was deleted after it was read.
             return null;
         }
-        return job;
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            // The same click, arriving twice at the same moment: the other request queued the job.
+            database.ChangeTracker.Clear();
+            return await FindByKeyAsync(storyboardId, idempotencyKey, cancellationToken) is { } theirs
+                ? new SubmittedRender(theirs, Queued: false)
+                : null;
+        }
+        return new SubmittedRender(job, Queued: true);
     }
 
     public async Task<Page<RenderJob>?> ListJobsAsync(
@@ -55,6 +65,25 @@ internal sealed class ScopedRenders(
     public Task<RenderJob?> FindJobAsync(Guid jobId, CancellationToken cancellationToken) =>
         database.RenderJobs.AsNoTracking().SingleOrDefaultAsync(j => j.Id == jobId, cancellationToken);
 
+    public async Task<RenderJob?> CancelJobAsync(Guid jobId, CancellationToken cancellationToken)
+    {
+        // A worker may move the job on between its being read and saved here; then it is read again.
+        for (var attempt = 1; ; attempt++)
+        {
+            var job = await database.RenderJobs.SingleOrDefaultAsync(j => j.Id == jobId, cancellationToken);
+            if (job is null || !job.Cancel(clock.GetUtcNow())) return job;
+            try
+            {
+                await database.SaveChangesAsync(cancellationToken);
+                return job;
+            }
+            catch (DbUpdateConcurrencyException) when (attempt < 5)
+            {
+                database.ChangeTracker.Clear();
+            }
+        }
+    }
+
     public Task<RenderedVideo?> FindVideoAsync(Guid videoId, CancellationToken cancellationToken) =>
         database.RenderedVideos.AsNoTracking().SingleOrDefaultAsync(v => v.Id == videoId, cancellationToken);
 
@@ -71,6 +100,10 @@ internal sealed class ScopedRenders(
         }
         return new RenderedVideoContent(video, content);
     }
+
+    private Task<RenderJob?> FindByKeyAsync(Guid storyboardId, string idempotencyKey, CancellationToken cancellationToken) =>
+        database.RenderJobs.AsNoTracking()
+            .SingleOrDefaultAsync(j => j.StoryboardId == storyboardId && j.IdempotencyKey == idempotencyKey, cancellationToken);
 
     // The version has to be this Variant's, and the Variant this Project's: an
     // identifier from one does not work under another.

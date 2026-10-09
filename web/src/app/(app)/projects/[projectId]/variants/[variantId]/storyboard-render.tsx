@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { api, problemDetail, type RenderJob, type RenderJobState, type Storyboard, type Variant } from "@/lib/api/client";
 
@@ -45,20 +45,44 @@ export function StoryboardRender({ variant, storyboard }: { variant: Variant; st
     refetchInterval: (query) => (query.state.data && !ENDED.includes(query.state.data.state) ? POLL_MS : false),
   });
   const [submitting, setSubmitting] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [refused, setRefused] = useState<string>();
+  // One key for one wish to render: a click sent twice, or sent again after the
+  // answer was lost, queues one job. A new key is made once the API has answered.
+  const idempotencyKey = useRef<string>(undefined);
 
   const render = async () => {
     setSubmitting(true);
     setRefused(undefined);
+    idempotencyKey.current ??= crypto.randomUUID();
     const { data, error } = await api
-      .POST("/api/v1/projects/{projectId}/variants/{variantId}/storyboards/{version}/renders", { params: { path } })
+      .POST("/api/v1/projects/{projectId}/variants/{variantId}/storyboards/{version}/renders", {
+        params: { path, header: { "Idempotency-Key": idempotencyKey.current } },
+      })
       .catch(() => ({ data: undefined, error: undefined }));
     if (data) {
+      idempotencyKey.current = undefined;
       queryClient.setQueryData(key, data);
     } else {
       setRefused(problemDetail(error) ?? "The render could not be started.");
     }
     setSubmitting(false);
+  };
+
+  const cancel = async (jobId: string) => {
+    setCancelling(true);
+    setRefused(undefined);
+    const { data, error } = await api
+      .POST("/api/v1/render-jobs/{jobId}/cancel", { params: { path: { jobId } } })
+      .catch(() => ({ data: undefined, error: undefined }));
+    if (data) {
+      queryClient.setQueryData(key, data);
+    } else {
+      // It ended while the member was reaching for the button: show how.
+      setRefused(problemDetail(error) ?? "The render could not be cancelled.");
+      await queryClient.invalidateQueries({ queryKey: key });
+    }
+    setCancelling(false);
   };
 
   const job = newest.data;
@@ -71,10 +95,15 @@ export function StoryboardRender({ variant, storyboard }: { variant: Variant; st
         Rendering makes a 1080 by 1920 MP4 of this version in Product Lock: the Product is cut out of its photo and only
         ever scaled, moved and rotated. It runs in the background, so this page can be left and come back to.
       </p>
-      <div>
+      <div className="flex gap-2">
         <Button onClick={render} disabled={submitting || running || newest.isPending}>
           {submitting ? "Starting…" : job ? "Render again" : "Render video"}
         </Button>
+        {running && (
+          <Button variant="outline" onClick={() => cancel(job.id)} disabled={cancelling} data-testid="render-cancel">
+            {cancelling ? "Cancelling…" : "Cancel"}
+          </Button>
+        )}
       </div>
       {refused && (
         <p role="alert" className="text-sm text-destructive">
@@ -95,9 +124,14 @@ export function StoryboardRender({ variant, storyboard }: { variant: Variant; st
           <span className="text-muted-foreground"> · started {new Date(job.createdAt).toLocaleString()}</span>
         </p>
       )}
+      {job?.state === "Queued" && job.retryAt && (
+        <p className="text-sm text-muted-foreground" data-testid="render-retry">
+          Attempt {job.attempt} did not finish. It will be tried again after {new Date(job.retryAt).toLocaleTimeString()}.
+        </p>
+      )}
       {job?.state === "Failed" && (
         <p role="alert" className="text-sm text-destructive" data-testid="render-failure">
-          {job.failureReason ?? "The video could not be rendered."}
+          {job.failure?.message ?? "The video could not be rendered."}
         </p>
       )}
       {job?.renderedVideoId && <RenderedVideoPreview videoId={job.renderedVideoId} />}

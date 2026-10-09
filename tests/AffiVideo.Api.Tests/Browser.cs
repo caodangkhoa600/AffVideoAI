@@ -25,7 +25,8 @@ public sealed class Browser(HttpClient http) : IDisposable
         return (await response.Content.ReadFromJsonAsync<T>(AffiVideoApp.Json, Cancellation))!;
     }
 
-    public Task<HttpResponseMessage> PostAsync(string path, object body) => SendAsync(HttpMethod.Post, path, Json(body));
+    public Task<HttpResponseMessage> PostAsync(string path, object body, params (string Name, string Value)[] headers) =>
+        SendAsync(HttpMethod.Post, path, Json(body), headers);
 
     /// <summary>Posts a form, as a file input does.</summary>
     public Task<HttpResponseMessage> PostFormAsync(string path, MultipartFormDataContent form) => SendAsync(HttpMethod.Post, path, form);
@@ -42,10 +43,12 @@ public sealed class Browser(HttpClient http) : IDisposable
 
     private static JsonContent Json(object body) => JsonContent.Create(body, options: AffiVideoApp.Json);
 
-    private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string path, HttpContent? content)
+    private async Task<HttpResponseMessage> SendAsync(
+        HttpMethod method, string path, HttpContent? content, params (string Name, string Value)[] headers)
     {
         using var request = new HttpRequestMessage(method, path) { Content = content };
         request.Headers.Add(AntiforgeryHeader, await AntiforgeryTokenAsync());
+        foreach (var (name, value) in headers) request.Headers.Add(name, value);
         return await http.SendAsync(request, Cancellation);
     }
 

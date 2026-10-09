@@ -74,6 +74,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/render-jobs/{jobId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancels a job that is queued or running. The worker stops what it is doing and keeps nothing of it. Cancelling a cancelled job changes nothing. */
+        post: operations["CancelRenderJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/organizations/{organizationId}": {
         parameters: {
             query?: never;
@@ -468,7 +485,7 @@ export interface paths {
         /** The jobs that render this Storyboard version, newest first. */
         get: operations["ListRenderJobs"];
         put?: never;
-        /** Queues a job that renders this Storyboard version in Product Lock. The worker renders it; ask for the job to see its state. */
+        /** Queues a job that renders this Storyboard version in Product Lock. The worker renders it; ask for the job to see its state. A request repeated with the same Idempotency-Key is answered 200 with the job the first one queued. */
         post: operations["SubmitRender"];
         delete?: never;
         options?: never;
@@ -770,13 +787,25 @@ export interface components {
         };
         /** @enum {unknown} */
         RenderedVideoState: "ReadyForReview";
+        /** @enum {unknown} */
+        RenderFailureCategory: "InvalidInput" | "Internal" | "Timeout" | "WorkerLost";
+        RenderFailureResponse: {
+            stage: components["schemas"]["RenderJobState"];
+            category: components["schemas"]["RenderFailureCategory"];
+            message: string;
+            detail: null | string;
+        };
         RenderJobResponse: {
             /** Format: uuid */
             id: string;
             /** Format: uuid */
             storyboardId: string;
             state: components["schemas"]["RenderJobState"];
-            failureReason: null | string;
+            /** Format: int32 */
+            attempt: number;
+            /** Format: date-time */
+            retryAt: null | string;
+            failure: null | components["schemas"]["RenderFailureResponse"];
             /** Format: uuid */
             renderedVideoId: null | string;
             /** Format: date-time */
@@ -993,6 +1022,44 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    CancelRenderJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RenderJobResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
             };
         };
     };
@@ -2127,7 +2194,9 @@ export interface operations {
     SubmitRender: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "Idempotency-Key"?: string;
+            };
             path: {
                 projectId: string;
                 variantId: string;
@@ -2137,6 +2206,15 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RenderJobResponse"];
+                };
+            };
             /** @description Accepted */
             202: {
                 headers: {
@@ -2144,6 +2222,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RenderJobResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
                 };
             };
             /** @description Not Found */

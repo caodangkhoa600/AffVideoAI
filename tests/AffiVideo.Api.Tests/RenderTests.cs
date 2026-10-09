@@ -36,7 +36,8 @@ public sealed partial class RenderTests(AffiVideoApp app)
         Assert.Equal(RenderJobState.Queued, rendered.Submitted.State);
         Assert.Equal(rendered.Storyboard.Id, rendered.Submitted.StoryboardId);
         Assert.Null(rendered.Submitted.RenderedVideoId);
-        Assert.Null(rendered.Submitted.FailureReason);
+        Assert.Null(rendered.Submitted.Failure);
+        Assert.Equal(0, rendered.Submitted.Attempt);
     }
 
     [Fact]
@@ -54,7 +55,8 @@ public sealed partial class RenderTests(AffiVideoApp app)
         Assert.Equal(order.Where(rendered.States.Contains), rendered.States);
         Assert.Contains(RenderJobState.Rendering, rendered.States);
         Assert.Equal(RenderJobState.Completed, rendered.Job.State);
-        Assert.Null(rendered.Job.FailureReason);
+        Assert.Null(rendered.Job.Failure);
+        Assert.Equal(1, rendered.Job.Attempt);
         Assert.Equal(rendered.Video.Id, rendered.Job.RenderedVideoId);
         Assert.True(rendered.Job.UpdatedAt > rendered.Job.CreatedAt);
 
@@ -242,7 +244,7 @@ public sealed partial class RenderTests(AffiVideoApp app)
 
         var job = await EndedAsync(member, await SubmittedAsync(member, variant, storyboard.Version));
 
-        Assert.True(job.State == RenderJobState.Completed, $"The render ended {job.State}: {job.FailureReason}\n{await app.WorkerLogAsync()}");
+        Assert.True(job.State == RenderJobState.Completed, $"The render ended {job.State}: {job.Failure?.Message}\n{await app.WorkerLogAsync()}");
         var video = await member.GetAsync<RenderedVideoResponse>($"/api/v1/rendered-videos/{job.RenderedVideoId}");
         Assert.Equal([photo.Id], video.UncutAssetIds);
         Assert.Equal(2, (await app.StoredKeysAsync(layers)).Length);
@@ -277,7 +279,12 @@ public sealed partial class RenderTests(AffiVideoApp app)
             "Scene 3 shows a photo that has since been removed from the Product. " +
             "Scene 4 shows a photo that has since been removed from the Product. " +
             "Generate the Storyboard again, then render that version.",
-            first.FailureReason);
+            first.Failure?.Message);
+        // The stage, and a category that says trying again would not have helped: it was tried once.
+        Assert.Equal(RenderJobState.Validating, first.Failure!.Stage);
+        Assert.Equal(RenderFailureCategory.InvalidInput, first.Failure.Category);
+        Assert.Null(first.Failure.Detail);
+        Assert.Equal(1, first.Attempt);
         Assert.Empty(await app.StoredKeysAsync($"organizations/{organization.Id}/rendered-videos/"));
         // Rendering again is another job. The newest is listed first.
         var listed = await member.GetAsync<PagedResponse<RenderJobResponse>>(Renders(variant, storyboard.Version));
@@ -304,11 +311,11 @@ public sealed partial class RenderTests(AffiVideoApp app)
 
         HttpResponseMessage[] responses =
         [
-            await member.PostAsync(Renders(variant, 2), new { }),
+            await SubmitAsync(member, Renders(variant, 2)),
             await member.GetAsync(Renders(variant, 2)),
-            await member.PostAsync(Renders(other, 1), new { }),
+            await SubmitAsync(member, Renders(other, 1)),
             await member.GetAsync(Renders(other, 1)),
-            await member.PostAsync(underOtherProject, new { }),
+            await SubmitAsync(member, underOtherProject),
             await member.GetAsync(underOtherProject),
             await member.GetAsync($"/api/v1/render-jobs/{Guid.NewGuid()}"),
             await member.GetAsync($"/api/v1/rendered-videos/{Guid.NewGuid()}"),
@@ -327,7 +334,7 @@ public sealed partial class RenderTests(AffiVideoApp app)
 
         HttpResponseMessage[] responses =
         [
-            await stranger.PostAsync(Renders(rendered.Variant, 1), new { }),
+            await SubmitAsync(stranger, Renders(rendered.Variant, 1)),
             await stranger.GetAsync(Renders(rendered.Variant, 1)),
             await stranger.GetAsync($"/api/v1/render-jobs/{rendered.Job.Id}"),
             await stranger.GetAsync($"/api/v1/rendered-videos/{rendered.Video.Id}"),
@@ -340,9 +347,16 @@ public sealed partial class RenderTests(AffiVideoApp app)
     internal static string Renders(VariantResponse variant, int version) =>
         $"{StoryboardTests.Storyboards(variant)}/{version}/renders";
 
+    /// <summary>The header a render is submitted with, so that a request sent twice queues one job.</summary>
+    internal const string IdempotencyKeyHeader = "Idempotency-Key";
+
+    /// <summary>Submits a render as one click does: with a key of its own unless it is given one.</summary>
+    internal static Task<HttpResponseMessage> SubmitAsync(Browser member, string renders, string? idempotencyKey = null) =>
+        member.PostAsync(renders, new { }, (IdempotencyKeyHeader, idempotencyKey ?? Guid.NewGuid().ToString()));
+
     internal static async Task<RenderJobResponse> SubmittedAsync(Browser member, VariantResponse variant, int version)
     {
-        var response = await member.PostAsync(Renders(variant, version), new { });
+        var response = await SubmitAsync(member, Renders(variant, version));
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         return await ReadAsync<RenderJobResponse>(response);
     }
@@ -381,7 +395,7 @@ public sealed partial class RenderTests(AffiVideoApp app)
         var variant = await StoryboardTests.NewVariantAsync(member, product, targetDurationSeconds: 15, hook: Hook);
         var storyboard = await StoryboardTests.GeneratedAsync(member, variant);
 
-        var response = await member.PostAsync(Renders(variant, storyboard.Version), new { });
+        var response = await SubmitAsync(member, Renders(variant, storyboard.Version));
         var submitted = await ReadAsync<RenderJobResponse>(response);
         var states = new List<RenderJobState> { submitted.State };
         var folderSeen = false;
@@ -390,10 +404,10 @@ public sealed partial class RenderTests(AffiVideoApp app)
             if (states[^1] != polled.State) states.Add(polled.State);
             if (polled.State == RenderJobState.Rendering && !folderSeen)
             {
-                folderSeen = (await app.InWorkerAsync(["test", "-d", $"/tmp/affivideo-render/{submitted.Id:N}/bundle"])).ExitCode == 0;
+                folderSeen = (await app.InWorkerAsync(["test", "-d", $"/tmp/affivideo-render/{submitted.Id:N}-1/bundle"])).ExitCode == 0;
             }
         });
-        Assert.True(job.State == RenderJobState.Completed, $"The render ended {job.State}: {job.FailureReason}\n{await app.WorkerLogAsync()}");
+        Assert.True(job.State == RenderJobState.Completed, $"The render ended {job.State}: {job.Failure?.Message}\n{await app.WorkerLogAsync()}");
 
         var video = await member.GetAsync<RenderedVideoResponse>($"/api/v1/rendered-videos/{job.RenderedVideoId}");
         var content = await member.GetAsync($"/api/v1/rendered-videos/{video.Id}/content");

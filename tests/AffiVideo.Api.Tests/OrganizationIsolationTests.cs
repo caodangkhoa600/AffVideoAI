@@ -231,16 +231,17 @@ public sealed class OrganizationIsolationTests(AffiVideoApp app)
         await StoryboardTests.GeneratedAsync(me, myVariant);
         var theirVariantUnderMyProject = $"{VariantTests.Variants(myVariant.ProjectId)}/{theirs.Variant.Id}/storyboards/1/renders";
 
-        var submit = await me.PostAsync(RenderTests.Renders(theirs.Variant, 1), new { });
+        var submit = await RenderTests.SubmitAsync(me, RenderTests.Renders(theirs.Variant, 1));
         var list = await me.GetAsync(RenderTests.Renders(theirs.Variant, 1));
-        var submitUnderMyProject = await me.PostAsync(theirVariantUnderMyProject, new { });
+        var submitUnderMyProject = await RenderTests.SubmitAsync(me, theirVariantUnderMyProject);
         var listUnderMyProject = await me.GetAsync(theirVariantUnderMyProject);
         var job = await me.GetAsync($"/api/v1/render-jobs/{theirs.Job.Id}");
+        var cancel = await me.PostAsync($"/api/v1/render-jobs/{theirs.Job.Id}/cancel", new { });
         var video = await me.GetAsync($"/api/v1/rendered-videos/{theirs.Video.Id}");
         var file = await me.GetAsync($"/api/v1/rendered-videos/{theirs.Video.Id}/content");
 
         Assert.All(
-            [submit, list, submitUnderMyProject, listUnderMyProject, job, video, file],
+            [submit, list, submitUnderMyProject, listUnderMyProject, job, cancel, video, file],
             response => Assert.Equal(HttpStatusCode.NotFound, response.StatusCode));
         // My own version 1 has no job: theirs is not listed under it, and none was queued for them.
         Assert.Equal(0, (await me.GetAsync<PagedResponse<RenderJobResponse>>(RenderTests.Renders(myVariant, 1))).Total);

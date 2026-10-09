@@ -142,6 +142,9 @@ The tests that render build the worker image from the code as it is
 (`docker build`, tagged `affivideo-worker:test`) and run it in a container
 beside the other two. The worker renders the jobs the tests queue over HTTP,
 and the MP4 the API serves is inspected with ffprobe inside that container.
+The tests about the queue (`RenderReliabilityTests`) each make a database of
+their own in the same PostgreSQL, run an API on it and start their own
+workers, which they kill, starve of Remotion or give short leases.
 The first build takes a few minutes; a render takes about a minute. To watch
 what they rendered, name a file for it:
 `AFFIVIDEO_TEST_VIDEO=render.mp4 dotnet test`.
@@ -196,11 +199,11 @@ Done: the look prototypes (tickets 01, 25, 26, in `prototypes/`), the affiliate
 experiment plan (ticket 24, `docs/business/affiliate-experiment.md`), the
 walking skeleton (ticket 02), sign in and Organizations (ticket 03),
 Products (ticket 04), Product assets (ticket 05), Facts (ticket 06),
-Projects and Variants (ticket 07), Storyboard generation (ticket 08) and
-render and preview (ticket 09).
+Projects and Variants (ticket 07), Storyboard generation (ticket 08),
+render and preview (ticket 09) and job reliability (ticket 10).
 
-Next: job reliability (ticket 10), approve, download and the library
-(ticket 11) and Storyboard editing (ticket 12).
+Next: approve, download and the library (ticket 11) and Storyboard editing
+(ticket 12).
 
 Notes from the walking skeleton:
 
@@ -319,10 +322,7 @@ Notes from render and preview:
 - A job goes queued, validating, planning, generating assets, rendering,
   quality review, completed, and can fail from any of them with a reason for
   the member. `RenderJobStates` in the domain is the whole list of allowed
-  changes. Generating video and cancelled exist and nothing enters them yet.
-- The worker renders one job at a time. A job it was rendering when it was
-  stopped stays where it was: picking it up again, retries, cancelling and
-  starting one job for two clicks are ticket 10.
+  changes. Generating video exists and nothing enters it yet.
 - The Product is cut out of each photo by BiRefNet (general, lite; MIT
   licence) run on the CPU by ONNX Runtime in the worker, about 15 seconds a
   photo, once: the cut-out, on its soft shadow, is kept in object storage
@@ -350,3 +350,41 @@ Notes from render and preview:
   It is ready for review; approving and downloading are ticket 11.
 - A Project that has a Rendered Video cannot be deleted (409). Nothing deletes
   a Rendered Video yet.
+
+Notes from job reliability:
+
+- A render is submitted with an `Idempotency-Key` header of at most 100
+  characters, and is refused (400) without one. A Storyboard version has one
+  job for each key: the first request is answered 202, and a repeat 200 with
+  the same job, whatever state it has reached. The web app makes a new key for
+  each wish to render and keeps it until the API has answered.
+- A worker takes a job under a lease (`LeaseId`, `LeaseExpiresAt` on the job)
+  and renews it every few seconds while it works. Every write a worker makes is
+  conditional on the lease still being its own, so a worker that has lost a job
+  saves nothing, whatever it goes on to do.
+- A job whose lease has run out goes back to the queue. Workers do this: each
+  looks for such jobs whenever it looks for work, so with no worker running a
+  job stays as its worker left it. A worker stopped politely leaves its job the
+  same way, and that also counts as an attempt.
+- An attempt that fails for a reason that might pass (anything but a Storyboard
+  that cannot be rendered) puts the job back in the queue, to be taken again
+  after a wait that doubles each time: 10 seconds, then 20. After three
+  attempts the job is failed. While it waits it is queued, and the job says
+  when it may next be taken (`retryAt`) and how often it has been (`attempt`).
+- A failed job says the stage it failed in, a category (`InvalidInput`,
+  `Internal`, `Timeout` or `WorkerLost`), a message for the member and the
+  technical detail (`failure` on the job). The web app shows the message. The
+  detail is what the program reported, stack trace included, and any member of
+  the Organization can read it from the API.
+- `POST /api/v1/render-jobs/{id}/cancel` cancels a job that is queued or
+  running; one that has completed or failed answers 409. A running job's worker
+  finds out when it next renews its lease or moves to the next stage, stops
+  Remotion and FFmpeg, and deletes the job's folder. What the member sees is
+  cancelled at once; the worker follows within the renewal interval.
+- The settings, with their defaults. For the worker's queue, section
+  `RenderQueue`: `LeaseDuration` (30 s), `LeaseRenewalInterval` (5 s),
+  `MaxAttempts` (3), `RetryBaseDelay` (10 s). For the worker itself, section
+  `Rendering`: `JobsAtOnce` (1), the number of jobs one worker renders at the
+  same time. In Compose they are environment variables on the worker, such as
+  `Rendering__JobsAtOnce`. Several workers can serve one queue.
+- A job's temporary files are in `/tmp/affivideo-render/{job id}-{attempt}`.

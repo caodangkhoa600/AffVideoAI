@@ -20,6 +20,9 @@ public sealed class RenderingOptions
     /// <summary>How long the worker waits before looking again when nothing is queued.</summary>
     public TimeSpan PollInterval { get; set; } = TimeSpan.FromSeconds(1);
 
+    /// <summary>How many jobs this worker renders at the same time. Each draws <see cref="ScenesAtOnce"/> Scenes at once.</summary>
+    public int JobsAtOnce { get; set; } = 1;
+
     /// <summary>How many Scenes of one job Remotion draws at the same time.</summary>
     public int ScenesAtOnce { get; set; } = 2;
 

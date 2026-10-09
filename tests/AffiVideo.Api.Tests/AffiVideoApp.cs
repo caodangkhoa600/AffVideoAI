@@ -46,6 +46,7 @@ public sealed class AffiVideoApp : IAsyncLifetime
     private readonly INetwork _network;
     private readonly PostgreSqlContainer _postgres;
     private readonly MinioContainer _minio;
+    private readonly Lazy<Task> _workerImage;
     private readonly Lazy<Task<IContainer>> _worker;
     private readonly ConcurrentDictionary<Type, Lazy<Task<object>>> _madeOnce = new();
 
@@ -56,7 +57,8 @@ public sealed class AffiVideoApp : IAsyncLifetime
         _network = new NetworkBuilder().Build();
         _postgres = new PostgreSqlBuilder(PostgresImage).WithNetwork(_network).WithNetworkAliases(PostgresHost).Build();
         _minio = new MinioBuilder(MinioImage).WithNetwork(_network).WithNetworkAliases(MinioHost).Build();
-        _worker = new Lazy<Task<IContainer>>(StartWorkerAsync);
+        _workerImage = new Lazy<Task>(BuildWorkerImageAsync);
+        _worker = new Lazy<Task<IContainer>>(() => RunWorkerAsync(_postgres.GetConnectionString(), []));
     }
 
     /// <summary>How the API writes JSON: camelCase names, enums by name.</summary>
@@ -86,11 +88,13 @@ public sealed class AffiVideoApp : IAsyncLifetime
     /// A new Organization with one Owner, made by the code the seed command uses:
     /// sign-up is closed, so there is no way to make one over HTTP.
     /// </summary>
-    public async Task<TestOrganization> CreateOrganizationAsync()
+    public Task<TestOrganization> CreateOrganizationAsync() => CreateOrganizationAsync(_factory!);
+
+    internal static async Task<TestOrganization> CreateOrganizationAsync(WebApplicationFactory<Program> factory)
     {
         var unique = Guid.NewGuid().ToString("N");
         var owner = new Credentials($"owner-{unique}@example.test", $"owner-password-{unique}");
-        await using var scope = _factory!.Services.CreateAsyncScope();
+        await using var scope = factory.Services.CreateAsyncScope();
         var id = await scope.ServiceProvider.GetRequiredService<IOrganizationProvisioner>()
             .CreateAsync($"Organization {unique}", owner.Email, owner.Password, CancellationToken.None);
         return new TestOrganization(id!.Value, owner);
@@ -151,12 +155,7 @@ public sealed class AffiVideoApp : IAsyncLifetime
     }
 
     /// <summary>The end of what the worker has logged, for saying why a render did not end as a test expected.</summary>
-    public async Task<string> WorkerLogAsync()
-    {
-        var (output, errors) = await (await WorkerAsync()).GetLogsAsync(ct: TestContext.Current.CancellationToken);
-        var log = $"{output}\n{errors}";
-        return log.Length > 6000 ? log[^6000..] : log;
-    }
+    public async Task<string> WorkerLogAsync() => await RenderStack.LogAsync(await WorkerAsync());
 
     /// <summary>
     /// Something slow that several tests only read, such as a Rendered Video, made by
@@ -165,26 +164,54 @@ public sealed class AffiVideoApp : IAsyncLifetime
     public async Task<T> OnceAsync<T>(Func<Task<T>> make) where T : class =>
         (T)await _madeOnce.GetOrAdd(typeof(T), _ => new Lazy<Task<object>>(async () => await make())).Value;
 
-    private async Task<IContainer> StartWorkerAsync()
+    /// <summary>
+    /// The system a second time, for the tests about the queue itself: a database of
+    /// its own in the same PostgreSQL, an API on it, and no worker but those the test
+    /// starts. What is queued there is taken by nobody else.
+    /// </summary>
+    public async Task<RenderStack> NewStackAsync()
     {
-        // The image compose.yaml builds, from the code as it is now. Docker's own cache keeps this short.
-        var root = CommonDirectoryPath.GetGitDirectory().DirectoryPath;
-        using var build = Process.Start(new ProcessStartInfo("docker")
+        var name = $"queue_{Guid.NewGuid():N}";
+        await using (var connection = new NpgsqlConnection(_postgres.GetConnectionString()))
         {
-            ArgumentList = { "build", "--quiet", "-f", Path.Combine(root, "src", "AffiVideo.Worker", "Dockerfile"), "-t", WorkerImage, root },
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-        })!;
-        var output = build.StandardOutput.ReadToEndAsync();
-        var errors = await build.StandardError.ReadToEndAsync();
-        await build.WaitForExitAsync();
-        if (build.ExitCode != 0)
-        {
-            throw new InvalidOperationException($"The worker image could not be built:\n{await output}\n{errors}");
+            await connection.OpenAsync();
+            await using var create = new NpgsqlCommand($"CREATE DATABASE \"{name}\"", connection);
+            await create.ExecuteNonQueryAsync();
         }
 
-        var database = new NpgsqlConnectionStringBuilder(_postgres.GetConnectionString()) { Host = PostgresHost, Port = PostgreSqlBuilder.PostgreSqlPort };
+        var database = new NpgsqlConnectionStringBuilder(_postgres.GetConnectionString()) { Database = name }.ConnectionString;
+        var api = With(new Dictionary<string, string> { ["ConnectionStrings:Database"] = database });
+        await api.Services.MigrateAsync(CancellationToken.None);
+        return new RenderStack(api, settings => RunWorkerAsync(database, settings));
+    }
+
+    // The image compose.yaml builds, from the code as it is now. Docker's own cache keeps this short.
+    private static async Task BuildWorkerImageAsync()
+    {
+        var root = CommonDirectoryPath.GetGitDirectory().DirectoryPath;
+        var (exitCode, said) = await DockerAsync(
+            "build", "--quiet", "-f", Path.Combine(root, "src", "AffiVideo.Worker", "Dockerfile"), "-t", WorkerImage, root);
+        if (exitCode != 0) throw new InvalidOperationException($"The worker image could not be built:\n{said}");
+    }
+
+    /// <summary>Runs the docker command line, for what Testcontainers has no word for.</summary>
+    internal static async Task<(int ExitCode, string Said)> DockerAsync(params string[] arguments)
+    {
+        var start = new ProcessStartInfo("docker") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
+        foreach (var argument in arguments) start.ArgumentList.Add(argument);
+        using var docker = Process.Start(start)!;
+        var output = docker.StandardOutput.ReadToEndAsync();
+        var errors = await docker.StandardError.ReadToEndAsync();
+        await docker.WaitForExitAsync();
+        return (docker.ExitCode, $"{await output}\n{errors}");
+    }
+
+    /// <param name="databaseConnection">As the tests reach the database; the worker is given the name it has inside the network.</param>
+    /// <param name="settings">Settings of the worker, named as its environment names them.</param>
+    private async Task<IContainer> RunWorkerAsync(string databaseConnection, IReadOnlyCollection<(string Name, string Value)> settings)
+    {
+        await _workerImage.Value;
+        var database = new NpgsqlConnectionStringBuilder(databaseConnection) { Host = PostgresHost, Port = PostgreSqlBuilder.PostgreSqlPort };
         var worker = new ContainerBuilder(WorkerImage)
             .WithNetwork(_network)
             .WithEnvironment("ConnectionStrings__Database", database.ConnectionString)
@@ -192,6 +219,7 @@ public sealed class AffiVideoApp : IAsyncLifetime
             .WithEnvironment("Storage__AccessKey", _minio.GetAccessKey())
             .WithEnvironment("Storage__SecretKey", _minio.GetSecretKey())
             .WithEnvironment("Storage__Bucket", Bucket)
+            .WithEnvironment(settings.ToDictionary(setting => setting.Name, setting => setting.Value))
             .WithWaitStrategy(Wait.ForUnixContainer().UntilMessageIsLogged("Worker started"))
             .Build();
         await worker.StartAsync();

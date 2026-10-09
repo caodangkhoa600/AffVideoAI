@@ -71,8 +71,11 @@ public static class InfrastructureSetup
     /// The render queue as the worker sees it, across Organizations. Only the worker
     /// asks for this: nothing in the API can claim a job.
     /// </summary>
-    public static IServiceCollection AddRenderQueue(this IServiceCollection services) =>
-        services.AddScoped<IRenderQueue, RenderQueue>();
+    public static IServiceCollection AddRenderQueue(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<RenderQueueOptions>(configuration.GetSection(RenderQueueOptions.Section));
+        return services.AddScoped<IRenderQueue, RenderQueue>();
+    }
 
     /// <summary>
     /// Applies every pending database migration and creates the storage bucket if it

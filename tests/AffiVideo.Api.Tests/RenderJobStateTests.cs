@@ -23,6 +23,17 @@ public sealed class RenderJobStateTests
         (RenderJobState.QualityReview, RenderJobState.Completed),
     ];
 
+    private static readonly RenderJobState[] Running =
+    [
+        RenderJobState.Validating, RenderJobState.Planning, RenderJobState.GeneratingAssets,
+        RenderJobState.GeneratingVideo, RenderJobState.Rendering, RenderJobState.QualityReview,
+    ];
+
+    private static readonly RenderFailure PhotoGone =
+        new(RenderJobState.Validating, RenderFailureCategory.InvalidInput, "A photo is gone.", null);
+
+    private static RenderJob NewJob() => new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "a-click", Now);
+
     public static TheoryData<RenderJobState, RenderJobState, bool> EveryChange()
     {
         var data = new TheoryData<RenderJobState, RenderJobState, bool>();
@@ -32,7 +43,9 @@ public sealed class RenderJobStateTests
             {
                 var ended = from is RenderJobState.Completed or RenderJobState.Failed or RenderJobState.Cancelled;
                 var stops = to is RenderJobState.Failed or RenderJobState.Cancelled;
-                data.Add(from, to, Forward.Contains((from, to)) || (!ended && stops));
+                // A job a worker is running may go back to the queue, to be tried again.
+                var triedAgain = Running.Contains(from) && to == RenderJobState.Queued;
+                data.Add(from, to, Forward.Contains((from, to)) || (!ended && stops) || triedAgain);
             }
         }
         return data;
@@ -48,7 +61,7 @@ public sealed class RenderJobStateTests
     [Fact]
     public void A_new_job_is_queued_and_a_refused_change_leaves_it_exactly_as_it_was()
     {
-        var job = new RenderJob(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Now);
+        var job = NewJob();
         Assert.Equal(RenderJobState.Queued, job.State);
 
         Assert.False(job.MoveTo(RenderJobState.Rendering, Now.AddMinutes(1)));
@@ -60,24 +73,27 @@ public sealed class RenderJobStateTests
     [Fact]
     public void A_job_that_failed_keeps_its_reason_and_goes_nowhere_else()
     {
-        var job = new RenderJob(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Now);
+        var job = NewJob();
         Assert.True(job.MoveTo(RenderJobState.Validating, Now.AddSeconds(1)));
 
-        Assert.True(job.Fail("A photo is gone.", Now.AddSeconds(2)));
+        Assert.True(job.Fail(PhotoGone, Now.AddSeconds(2)));
 
         Assert.Equal(RenderJobState.Failed, job.State);
-        Assert.Equal("A photo is gone.", job.FailureReason);
+        Assert.Equal("A photo is gone.", job.FailureMessage);
+        Assert.Equal(RenderJobState.Validating, job.FailureStage);
+        Assert.Equal(RenderFailureCategory.InvalidInput, job.FailureCategory);
         Assert.Equal(Now.AddSeconds(2), job.UpdatedAt);
         Assert.False(job.MoveTo(RenderJobState.Planning, Now.AddSeconds(3)));
-        Assert.False(job.Fail("Something else.", Now.AddSeconds(3)));
-        Assert.Equal("A photo is gone.", job.FailureReason);
+        Assert.False(job.Fail(PhotoGone with { Message = "Something else." }, Now.AddSeconds(3)));
+        Assert.False(job.Cancel(Now.AddSeconds(3)));
+        Assert.Equal("A photo is gone.", job.FailureMessage);
     }
 
     [Fact]
     public void A_job_is_only_completed_from_quality_review_and_then_names_its_Rendered_Video()
     {
         var video = Guid.NewGuid();
-        var job = new RenderJob(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Now);
+        var job = NewJob();
         Assert.False(job.Complete(video, Now));
         Assert.Null(job.RenderedVideoId);
 
@@ -95,6 +111,6 @@ public sealed class RenderJobStateTests
 
         Assert.Equal(RenderJobState.Completed, job.State);
         Assert.Equal(video, job.RenderedVideoId);
-        Assert.False(job.Fail("Too late.", Now.AddMinutes(2)));
+        Assert.False(job.Fail(PhotoGone, Now.AddMinutes(2)));
     }
 }
