@@ -6,6 +6,7 @@ using AffiVideo.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Npgsql;
 
 namespace AffiVideo.Infrastructure.Rendering;
 
@@ -13,18 +14,29 @@ namespace AffiVideo.Infrastructure.Rendering;
 // lease has run out, are the queries here that look across Organizations; a claim
 // identifies the caller as the job's Organization, and everything after it is
 // filtered like any other request.
+//
+// Every attempt that ends here leaves a production cost record, saved with what
+// ended it: the Rendered Video, the failure, or the return to the queue.
 internal sealed class RenderQueue(
     AffiVideoDbContext database,
     IObjectStorage storage,
     Caller caller,
     TimeProvider clock,
     IOptions<RenderQueueOptions> options,
+    IOptions<ProductionCostOptions> costs,
     ILogger<RenderQueue> logger) : IRenderQueue
 {
     private static readonly string[] Running =
         [.. Enum.GetValues<RenderJobState>().Where(state => state.IsRunning()).Select(state => state.ToString())];
 
+    // The index that keeps an attempt to one production cost record.
+    private const string OneRecordForAnAttempt = "IX_ProductionCostRecords_RenderJobId_Attempt";
+
+    // The worker itself renders: no other provider does yet.
+    private const RenderProvider Provider = RenderProvider.Local;
+
     private readonly RenderQueueOptions _options = options.Value;
+    private readonly RenderRates _rates = costs.Value.RatesOf(Provider);
 
     public async Task<RenderWork?> ClaimAsync(CancellationToken cancellationToken)
     {
@@ -45,7 +57,7 @@ internal sealed class RenderQueue(
         var claimed = await database.Database
             .SqlQuery<ClaimedJob>($"""
                 UPDATE "RenderJobs" SET
-                    "State" = {validating}, "Attempt" = "Attempt" + 1,
+                    "State" = {validating}, "Attempt" = "Attempt" + 1, "AttemptStartedAt" = {now},
                     "LeaseId" = {leaseId}, "LeaseExpiresAt" = {leaseExpiresAt}, "UpdatedAt" = {now}
                 WHERE "Id" = (
                     SELECT "Id" FROM "RenderJobs" WHERE "State" = {queued} AND "AvailableAt" <= {now}
@@ -61,7 +73,12 @@ internal sealed class RenderQueue(
         var shown = storyboard.Scenes.SelectMany(scene => scene.AssetIds).Distinct().ToList();
         var assets = await database.ProductAssets.AsNoTracking().Where(a => shown.Contains(a.Id)).ToListAsync(cancellationToken);
         var audio = await database.VariantAudio.AsNoTracking().Where(a => a.VariantId == storyboard.VariantId).ToListAsync(cancellationToken);
-        return new RenderWork(job, leaseId, storyboard, assets, [.. audio.OrderBy(a => a.Kind)]);
+        var productId = await (
+            from variant in database.Variants
+            join project in database.Projects on variant.ProjectId equals project.Id
+            where variant.Id == storyboard.VariantId
+            select project.ProductId).SingleAsync(cancellationToken);
+        return new RenderWork(job, leaseId, storyboard, assets, [.. audio.OrderBy(a => a.Kind)], productId);
     }
 
     public async Task<bool> RenewAsync(RenderWork work, CancellationToken cancellationToken)
@@ -112,12 +129,14 @@ internal sealed class RenderQueue(
         {
             job.Fail(new RenderFailure(job.State, category, message, detail), now);
         }
+        // Tried again or not, the attempt was made, and took what it took.
+        database.ProductionCostRecords.Add(CostOf(work, job, RenderAttemptOutcome.Failed, now));
 
         try
         {
             await database.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateConcurrencyException)
+        catch (Exception notSaved) when (notSaved is DbUpdateConcurrencyException || AttemptAlreadyRecorded(notSaved))
         {
             // Cancelled, or taken away, since it was read: the failure is no longer the job's to have.
         }
@@ -137,6 +156,7 @@ internal sealed class RenderQueue(
             throw new InvalidOperationException($"Render job {job.Id} cannot be completed from {job.State}.");
         }
         database.RenderedVideos.Add(video);
+        database.ProductionCostRecords.Add(CostOf(work, job, RenderAttemptOutcome.Completed, now));
 
         // The file first: a record never points at a file that is not there.
         await storage.PutAsync(video.StorageKey, mp4, RenderedVideo.ContentType, cancellationToken);
@@ -154,47 +174,125 @@ internal sealed class RenderQueue(
             {
                 logger.LogWarning(exception, "The file at {StorageKey} could not be deleted and is left behind", video.StorageKey);
             }
-            if (notSaved is DbUpdateConcurrencyException) throw new RenderStoppedException(job.Id);
+            if (notSaved is DbUpdateConcurrencyException || AttemptAlreadyRecorded(notSaved)) throw new RenderStoppedException(job.Id);
             throw;
         }
     }
 
+    // The job's lease ran out and the queue took the job back between its being read and saved
+    // here: the attempt has the record the queue wrote for it, and nothing of this save was kept.
+    private static bool AttemptAlreadyRecorded(Exception notSaved) =>
+        notSaved is DbUpdateException
+        {
+            InnerException: PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: OneRecordForAnAttempt },
+        };
+
+    // The record of the attempt the job is at, which ends now.
+    private ProductionCostRecord CostOf(RenderWork work, RenderJob job, RenderAttemptOutcome outcome, DateTimeOffset now) => new(
+        Guid.CreateVersion7(), job.OrganizationId, work.ProductId, job.Id, job.Attempt, outcome, Provider,
+        ProductionCosts.CountTechniques(work.Storyboard.Scenes), now - (job.AttemptStartedAt ?? now), _rates, now);
+
     // A worker that stops without a word leaves its job running, under a lease nobody
     // renews. Each such job goes back to the queue, to wait as a job that failed waits;
-    // one that has been taken as often as a job is, is failed instead.
+    // one that has been taken as often as a job is, is failed instead. Either way the
+    // attempt is over, and its production cost record is written with the change.
     private async Task ReturnAbandonedAsync(DateTimeOffset now, CancellationToken cancellationToken)
     {
+        await using var transaction = await database.Database.BeginTransactionAsync(cancellationToken);
+
+        // In each statement the rows are locked as they are chosen, so of two workers that
+        // come by at the same moment one returns a job and the other finds it returned.
         var failed = nameof(RenderJobState.Failed);
-        var lost = nameof(RenderFailureCategory.WorkerLost);
+        var workerLost = nameof(RenderFailureCategory.WorkerLost);
         var tried = _options.MaxAttempts == 1 ? "once" : $"{_options.MaxAttempts} times";
         var message = $"The video could not be rendered: the worker stopped before it had finished, and the job had been tried {tried}. Try rendering again.";
-        var failedForGood = await database.Database.ExecuteSqlAsync(
-            $"""
-            UPDATE "RenderJobs" SET
-                "FailureStage" = "State", "FailureCategory" = {lost}, "FailureMessage" = {message},
-                "FailureDetail" = format('The lease of attempt %s ran out at %s and was not renewed.', "Attempt", "LeaseExpiresAt"),
-                "State" = {failed}, "LeaseId" = NULL, "LeaseExpiresAt" = NULL, "UpdatedAt" = {now}
-            WHERE "State" = ANY({Running}) AND "LeaseExpiresAt" < {now} AND "Attempt" >= {_options.MaxAttempts}
-            """,
-            cancellationToken);
+        var failedForGood = await database.Database
+            .SqlQuery<LostAttempt>($"""
+                WITH lost AS (
+                    SELECT "Id", "LeaseExpiresAt" AS "LostAt" FROM "RenderJobs"
+                    WHERE "State" = ANY({Running}) AND "LeaseExpiresAt" < {now} AND "Attempt" >= {_options.MaxAttempts}
+                    FOR UPDATE)
+                UPDATE "RenderJobs" AS job SET
+                    "FailureStage" = job."State", "FailureCategory" = {workerLost}, "FailureMessage" = {message},
+                    "FailureDetail" = format('The lease of attempt %s ran out at %s and was not renewed.', job."Attempt", job."LeaseExpiresAt"),
+                    "State" = {failed}, "LeaseId" = NULL, "LeaseExpiresAt" = NULL, "UpdatedAt" = {now}
+                FROM lost WHERE job."Id" = lost."Id"
+                RETURNING job."Id" AS "JobId", job."OrganizationId", job."StoryboardId", job."Attempt", job."AttemptStartedAt", lost."LostAt"
+                """)
+            .ToListAsync(cancellationToken);
 
         var queued = nameof(RenderJobState.Queued);
         var baseSeconds = _options.RetryBaseDelay.TotalSeconds;
-        var returned = await database.Database.ExecuteSqlAsync(
-            $"""
-            UPDATE "RenderJobs" SET
-                "State" = {queued}, "LeaseId" = NULL, "LeaseExpiresAt" = NULL, "UpdatedAt" = {now},
-                "AvailableAt" = {now} + {baseSeconds} * power(2, GREATEST("Attempt" - 1, 0)) * interval '1 second'
-            WHERE "State" = ANY({Running}) AND "LeaseExpiresAt" < {now} AND "Attempt" < {_options.MaxAttempts}
-            """,
-            cancellationToken);
+        var returned = await database.Database
+            .SqlQuery<LostAttempt>($"""
+                WITH lost AS (
+                    SELECT "Id", "LeaseExpiresAt" AS "LostAt" FROM "RenderJobs"
+                    WHERE "State" = ANY({Running}) AND "LeaseExpiresAt" < {now} AND "Attempt" < {_options.MaxAttempts}
+                    FOR UPDATE)
+                UPDATE "RenderJobs" AS job SET
+                    "State" = {queued}, "LeaseId" = NULL, "LeaseExpiresAt" = NULL, "UpdatedAt" = {now},
+                    "AvailableAt" = {now} + {baseSeconds} * power(2, GREATEST(job."Attempt" - 1, 0)) * interval '1 second'
+                FROM lost WHERE job."Id" = lost."Id"
+                RETURNING job."Id" AS "JobId", job."OrganizationId", job."StoryboardId", job."Attempt", job."AttemptStartedAt", lost."LostAt"
+                """)
+            .ToListAsync(cancellationToken);
 
-        if (failedForGood + returned > 0)
+        await RecordLostAsync([.. failedForGood, .. returned], now, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        if (failedForGood.Count + returned.Count > 0)
         {
             logger.LogWarning(
-                "{Returned} render jobs whose lease had run out went back to the queue, and {Failed} were failed", returned, failedForGood);
+                "{Returned} render jobs whose lease had run out went back to the queue, and {Failed} were failed",
+                returned.Count, failedForGood.Count);
+        }
+    }
+
+    // The attempts that ended with nobody there to say so. They are of any Organization, and
+    // this queue acts for none yet, so their records are read and written past the filter.
+    private async Task RecordLostAsync(IReadOnlyCollection<LostAttempt> lost, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        if (lost.Count == 0) return;
+
+        var storyboardIds = lost.Select(attempt => attempt.StoryboardId).Distinct().ToList();
+        var storyboards = await database.Storyboards.IgnoreQueryFilters().AsNoTracking()
+            .Where(storyboard => storyboardIds.Contains(storyboard.Id))
+            .ToDictionaryAsync(storyboard => storyboard.Id, cancellationToken);
+        var productOf = await (
+                from storyboard in database.Storyboards.IgnoreQueryFilters()
+                join variant in database.Variants on storyboard.VariantId equals variant.Id
+                join project in database.Projects on variant.ProjectId equals project.Id
+                where storyboardIds.Contains(storyboard.Id)
+                select new { storyboard.Id, project.ProductId })
+            .ToDictionaryAsync(found => found.Id, found => found.ProductId, cancellationToken);
+
+        foreach (var attempt in lost)
+        {
+            // The worker was last known to have the job when its lease ran out: the attempt is taken to have lasted until then.
+            var cost = new ProductionCostRecord(
+                Guid.CreateVersion7(), attempt.OrganizationId, productOf[attempt.StoryboardId], attempt.JobId, attempt.Attempt,
+                RenderAttemptOutcome.Failed, Provider, ProductionCosts.CountTechniques(storyboards[attempt.StoryboardId].Scenes),
+                attempt.LostAt - (attempt.AttemptStartedAt ?? attempt.LostAt), _rates, now);
+            var outcome = cost.Outcome.ToString();
+            var provider = cost.Provider.ToString();
+            var techniqueCounts = TechniqueCountsJson.Write(cost.TechniqueCounts);
+            // Every column of the record, as its mapping in AffiVideoDbContext has them: a new one is added here too.
+            await database.Database.ExecuteSqlAsync(
+                $"""
+                INSERT INTO "ProductionCostRecords" (
+                    "Id", "OrganizationId", "ProductId", "RenderJobId", "Attempt", "Outcome", "Provider", "TechniqueCounts",
+                    "DurationMs", "EstimatedAmount", "Currency", "RatesVersion", "RecordedAt")
+                VALUES (
+                    {cost.Id}, {cost.OrganizationId}, {cost.ProductId}, {cost.RenderJobId}, {cost.Attempt}, {outcome}, {provider},
+                    {techniqueCounts}::jsonb, {cost.DurationMs}, {cost.EstimatedAmount}, {cost.Currency}, {cost.RatesVersion}, {cost.RecordedAt})
+                """,
+                cancellationToken);
         }
     }
 
     private sealed record ClaimedJob(Guid Id, Guid OrganizationId);
+
+    /// <param name="LostAt">When the lease the attempt held the job under ran out.</param>
+    private sealed record LostAttempt(
+        Guid JobId, Guid OrganizationId, Guid StoryboardId, int Attempt, DateTimeOffset? AttemptStartedAt, DateTimeOffset LostAt);
 }

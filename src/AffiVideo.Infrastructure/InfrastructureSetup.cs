@@ -7,6 +7,7 @@ using AffiVideo.Application.Rendering;
 using AffiVideo.Application.Storage;
 using AffiVideo.Application.Storyboards;
 using AffiVideo.Application.SystemStatus;
+using AffiVideo.Domain;
 using AffiVideo.Infrastructure.Identity;
 using AffiVideo.Infrastructure.Organizations;
 using AffiVideo.Infrastructure.Persistence;
@@ -76,6 +77,14 @@ public static class InfrastructureSetup
     public static IServiceCollection AddRenderQueue(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<RenderQueueOptions>(configuration.GetSection(RenderQueueOptions.Section));
+        // Rates nobody could estimate with stop the worker as it starts, not at its first render.
+        services.AddOptions<ProductionCostOptions>()
+            .Bind(configuration.GetSection(ProductionCostOptions.Section))
+            .Validate(
+                options => Enum.GetValues<RenderProvider>().All(provider => options.RatesOf(provider).Problem is null),
+                $"The rates under {ProductionCostOptions.Section} cannot be used: the version is a name, " +
+                $"the currency a three-letter code in capitals, and a rate is from zero to {RenderRates.MaxAmount:0}.")
+            .ValidateOnStart();
         return services.AddScoped<IRenderQueue, RenderQueue>();
     }
 

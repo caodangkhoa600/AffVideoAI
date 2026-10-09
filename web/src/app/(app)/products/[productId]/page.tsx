@@ -9,6 +9,7 @@ import { api, type Product } from "@/lib/api/client";
 import { ProductAssets } from "./product-assets";
 import { ProductFacts } from "./product-facts";
 import { ProductMissing } from "./product-missing";
+import { ProductProductionCost } from "./product-production-cost";
 import { useProduct } from "../use-product";
 
 const LOADING = <p className="text-sm text-muted-foreground">Loading…</p>;
@@ -79,6 +80,7 @@ function ProductDetails({ product }: { product: Product }) {
       </dl>
       <ProductFacts productId={product.id} />
       <ProductAssets productId={product.id} />
+      <ProductProductionCost productId={product.id} />
     </>
   );
 }

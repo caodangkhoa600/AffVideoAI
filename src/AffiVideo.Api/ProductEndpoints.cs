@@ -62,6 +62,18 @@ internal static class ProductEndpoints
                     : TypedResults.NotFound())
             .WithName("ArchiveProduct")
             .WithSummary("Archives a Product. Archiving one that is already archived changes nothing.");
+
+        group.MapGet("/{productId:guid}/production-cost", async Task<Results<Ok<ProductProductionCostResponse>, NotFound>> (
+                Guid productId, IProducts products, CancellationToken cancellationToken) =>
+                await products.ProductionCostAsync(productId, cancellationToken) is { } cost
+                    ? TypedResults.Ok(new ProductProductionCostResponse(
+                        cost.EstimatedTotals.Select(RenderedVideoEndpoints.ToResponse).ToList(), cost.Attempts, cost.FailedAttempts))
+                    : TypedResults.NotFound())
+            .WithName("GetProductProductionCost")
+            .WithSummary(
+                "What rendering for the Product is estimated to have cost so far, from the rates configured at each render: " +
+                "every attempt, including those that failed and those whose Rendered Video has since been deleted. " +
+                "An estimate, never an amount anyone was billed.");
     }
 
     private static ProductDetails ToDetails(this ProductRequest request) => new(

@@ -57,6 +57,10 @@ public enum RenderedVideoOrder
 /// <param name="StoryboardVersion">The version of the Variant's Storyboard that was rendered.</param>
 /// <param name="ApprovedByEmail">Of the member who approved it, when one did.</param>
 /// <param name="Flags">One for each Withdrawn Fact the video used, until a member clears it. Empty when it is not Flagged for Review.</param>
+/// <param name="Costs">
+/// The production cost records of the job that made the video, by attempt: the one that
+/// made it and any that failed before it. Empty for a video rendered before costs were recorded.
+/// </param>
 public sealed record RenderedVideoRecord(
     RenderedVideo Video,
     Guid ProductId,
@@ -68,7 +72,8 @@ public sealed record RenderedVideoRecord(
     string Hook,
     int StoryboardVersion,
     string? ApprovedByEmail,
-    IReadOnlyList<ReviewFlag> Flags);
+    IReadOnlyList<ReviewFlag> Flags,
+    IReadOnlyList<ProductionCostRecord> Costs);
 
 /// <summary>Either the MP4, for the caller to dispose, or the reason it may not be downloaded, in words for the member.</summary>
 public sealed record RenderedVideoDownload(RenderedVideoRecord Record, Stream? Content, string? Refused);

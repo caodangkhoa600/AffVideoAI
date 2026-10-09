@@ -47,6 +47,9 @@ public sealed class RenderJob : IOwnedByOrganization
     /// <summary>How many times a worker has taken the job. A job that is tried again is taken again.</summary>
     public int Attempt { get; private set; }
 
+    /// <summary>When a worker last took the job: the start of its latest attempt. Absent until one has.</summary>
+    public DateTimeOffset? AttemptStartedAt { get; private set; }
+
     /// <summary>The earliest a worker may take the job while it is queued: later than now when it waits to be tried again.</summary>
     public DateTimeOffset AvailableAt { get; private set; }
 

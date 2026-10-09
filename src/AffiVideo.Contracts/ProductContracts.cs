@@ -114,3 +114,14 @@ public sealed class TagsAttribute() : ValidationAttribute(
             // Counted as they are kept: blanks dropped, and a repeat in another letter case once.
             && tags.Select(tag => tag.Trim()).Where(tag => tag.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).Count() <= Product.MaxTags);
 }
+
+/// <summary>
+/// What rendering for a Product is estimated to have cost so far: every attempt at
+/// every render, those that failed and those whose video has since been deleted
+/// included. An estimate from the configured rates, never an amount anyone was billed.
+/// </summary>
+/// <param name="EstimatedTotals">One total for each currency the attempts were estimated in. Empty when nothing has been recorded.</param>
+/// <param name="Attempts">How many attempts the totals add up.</param>
+/// <param name="FailedAttempts">How many of those made no video.</param>
+public sealed record ProductProductionCostResponse(
+    IReadOnlyList<EstimatedAmountResponse> EstimatedTotals, int Attempts, int FailedAttempts);

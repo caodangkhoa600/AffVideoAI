@@ -21,7 +21,20 @@ public interface IProducts
 
     /// <summary>Every category the Organization's Products use, in alphabetical order.</summary>
     Task<IReadOnlyList<string>> ListCategoriesAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// What rendering for the Product is estimated to have cost so far: every attempt
+    /// at every render of its Storyboards, whatever has since become of the video.
+    /// </summary>
+    /// <returns>Null when there is no such Product.</returns>
+    Task<ProductProductionCost?> ProductionCostAsync(Guid productId, CancellationToken cancellationToken);
 }
+
+/// <summary>What rendering for one Product is estimated to have cost.</summary>
+/// <param name="EstimatedTotals">One total for each currency the records are in. Empty when nothing has been recorded.</param>
+/// <param name="Attempts">How many attempts the totals add up.</param>
+/// <param name="FailedAttempts">How many of those made no video.</param>
+public sealed record ProductProductionCost(IReadOnlyList<EstimatedAmount> EstimatedTotals, int Attempts, int FailedAttempts);
 
 /// <summary>Each part narrows the list; an absent part does not.</summary>
 /// <param name="Search">Text the name contains, in any letter case.</param>

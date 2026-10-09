@@ -145,6 +145,10 @@ _Avoid_: Retry count, run
 A worker's time-limited hold on a Render job, which it renews while it works. A job whose lease runs out goes back to the queue.
 _Avoid_: Lock, claim
 
+**Production cost**:
+What rendering is estimated to have cost the Organization, from rates it configures. One record is kept for each Attempt, failed ones included. It is always an estimate, never an amount anyone was billed.
+_Avoid_: Bill, charge, spend, price
+
 **Cut-out**:
 A Product photo with everything but the Product made transparent. Only transparency is decided; the Product's own pixels are the photo's.
 _Avoid_: Mask, background removal

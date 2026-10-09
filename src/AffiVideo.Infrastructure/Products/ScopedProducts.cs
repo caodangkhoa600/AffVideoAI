@@ -43,6 +43,17 @@ internal sealed class ScopedProducts(AffiVideoDbContext database, Caller caller,
         return product;
     }
 
+    public async Task<ProductProductionCost?> ProductionCostAsync(Guid productId, CancellationToken cancellationToken)
+    {
+        if (!await database.Products.AnyAsync(p => p.Id == productId, cancellationToken)) return null;
+
+        var records = await database.ProductionCostRecords.AsNoTracking()
+            .Where(cost => cost.ProductId == productId)
+            .ToListAsync(cancellationToken);
+        return new ProductProductionCost(
+            ProductionCosts.Totals(records), records.Count, records.Count(cost => cost.Outcome == RenderAttemptOutcome.Failed));
+    }
+
     public async Task<Page<Product>> ListAsync(ProductFilter filter, PageRequest page, CancellationToken cancellationToken)
     {
         var all = database.Products.AsNoTracking();

@@ -172,5 +172,21 @@ internal static class RenderedVideoEndpoints
         record.Video.NarrationAudioId,
         record.Video.MusicAudioId,
         record.Video.MusicVolumePercent,
-        record.Flags.Select(StoryboardEndpoints.ToResponse).ToList());
+        record.Flags.Select(StoryboardEndpoints.ToResponse).ToList(),
+        new ProductionCostResponse(
+            ProductionCosts.Totals(record.Costs).Select(ToResponse).ToList(),
+            record.Costs.Select(ToResponse).ToList()));
+
+    internal static EstimatedAmountResponse ToResponse(EstimatedAmount total) => new(total.Amount, total.Currency);
+
+    private static RenderAttemptCostResponse ToResponse(ProductionCostRecord cost) => new(
+        cost.Attempt,
+        cost.Outcome,
+        cost.Provider,
+        cost.TechniqueCounts.Select(count => new TechniqueCountResponse(count.Technique, count.Scenes)).ToList(),
+        cost.DurationMs,
+        cost.EstimatedAmount,
+        cost.Currency,
+        cost.RatesVersion,
+        cost.RecordedAt);
 }

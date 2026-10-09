@@ -5,9 +5,10 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { api, problemDetail, type Scene, type SceneLayout, type Storyboard, type Technique, type Variant } from "@/lib/api/client";
+import { api, problemDetail, type Scene, type SceneLayout, type Storyboard, type Variant } from "@/lib/api/client";
 import { FlaggedForReview } from "../../../../flagged-for-review";
 import { creativeTemplateName } from "../../../creative-templates";
+import { TECHNIQUES } from "../../../techniques";
 import { SceneEditor } from "./scene-editor";
 import { StoryboardRender } from "./storyboard-render";
 import { VariantAudioSection } from "./variant-audio";
@@ -24,16 +25,6 @@ const LAYOUTS: Record<SceneLayout, string> = {
   Facts: "Facts",
   Closing: "Closing",
   Solution: "Solution",
-};
-
-/** How a Scene is produced (Technique in the domain), as a member reads it. */
-const TECHNIQUES: Record<Technique, string> = {
-  StaticImage: "Static image",
-  ImageMotion: "Image motion",
-  ImageToVideo: "Image-to-video",
-  VideoAsset: "Video asset",
-  TextAnimation: "Text animation",
-  ThreeDRender: "3D render",
 };
 
 const seconds = (milliseconds: number) => `${milliseconds / 1000} s`;

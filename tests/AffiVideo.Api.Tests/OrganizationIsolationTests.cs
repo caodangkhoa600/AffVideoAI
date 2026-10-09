@@ -81,8 +81,10 @@ public sealed class OrganizationIsolationTests(AffiVideoApp app)
         var read = await me.GetAsync(path);
         var edit = await me.PutAsync(path, ProductTests.Valid(name: "Taken over"));
         var archive = await me.PostAsync($"{path}/archive", new { });
+        var cost = await me.GetAsync(ProductionCostTests.ProductCost(product.Id));
 
         Assert.Equal(HttpStatusCode.NotFound, read.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, cost.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, edit.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, archive.StatusCode);
         var after = await them.GetAsync<ProductResponse>(path);

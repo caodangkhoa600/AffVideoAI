@@ -51,16 +51,31 @@ internal sealed class ScopedRenderedVideos(
             : all.OrderByDescending(x => x.Video.CreatedAt).ThenByDescending(x => x.Video.Id);
         var items = await ordered.Skip(page.Skip).Take(page.PageSize).ToListAsync(cancellationToken);
         var flags = await database.OnRenderedVideos().OfAsync(items.Select(x => x.Video.Id).ToList(), cancellationToken);
+        var costs = await CostsOfAsync(items.Select(x => x.Video).ToList(), cancellationToken);
         return new Page<RenderedVideoRecord>(
-            items.Select(x => ToRecord(x, flags.GetValueOrDefault(x.Video.Id, []))).ToList(),
+            items.Select(x => ToRecord(x, flags.GetValueOrDefault(x.Video.Id, []), costs[x.Video.RenderJobId].ToList())).ToList(),
             page.Page, page.PageSize, await all.CountAsync(cancellationToken));
     }
 
     public async Task<RenderedVideoRecord?> FindAsync(Guid videoId, CancellationToken cancellationToken) =>
         await InContext(database.RenderedVideos.AsNoTracking().Where(v => v.Id == videoId))
             .SingleOrDefaultAsync(cancellationToken) is { } found
-            ? ToRecord(found, await database.OnRenderedVideos().OfAsync(videoId, cancellationToken))
+            ? ToRecord(
+                found, await database.OnRenderedVideos().OfAsync(videoId, cancellationToken),
+                (await CostsOfAsync([found.Video], cancellationToken))[found.Video.RenderJobId].ToList())
             : null;
+
+    // What each video's job cost, attempt by attempt: the attempts that failed before the one that made the video are the job's too.
+    private async Task<ILookup<Guid, ProductionCostRecord>> CostsOfAsync(
+        IReadOnlyCollection<RenderedVideo> videos, CancellationToken cancellationToken)
+    {
+        var jobIds = videos.Select(video => (Guid?)video.RenderJobId).ToList();
+        var records = await database.ProductionCostRecords.AsNoTracking()
+            .Where(cost => jobIds.Contains(cost.RenderJobId))
+            .OrderBy(cost => cost.Attempt)
+            .ToListAsync(cancellationToken);
+        return records.ToLookup(cost => cost.RenderJobId!.Value);
+    }
 
     public async Task<Stream?> OpenPreviewAsync(Guid videoId, CancellationToken cancellationToken) =>
         await database.RenderedVideos.AsNoTracking().SingleOrDefaultAsync(v => v.Id == videoId, cancellationToken) is { } video
@@ -208,9 +223,10 @@ internal sealed class ScopedRenderedVideos(
             ApprovedByEmail = approver.Email,
         };
 
-    private static RenderedVideoRecord ToRecord(VideoInContext found, IReadOnlyList<ReviewFlag> flags) => new(
+    private static RenderedVideoRecord ToRecord(
+        VideoInContext found, IReadOnlyList<ReviewFlag> flags, IReadOnlyList<ProductionCostRecord> costs) => new(
         found.Video, found.ProductId, found.ProductName, found.ProjectId, found.ProjectObjective,
-        found.VariantId, found.CreativeTemplate, found.Hook, found.StoryboardVersion, found.ApprovedByEmail, flags);
+        found.VariantId, found.CreativeTemplate, found.Hook, found.StoryboardVersion, found.ApprovedByEmail, flags, costs);
 
     private sealed class VideoInContext
     {

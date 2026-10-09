@@ -668,6 +668,41 @@
         }
       }
     },
+    "/api/v1/products/{productId}/production-cost": {
+      "get": {
+        "tags": [
+          "Products"
+        ],
+        "summary": "What rendering for the Product is estimated to have cost so far, from the rates configured at each render: every attempt, including those that failed and those whose Rendered Video has since been deleted. An estimate, never an amount anyone was billed.",
+        "operationId": "GetProductProductionCost",
+        "parameters": [
+          {
+            "name": "productId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductProductionCostResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
     "/api/v1/products/{productId}/assets": {
       "get": {
         "tags": [
@@ -2860,6 +2895,22 @@
           }
         }
       },
+      "EstimatedAmountResponse": {
+        "required": [
+          "amount",
+          "currency"
+        ],
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "format": "double"
+          },
+          "currency": {
+            "type": "string"
+          }
+        }
+      },
       "FactRequest": {
         "required": [
           "text",
@@ -3395,6 +3446,51 @@
           }
         }
       },
+      "ProductionCostResponse": {
+        "required": [
+          "estimatedTotals",
+          "attempts"
+        ],
+        "type": "object",
+        "properties": {
+          "estimatedTotals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EstimatedAmountResponse"
+            }
+          },
+          "attempts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RenderAttemptCostResponse"
+            }
+          }
+        }
+      },
+      "ProductProductionCostResponse": {
+        "required": [
+          "estimatedTotals",
+          "attempts",
+          "failedAttempts"
+        ],
+        "type": "object",
+        "properties": {
+          "estimatedTotals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EstimatedAmountResponse"
+            }
+          },
+          "attempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "failedAttempts": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "ProductRequest": {
         "required": [
           "name",
@@ -3616,6 +3712,62 @@
           }
         }
       },
+      "RenderAttemptCostResponse": {
+        "required": [
+          "attempt",
+          "outcome",
+          "provider",
+          "techniqueCounts",
+          "durationMs",
+          "estimatedAmount",
+          "currency",
+          "ratesVersion",
+          "recordedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "attempt": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/RenderAttemptOutcome"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/RenderProvider"
+          },
+          "techniqueCounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TechniqueCountResponse"
+            }
+          },
+          "durationMs": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "estimatedAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "ratesVersion": {
+            "type": "string"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "RenderAttemptOutcome": {
+        "enum": [
+          "Completed",
+          "Failed"
+        ]
+      },
       "RenderedVideoOrder": {
         "enum": [
           "NewestFirst",
@@ -3648,7 +3800,8 @@
           "narrationAudioId",
           "musicAudioId",
           "musicVolumePercent",
-          "flags"
+          "flags",
+          "productionCost"
         ],
         "type": "object",
         "properties": {
@@ -3767,6 +3920,9 @@
             "items": {
               "$ref": "#/components/schemas/ReviewFlagResponse"
             }
+          },
+          "productionCost": {
+            "$ref": "#/components/schemas/ProductionCostResponse"
           }
         }
       },
@@ -3892,6 +4048,11 @@
         "enum": [
           "ProductLock",
           "Hybrid"
+        ]
+      },
+      "RenderProvider": {
+        "enum": [
+          "Local"
         ]
       },
       "ReviewFlagResponse": {
@@ -4167,6 +4328,22 @@
           "TextAnimation",
           "ThreeDRender"
         ]
+      },
+      "TechniqueCountResponse": {
+        "required": [
+          "technique",
+          "scenes"
+        ],
+        "type": "object",
+        "properties": {
+          "technique": {
+            "$ref": "#/components/schemas/Technique"
+          },
+          "scenes": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
       },
       "UpdateOrganizationRequest": {
         "required": [

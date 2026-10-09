@@ -21,7 +21,7 @@ public interface IRenderQueue
     /// and moves it to validating under a new lease. A job is given to one caller
     /// only, however many ask at the same moment. Before that, every job whose
     /// lease has run out is put back in the queue, or failed if it has been tried
-    /// as often as a job is.
+    /// as often as a job is, and the attempt it lost is given its production cost record.
     /// </summary>
     /// <returns>Null when nothing is queued.</returns>
     Task<RenderWork?> ClaimAsync(CancellationToken cancellationToken);
@@ -40,6 +40,7 @@ public interface IRenderQueue
     /// Records that this attempt failed. The job is failed for good when trying
     /// again would not help or it has been tried as often as a job is; otherwise
     /// it goes back to the queue, to be taken again after a wait that doubles with each attempt.
+    /// Either way the attempt's production cost record is written with it.
     /// </summary>
     /// <param name="message">Why, in words for the member.</param>
     /// <param name="detail">What went wrong as the program reported it.</param>
@@ -47,7 +48,8 @@ public interface IRenderQueue
 
     /// <summary>
     /// Stores the MP4 as the Storyboard version's Rendered Video, ready for review, and completes the job.
-    /// The video records the audio of the work as what was mixed into it.
+    /// The video records the audio of the work as what was mixed into it, and the
+    /// attempt's production cost record is written with it.
     /// </summary>
     /// <param name="uncutAssetIds">The photos the video shows whole, on a card.</param>
     /// <param name="drawnScenePositions">The Scenes that were drawn for this video. The others were reused from an earlier render.</param>
@@ -61,8 +63,10 @@ public interface IRenderQueue
 /// <param name="Storyboard">The version to render, with its Scenes.</param>
 /// <param name="Assets">Those of the assets the Scenes show that the Product still has.</param>
 /// <param name="Audio">The narration and music the Variant has as the job is claimed, to be mixed into the video.</param>
+/// <param name="ProductId">The Product the video is of, which the cost of rendering it is recorded against.</param>
 public sealed record RenderWork(
-    RenderJob Job, Guid LeaseId, Storyboard Storyboard, IReadOnlyList<ProductAsset> Assets, IReadOnlyList<VariantAudio> Audio);
+    RenderJob Job, Guid LeaseId, Storyboard Storyboard, IReadOnlyList<ProductAsset> Assets, IReadOnlyList<VariantAudio> Audio,
+    Guid ProductId);
 
 /// <summary>
 /// The job is no longer this worker's: a member cancelled it, it was deleted with
@@ -94,4 +98,32 @@ public sealed class RenderQueueOptions
     /// <summary>The wait before the attempt that follows this one: exponential backoff.</summary>
     /// <param name="attempt">The attempt that has just failed, counted from one.</param>
     public TimeSpan RetryDelayAfter(int attempt) => RetryBaseDelay * Math.Pow(2, Math.Max(0, attempt - 1));
+}
+
+/// <summary>
+/// What rendering is taken to cost, for the production cost record of each attempt.
+/// These are estimates of the Organization's own costs, and nothing is billed from them.
+/// </summary>
+public sealed class ProductionCostOptions
+{
+    public const string Section = "ProductionCost";
+
+    /// <summary>Names the rates below. Change it whenever one of them changes: each record keeps the version it was estimated with.</summary>
+    public string RatesVersion { get; set; } = "1";
+
+    /// <summary>The three-letter code of the currency the rates are in.</summary>
+    public string Currency { get; set; } = "USD";
+
+    /// <summary>What one attempt at a render by the worker itself is taken to cost, however long it takes.</summary>
+    public decimal LocalPerAttempt { get; set; }
+
+    /// <summary>What a minute of rendering by the worker itself is taken to cost.</summary>
+    public decimal LocalPerMinute { get; set; }
+
+    /// <summary>The rates of rendering by this provider.</summary>
+    public RenderRates RatesOf(RenderProvider provider) => provider switch
+    {
+        RenderProvider.Local => new RenderRates(RatesVersion, Currency, LocalPerAttempt, LocalPerMinute),
+        _ => throw new ArgumentOutOfRangeException(nameof(provider), provider, "No rates are configured for this provider."),
+    };
 }

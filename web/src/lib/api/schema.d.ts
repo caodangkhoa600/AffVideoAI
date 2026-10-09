@@ -214,6 +214,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/products/{productId}/production-cost": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What rendering for the Product is estimated to have cost so far, from the rates configured at each render: every attempt, including those that failed and those whose Rendered Video has since been deleted. An estimate, never an amount anyone was billed. */
+        get: operations["GetProductProductionCost"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/products/{productId}/assets": {
         parameters: {
             query?: never;
@@ -756,6 +773,11 @@ export interface components {
         DuplicateVariantRequest: {
             hook: string;
         };
+        EstimatedAmountResponse: {
+            /** Format: double */
+            amount: number;
+            currency: string;
+        };
         FactRequest: {
             text: string;
             language: string;
@@ -914,6 +936,17 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
         };
+        ProductionCostResponse: {
+            estimatedTotals: components["schemas"]["EstimatedAmountResponse"][];
+            attempts: components["schemas"]["RenderAttemptCostResponse"][];
+        };
+        ProductProductionCostResponse: {
+            estimatedTotals: components["schemas"]["EstimatedAmountResponse"][];
+            /** Format: int32 */
+            attempts: number;
+            /** Format: int32 */
+            failedAttempts: number;
+        };
         ProductRequest: {
             name: string;
             category: string;
@@ -974,6 +1007,23 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
         };
+        RenderAttemptCostResponse: {
+            /** Format: int32 */
+            attempt: number;
+            outcome: components["schemas"]["RenderAttemptOutcome"];
+            provider: components["schemas"]["RenderProvider"];
+            techniqueCounts: components["schemas"]["TechniqueCountResponse"][];
+            /** Format: int64 */
+            durationMs: number;
+            /** Format: double */
+            estimatedAmount: number;
+            currency: string;
+            ratesVersion: string;
+            /** Format: date-time */
+            recordedAt: string;
+        };
+        /** @enum {unknown} */
+        RenderAttemptOutcome: "Completed" | "Failed";
         /** @enum {unknown} */
         RenderedVideoOrder: "NewestFirst" | "OldestFirst" | null;
         RenderedVideoResponse: {
@@ -1016,6 +1066,7 @@ export interface components {
             /** Format: int32 */
             musicVolumePercent: null | number;
             flags: components["schemas"]["ReviewFlagResponse"][];
+            productionCost: components["schemas"]["ProductionCostResponse"];
         };
         /** @enum {unknown} */
         RenderedVideoState: "ReadyForReview" | "Approved";
@@ -1049,6 +1100,8 @@ export interface components {
         RenderJobState: "Created" | "Queued" | "Validating" | "Planning" | "GeneratingAssets" | "GeneratingVideo" | "Rendering" | "QualityReview" | "Completed" | "Failed" | "Cancelled";
         /** @enum {unknown} */
         RenderMode: "ProductLock" | "Hybrid";
+        /** @enum {unknown} */
+        RenderProvider: "Local";
         ReviewFlagResponse: {
             /** Format: uuid */
             factId: string;
@@ -1122,6 +1175,11 @@ export interface components {
         };
         /** @enum {unknown} */
         Technique: "StaticImage" | "ImageMotion" | "ImageToVideo" | "VideoAsset" | "TextAnimation" | "ThreeDRender";
+        TechniqueCountResponse: {
+            technique: components["schemas"]["Technique"];
+            /** Format: int32 */
+            scenes: number;
+        };
         UpdateOrganizationRequest: {
             name: string;
         };
@@ -1679,6 +1737,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProductResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GetProductProductionCost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                productId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductProductionCostResponse"];
                 };
             };
             /** @description Not Found */

@@ -205,11 +205,11 @@ Projects and Variants (ticket 07), Storyboard generation (ticket 08),
 render and preview (ticket 09), job reliability (ticket 10), approve,
 download and the library (ticket 11), Storyboard editing (ticket 12),
 flagging work built on Withdrawn Facts (ticket 13), the Luxury Cinematic
-and Problem–Solution templates (ticket 14) and uploaded narration and music
-(ticket 15).
+and Problem–Solution templates (ticket 14), uploaded narration and music
+(ticket 15) and production cost records (ticket 16).
 
-Next: production cost records (ticket 16) and the Affiliate Lab and
-Campaigns (ticket 18).
+Next: the create video wizard, dashboard and end-to-end test (ticket 17) and
+the Affiliate Lab and Campaigns (ticket 18).
 
 Notes from the walking skeleton:
 
@@ -504,6 +504,46 @@ Notes from uploaded narration and music:
 - The whole upload and the decoded sound are held in memory while the API
   decodes. For one MP3 at the limits that is the 20 MB file, the samples as
   they are decoded and the WAV made of them: about 200 MB at worst.
+
+Notes from production cost records:
+
+- Every attempt at a render job that ends leaves one production cost record
+  (`ProductionCostRecords`): the attempt that made the Rendered Video, an
+  attempt that failed, whether or not the job was tried again, and an attempt
+  whose worker stopped. It is saved together with what ended the attempt, so
+  there is never one without the other. It holds the provider (`Local`, the
+  only one), how many Scenes of the Storyboard version are made by each
+  Technique, how long the attempt took, the attempt number, the estimated
+  amount, its currency and the version of the rates.
+- The duration is how long the worker had the job, from taking it to the
+  attempt ending. For an attempt whose worker stopped it runs to the moment
+  the lease ran out, since that is the last anyone knew.
+- The amount is an estimate: the rate for an attempt, plus the rate for a
+  minute for as long as the attempt took, kept to six decimals
+  (`ProductionCosts.Estimate` in the domain). It is called estimated wherever
+  it appears (`estimatedAmount`, `estimatedTotals`, "Estimated production
+  cost"), and nothing is billed from it. The Technique counts are recorded and
+  have no rate of their own yet.
+- The rates are settings of the worker, section `ProductionCost`:
+  `RatesVersion` (`1`), `Currency` (`USD`), `LocalPerAttempt` (0) and
+  `LocalPerMinute` (0). In Compose they are environment variables on the
+  worker, such as `ProductionCost__LocalPerAttempt`. Local rendering costs
+  nothing until they are set. Change `RatesVersion` whenever a rate changes:
+  a record keeps the version, currency and amount it was written with, and is
+  never estimated again. A worker whose rates cannot be used (a currency that
+  is not three capital letters, a rate below zero or over a million) does not
+  start.
+- A Rendered Video says what it cost in `productionCost`: every attempt of the
+  job that made it, in order, and their total. A video rendered before this
+  existed has no attempts and no total, which the page shows as "not
+  recorded", not as zero.
+- `GET /api/v1/products/{id}/production-cost` adds up every record of the
+  Product: attempts that failed, jobs that never made a video, and videos
+  since deleted are all included, because the cost was incurred. The records
+  stay when a Rendered Video or a Project is deleted.
+- Totals are a list, one for each currency: amounts recorded in different
+  currencies are never added to each other.
+- An attempt a member cancels leaves no record.
 
 Notes from flagging work built on Withdrawn Facts:
 

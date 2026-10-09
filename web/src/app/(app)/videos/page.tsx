@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api, type CreativeTemplate, type RenderedVideoOrder, type RenderedVideoState } from "@/lib/api/client";
 import { CREATIVE_TEMPLATES, creativeTemplateName } from "../projects/creative-templates";
+import { RenderedVideoCost } from "./production-cost";
 import { RenderedVideoActions, RenderedVideoFlag, RenderedVideoStatus, VIDEO_STATES } from "./rendered-video-actions";
 
 const PAGE_SIZE = 10;
@@ -169,6 +170,7 @@ export default function VideosPage() {
                   <p className="text-sm font-medium">
                     <RenderedVideoStatus video={video} />
                   </p>
+                  <RenderedVideoCost video={video} />
                   <RenderedVideoFlag video={video} />
                   <RenderedVideoActions video={video} />
                 </div>

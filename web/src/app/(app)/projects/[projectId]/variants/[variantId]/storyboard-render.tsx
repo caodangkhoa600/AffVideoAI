@@ -12,6 +12,7 @@ import {
   type Storyboard,
   type Variant,
 } from "@/lib/api/client";
+import { RenderedVideoCost } from "../../../../videos/production-cost";
 import { RenderedVideoActions, RenderedVideoFlag, RenderedVideoStatus } from "../../../../videos/rendered-video-actions";
 
 /** Where a render job is (RenderJobState in the domain), as a member reads it. There is no percentage to show. */
@@ -212,6 +213,7 @@ function RenderedVideoPreview({ videoId }: { videoId: string }) {
           out cleanly. A photo of the Product alone on a plain background cuts out best.
         </p>
       )}
+      {video.data && <RenderedVideoCost video={video.data} />}
       {video.data && <RenderedVideoFlag video={video.data} />}
       {video.data && <RenderedVideoActions video={video.data} />}
     </div>

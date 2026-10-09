@@ -45,6 +45,7 @@ public sealed record RenderFailureResponse(RenderJobState Stage, RenderFailureCa
 /// <param name="MusicAudioId">The music mixed into the video, when the Variant had one as it was rendered.</param>
 /// <param name="MusicVolumePercent">How loud that music was mixed, from 0 to 100. Only a video with music has one.</param>
 /// <param name="Flags">Why the video is Flagged for Review: one for each Withdrawn Fact it used, until a member clears it. Empty when it is not flagged.</param>
+/// <param name="ProductionCost">What rendering the video is estimated to have cost, with the attempts that failed before the one that made it.</param>
 public sealed record RenderedVideoResponse(
     Guid Id,
     Guid StoryboardId,
@@ -69,4 +70,42 @@ public sealed record RenderedVideoResponse(
     Guid? NarrationAudioId,
     Guid? MusicAudioId,
     int? MusicVolumePercent,
-    IReadOnlyList<ReviewFlagResponse> Flags);
+    IReadOnlyList<ReviewFlagResponse> Flags,
+    ProductionCostResponse ProductionCost);
+
+/// <summary>
+/// What rendering one Rendered Video is estimated to have cost. Every amount is an
+/// estimate from the rates configured when it was rendered; none is an amount anyone was billed.
+/// </summary>
+/// <param name="EstimatedTotals">
+/// The attempts added up, one total for each currency they were estimated in. Empty when
+/// the video was rendered before costs were recorded: nothing is known, which is not a cost of nothing.
+/// </param>
+/// <param name="Attempts">Each attempt of the job that made the video, in order: those that failed, then the one that made it.</param>
+public sealed record ProductionCostResponse(
+    IReadOnlyList<EstimatedAmountResponse> EstimatedTotals, IReadOnlyList<RenderAttemptCostResponse> Attempts);
+
+/// <summary>An amount of money that was estimated, not billed.</summary>
+/// <param name="Currency">A three-letter code.</param>
+public sealed record EstimatedAmountResponse(decimal Amount, string Currency);
+
+/// <summary>The production cost record of one attempt at a render job.</summary>
+/// <param name="Attempt">Which taking of the job it was, counted from one.</param>
+/// <param name="Provider">What rendered.</param>
+/// <param name="TechniqueCounts">How many Scenes of the Storyboard version are made by each Technique.</param>
+/// <param name="DurationMs">How long the attempt took, in milliseconds.</param>
+/// <param name="EstimatedAmount">What the attempt is estimated to have cost. Nobody was billed this.</param>
+/// <param name="RatesVersion">Names the configured rates the amount was estimated with.</param>
+public sealed record RenderAttemptCostResponse(
+    int Attempt,
+    RenderAttemptOutcome Outcome,
+    RenderProvider Provider,
+    IReadOnlyList<TechniqueCountResponse> TechniqueCounts,
+    long DurationMs,
+    decimal EstimatedAmount,
+    string Currency,
+    string RatesVersion,
+    DateTimeOffset RecordedAt);
+
+/// <param name="Scenes">How many Scenes are made by the Technique.</param>
+public sealed record TechniqueCountResponse(Technique Technique, int Scenes);

@@ -45,6 +45,8 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
 
     public DbSet<ClearedFlag> ClearedFlags => Set<ClearedFlag>();
 
+    public DbSet<ProductionCostRecord> ProductionCostRecords => Set<ProductionCostRecord>();
+
     /// <summary>The keys that protect session cookies and anti-forgery tokens, kept here so sessions outlive a restart of the API.</summary>
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
@@ -251,6 +253,32 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
             cleared.ToTable(table => table.HasCheckConstraint(
                 "CK_ClearedFlags_OneSubject",
                 $"(\"{nameof(ClearedFlag.StoryboardId)}\" IS NULL) <> (\"{nameof(ClearedFlag.RenderedVideoId)}\" IS NULL)"));
+        });
+
+        builder.Entity<ProductionCostRecord>(cost =>
+        {
+            cost.HasOne<Organization>().WithMany().HasForeignKey(c => c.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            // What a Product has cost to render is kept with the Product, which is never deleted.
+            cost.HasOne<Product>().WithMany().HasForeignKey(c => c.ProductId).OnDelete(DeleteBehavior.Restrict);
+            // The record outlives its job: a job goes with its Project, and what rendering it cost is still part of the Product's production cost.
+            cost.HasOne<RenderJob>().WithMany().HasForeignKey(c => c.RenderJobId).OnDelete(DeleteBehavior.SetNull);
+            cost.Property(c => c.Outcome).HasConversion<string>().HasMaxLength(20);
+            cost.Property(c => c.Provider).HasConversion<string>().HasMaxLength(20);
+            cost.Property(c => c.TechniqueCounts)
+                .HasColumnType("jsonb")
+                .HasConversion(
+                    counts => TechniqueCountsJson.Write(counts),
+                    json => TechniqueCountsJson.Read(json),
+                    new ValueComparer<IReadOnlyList<TechniqueCount>>(
+                        (a, b) => a!.SequenceEqual(b!),
+                        counts => counts.Aggregate(0, (hash, count) => HashCode.Combine(hash, count)),
+                        counts => counts.ToList()));
+            cost.Property(c => c.EstimatedAmount).HasPrecision(ProductionCosts.AmountPrecision, ProductionCosts.AmountDecimals);
+            cost.Property(c => c.Currency).HasMaxLength(Product.CurrencyLength);
+            cost.Property(c => c.RatesVersion).HasMaxLength(RenderRates.VersionMaxLength);
+            // An attempt has one record, whoever comes to write it.
+            cost.HasIndex(c => new { c.RenderJobId, c.Attempt }).IsUnique();
+            cost.HasIndex(c => c.ProductId);
         });
 
         var filter = typeof(AffiVideoDbContext).GetMethod(nameof(FilterToCallerOrganization), BindingFlags.NonPublic | BindingFlags.Instance)!;
