@@ -85,7 +85,8 @@ A mark on a Scene whose text a person changed. Its text is no longer traceable t
 _Avoid_: Overridden, custom
 
 **Flagged for Review**:
-A mark on a Storyboard or Rendered Video that used a Fact which has since been Withdrawn. Flagged work is kept, never deleted.
+A mark on a Storyboard version or Rendered Video that used a Fact which has since been Withdrawn. Flagged work is kept, never deleted. A member clears the mark after reviewing the work, one version or one video at a time.
+_Avoid_: Invalidated, stale, needs attention
 
 **Rendered Video**:
 The MP4 produced from one specific Storyboard version.

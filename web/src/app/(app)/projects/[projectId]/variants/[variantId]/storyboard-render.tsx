@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { api, problemDetail, type RenderJob, type RenderJobState, type Storyboard, type Variant } from "@/lib/api/client";
-import { RenderedVideoActions, RenderedVideoStatus } from "../../../../videos/rendered-video-actions";
+import { RenderedVideoActions, RenderedVideoFlag, RenderedVideoStatus } from "../../../../videos/rendered-video-actions";
 
 /** Where a render job is (RenderJobState in the domain), as a member reads it. There is no percentage to show. */
 const STAGES: Record<RenderJobState, string> = {
@@ -196,6 +196,7 @@ function RenderedVideoPreview({ videoId }: { videoId: string }) {
           out cleanly. A photo of the Product alone on a plain background cuts out best.
         </p>
       )}
+      {video.data && <RenderedVideoFlag video={video.data} />}
       {video.data && <RenderedVideoActions video={video.data} />}
     </div>
   );

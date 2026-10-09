@@ -123,7 +123,8 @@ public sealed class StoryboardTests(AffiVideoApp app)
         (await FactTests.WithdrawAsync(member, product, battery.Id)).EnsureSuccessStatusCode();
         var kept = await member.GetAsync<StoryboardResponse>($"{Storyboards(variant)}/1");
         var next = await GeneratedAsync(member, variant);
-        Assert.Equal(storyboard, kept, Same);
+        // Nothing of the version itself changed: only the flag the Withdrawn Fact put on it is new.
+        Assert.Equal(storyboard, kept with { Flags = [] }, Same);
         Assert.Equal([new SceneFactResponse(noise.Id, "Chống ồn chủ động")], next.Scenes.Single(scene => scene.Layout == SceneLayout.Facts).Facts);
         Assert.DoesNotContain("Pin dùng liên tục 30 giờ", AllText(next));
     }

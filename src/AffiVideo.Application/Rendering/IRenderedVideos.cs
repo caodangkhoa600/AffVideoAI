@@ -24,6 +24,14 @@ public interface IRenderedVideos
     Task<RenderedVideoChange?> ApproveAsync(Guid videoId, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Clears the flags these Withdrawn Facts put on a Rendered Video, in the calling
+    /// member's name, and records it in the audit log. Nothing else about it changes.
+    /// </summary>
+    /// <param name="factIds">The Facts whose flags the member has reviewed.</param>
+    /// <returns>Null when there is no such Rendered Video.</returns>
+    Task<RenderedVideoChange?> ClearFlagAsync(Guid videoId, IReadOnlyCollection<Guid> factIds, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Deletes a Rendered Video in either state, with its file, and records it in the
     /// audit log. The job that made it is kept, with nothing to show for it.
     /// </summary>
@@ -33,7 +41,9 @@ public interface IRenderedVideos
 
 /// <summary>What narrows the library, and its order. Whatever is left out narrows nothing.</summary>
 /// <param name="Search">Looked for in the Product's name and in the Project's objective, which is what a Project is called by.</param>
-public sealed record RenderedVideoFilter(string? Search, RenderedVideoState? State, CreativeTemplate? CreativeTemplate, RenderedVideoOrder Order);
+/// <param name="Flagged">True for those Flagged for Review only, false for the others only.</param>
+public sealed record RenderedVideoFilter(
+    string? Search, RenderedVideoState? State, CreativeTemplate? CreativeTemplate, bool? Flagged, RenderedVideoOrder Order);
 
 /// <summary>The order of the library, by when each Rendered Video was rendered.</summary>
 public enum RenderedVideoOrder
@@ -46,6 +56,7 @@ public enum RenderedVideoOrder
 /// <param name="ProjectObjective">What the Project is called by.</param>
 /// <param name="StoryboardVersion">The version of the Variant's Storyboard that was rendered.</param>
 /// <param name="ApprovedByEmail">Of the member who approved it, when one did.</param>
+/// <param name="Flags">One for each Withdrawn Fact the video used, until a member clears it. Empty when it is not Flagged for Review.</param>
 public sealed record RenderedVideoRecord(
     RenderedVideo Video,
     Guid ProductId,
@@ -56,12 +67,13 @@ public sealed record RenderedVideoRecord(
     CreativeTemplate CreativeTemplate,
     string Hook,
     int StoryboardVersion,
-    string? ApprovedByEmail);
+    string? ApprovedByEmail,
+    IReadOnlyList<ReviewFlag> Flags);
 
 /// <summary>Either the MP4, for the caller to dispose, or the reason it may not be downloaded, in words for the member.</summary>
 public sealed record RenderedVideoDownload(RenderedVideoRecord Record, Stream? Content, string? Refused);
 
-/// <summary>Either the Rendered Video as it now is, or the reason it could not be approved, in words for the member.</summary>
+/// <summary>Either the Rendered Video as it now is, or the reason it was not changed, in words for the member.</summary>
 public sealed record RenderedVideoChange(RenderedVideoRecord? Record, string? Refused)
 {
     public static RenderedVideoChange Made(RenderedVideoRecord record) => new(record, null);

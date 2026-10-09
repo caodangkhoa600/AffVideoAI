@@ -79,6 +79,22 @@ internal static class StoryboardEndpoints
                 "Makes the Variant's next Storyboard version from this one with one Scene planned again, by the mock planner, from the " +
                 "Product's Confirmed Facts and photos as they are now. The Scene keeps its place and its duration and is no longer " +
                 "Manually Edited; every other Scene is as it was. Answers 409 with the reason when the Scene cannot be planned.");
+
+        group.MapPost("/{version:int}/clear-flag", async Task<Results<Ok<StoryboardResponse>, NotFound, ProblemHttpResult>> (
+                Guid projectId, Guid variantId, int version, ClearFlagRequest request,
+                IStoryboards storyboards, CancellationToken cancellationToken) =>
+                await storyboards.ClearFlagAsync(projectId, variantId, version, request.FactIds, cancellationToken) switch
+                {
+                    null => TypedResults.NotFound(),
+                    { Record: { } cleared } => TypedResults.Ok(ToResponse(cleared)),
+                    var refused => TypedResults.Problem(refused.Refused, statusCode: StatusCodes.Status409Conflict),
+                })
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .WithName("ClearStoryboardFlag")
+            .WithSummary(
+                "Clears the flags the named Withdrawn Facts put on a Storyboard version a member has reviewed, in the member's name. " +
+                "The version stays as it is, and so does the flag on any Rendered Video made from it. A Fact withdrawn " +
+                "afterwards flags the version again. Answers 409 for a version that is not flagged, or not by any of these Facts.");
     }
 
     private static Results<Created<StoryboardResponse>, NotFound, ProblemHttpResult> ToResult(
@@ -90,7 +106,10 @@ internal static class StoryboardEndpoints
         var refused => TypedResults.Problem(refused.Refused, statusCode: StatusCodes.Status409Conflict),
     };
 
-    private static StoryboardResponse ToResponse(Storyboard storyboard) => new(
+    private static StoryboardResponse ToResponse(StoryboardRecord record) => ToResponse(record.Storyboard, record.Flags);
+
+    // A version just made rests on Confirmed Facts only, so it has no flags.
+    private static StoryboardResponse ToResponse(Storyboard storyboard, IReadOnlyList<ReviewFlag>? flags = null) => new(
         storyboard.Id,
         storyboard.VariantId,
         storyboard.Version,
@@ -108,5 +127,8 @@ internal static class StoryboardEndpoints
             scene.AssetIds,
             scene.Facts.Select(fact => new SceneFactResponse(fact.FactId, fact.Text)).ToList(),
             scene.ManuallyEdited)).ToList(),
-        storyboard.CreatedAt);
+        storyboard.CreatedAt,
+        (flags ?? []).Select(ToResponse).ToList());
+
+    internal static ReviewFlagResponse ToResponse(ReviewFlag flag) => new(flag.FactId, flag.Text, flag.WithdrawnAt);
 }

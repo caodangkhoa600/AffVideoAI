@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { api, problemDetail, type RenderedVideo, type RenderedVideoState } from "@/lib/api/client";
+import { FlaggedForReview } from "../flagged-for-review";
 
 /** Where a Rendered Video is (RenderedVideoState in the domain), as a member reads it. */
 export const VIDEO_STATES: Record<RenderedVideoState, string> = {
@@ -100,6 +101,25 @@ export function RenderedVideoActions({ video }: { video: RenderedVideo }) {
       )}
     </div>
   );
+}
+
+/** The Flagged for Review mark on a Rendered Video, and clearing it. Draws nothing for one that is not flagged. */
+export function RenderedVideoFlag({ video }: { video: RenderedVideo }) {
+  const queryClient = useQueryClient();
+
+  const clear = async (factIds: string[]) => {
+    const { data, error } = await api
+      .POST("/api/v1/rendered-videos/{videoId}/clear-flag", { params: { path: { videoId: video.id } }, body: { factIds } })
+      .catch(() => ({ data: undefined, error: undefined }));
+    // A 409 is a flag someone else cleared meanwhile: asking again shows it gone.
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["rendered-videos"] }),
+      queryClient.invalidateQueries({ queryKey: ["projects", "one", video.projectId] }),
+    ]);
+    return data ? undefined : (problemDetail(error) ?? "The flag could not be cleared.");
+  };
+
+  return <FlaggedForReview flags={video.flags} subject="Rendered Video" onClear={clear} />;
 }
 
 /** The state of a Rendered Video and, once approved, who approved it and when. */

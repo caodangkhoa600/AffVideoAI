@@ -23,6 +23,7 @@ export type Scene = components["schemas"]["SceneResponse"];
 export type SceneEdit = components["schemas"]["SceneEditRequest"];
 export type SceneLayout = components["schemas"]["SceneLayout"];
 export type Technique = components["schemas"]["Technique"];
+export type ReviewFlag = components["schemas"]["ReviewFlagResponse"];
 export type RenderJob = components["schemas"]["RenderJobResponse"];
 export type RenderJobState = components["schemas"]["RenderJobState"];
 export type RenderedVideo = components["schemas"]["RenderedVideoResponse"];

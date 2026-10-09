@@ -14,7 +14,8 @@ namespace AffiVideo.Infrastructure.Storyboards;
 internal sealed class ScopedStoryboards(
     AffiVideoDbContext database, Caller caller, ILanguageModel languageModel, TimeProvider clock) : IStoryboards
 {
-    // How often a version number taken by a Storyboard made at the same moment is given up for the next.
+    // How often a version number taken by a Storyboard made at the same moment is given up for the next,
+    // and how often flags someone else cleared at the same moment are read again.
     private const int MaxAttempts = 3;
 
     public async Task<StoryboardGeneration?> GenerateAsync(Guid projectId, Guid variantId, CancellationToken cancellationToken)
@@ -116,7 +117,7 @@ internal sealed class ScopedStoryboards(
             cancellationToken);
     }
 
-    public async Task<Page<Storyboard>?> ListAsync(Guid projectId, Guid variantId, PageRequest page, CancellationToken cancellationToken)
+    public async Task<Page<StoryboardRecord>?> ListAsync(Guid projectId, Guid variantId, PageRequest page, CancellationToken cancellationToken)
     {
         if (await FindVariantAsync(projectId, variantId, cancellationToken) is null) return null;
 
@@ -125,14 +126,50 @@ internal sealed class ScopedStoryboards(
             .OrderByDescending(s => s.Version)
             .Skip(page.Skip).Take(page.PageSize)
             .ToListAsync(cancellationToken);
-        return new Page<Storyboard>(items, page.Page, page.PageSize, await all.CountAsync(cancellationToken));
+        var flags = await database.OnStoryboards().OfAsync(items.Select(s => s.Id).ToList(), cancellationToken);
+        return new Page<StoryboardRecord>(
+            items.Select(s => new StoryboardRecord(s, flags.GetValueOrDefault(s.Id, []))).ToList(),
+            page.Page, page.PageSize, await all.CountAsync(cancellationToken));
     }
 
-    public async Task<Storyboard?> FindAsync(Guid projectId, Guid variantId, int version, CancellationToken cancellationToken) =>
-        await FindVariantAsync(projectId, variantId, cancellationToken) is null
+    public async Task<StoryboardRecord?> FindAsync(Guid projectId, Guid variantId, int version, CancellationToken cancellationToken)
+    {
+        if (await FindVariantAsync(projectId, variantId, cancellationToken) is null) return null;
+
+        var storyboard = await database.Storyboards.AsNoTracking()
+            .SingleOrDefaultAsync(s => s.VariantId == variantId && s.Version == version, cancellationToken);
+        return storyboard is null
             ? null
-            : await database.Storyboards.AsNoTracking()
-                .SingleOrDefaultAsync(s => s.VariantId == variantId && s.Version == version, cancellationToken);
+            : new StoryboardRecord(storyboard, await database.OnStoryboards().OfAsync(storyboard.Id, cancellationToken));
+    }
+
+    public async Task<StoryboardFlagClearing?> ClearFlagAsync(
+        Guid projectId, Guid variantId, int version, IReadOnlyCollection<Guid> factIds, CancellationToken cancellationToken)
+    {
+        var member = caller.MemberId ?? throw new InvalidOperationException("Only a member can clear a flag.");
+        // Someone may clear one of the flags, or delete the Project, between their being read and cleared here; then they are read again.
+        for (var attempt = 1; ; attempt++)
+        {
+            if (await FindAsync(projectId, variantId, version, cancellationToken) is not { } found) return null;
+            if (found.Flags.Count == 0) return StoryboardFlagClearing.Refuse(NotFlagged);
+            // Only what the member saw is cleared: a Fact withdrawn since is a flag nobody has reviewed.
+            var reviewed = found.Flags.Where(flag => factIds.Contains(flag.FactId)).ToList();
+            if (reviewed.Count == 0) return StoryboardFlagClearing.Refuse(ReviewFlags.FlagsChanged);
+
+            var now = clock.GetUtcNow();
+            database.ClearedFlags.AddRange(reviewed.Select(flag => ClearedFlag.OnStoryboard(found.Storyboard, flag.FactId, member, now)));
+            database.AuditLog.Add(new AuditLogEntry(
+                Guid.CreateVersion7(), found.Storyboard.OrganizationId, member, AuditActions.StoryboardFlagCleared, found.Storyboard.Id, now));
+            // The clearing and its audit log entry are saved together, or neither is.
+            if (await database.SaveUnlessClearedMeanwhileAsync(cancellationToken))
+            {
+                return StoryboardFlagClearing.Made(found with { Flags = await database.OnStoryboards().OfAsync(found.Storyboard.Id, cancellationToken) });
+            }
+            if (attempt == MaxAttempts) return StoryboardFlagClearing.Refuse(ReviewFlags.ClearedMeanwhile);
+        }
+    }
+
+    private const string NotFlagged = "This Storyboard version is not Flagged for Review.";
 
     private const string NoConfirmedFact =
         "This Product has no Confirmed Fact in the language of the video. Confirm at least one, then generate again.";

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api, type CreativeTemplate, type RenderedVideoOrder, type RenderedVideoState } from "@/lib/api/client";
 import { CREATIVE_TEMPLATES, creativeTemplateName } from "../projects/creative-templates";
-import { RenderedVideoActions, RenderedVideoStatus, VIDEO_STATES } from "./rendered-video-actions";
+import { RenderedVideoActions, RenderedVideoFlag, RenderedVideoStatus, VIDEO_STATES } from "./rendered-video-actions";
 
 const PAGE_SIZE = 10;
 
@@ -20,11 +20,13 @@ export default function VideosPage() {
   const [search, setSearch] = useState("");
   const [state, setState] = useState<RenderedVideoState | "">("");
   const [creativeTemplate, setCreativeTemplate] = useState<CreativeTemplate | "">("");
+  // Whether only the Rendered Videos Flagged for Review are listed, only the others, or all.
+  const [flagged, setFlagged] = useState<"" | "true" | "false">("");
   const [sort, setSort] = useState<RenderedVideoOrder>("NewestFirst");
   const [page, setPage] = useState(1);
 
   const videos = useQuery({
-    queryKey: ["rendered-videos", "list", { search, state, creativeTemplate, sort, page }],
+    queryKey: ["rendered-videos", "list", { search, state, creativeTemplate, flagged, sort, page }],
     queryFn: async () => {
       const { data, response } = await api.GET("/api/v1/rendered-videos", {
         params: {
@@ -32,6 +34,7 @@ export default function VideosPage() {
             search: search || undefined,
             state: state || undefined,
             creativeTemplate: creativeTemplate || undefined,
+            flagged: flagged ? flagged === "true" : undefined,
             sort,
             page,
             pageSize: PAGE_SIZE,
@@ -96,6 +99,19 @@ export default function VideosPage() {
           </select>
         </div>
         <div className="flex flex-col gap-2">
+          <Label htmlFor="flagged">Flagged for Review</Label>
+          <select
+            id="flagged"
+            className={SELECT}
+            value={flagged}
+            onChange={(e) => fromFirstPage(setFlagged)(e.target.value as "" | "true" | "false")}
+          >
+            <option value="">All</option>
+            <option value="true">Flagged</option>
+            <option value="false">Not flagged</option>
+          </select>
+        </div>
+        <div className="flex flex-col gap-2">
           <Label htmlFor="sort">Sort by date</Label>
           <select
             id="sort"
@@ -119,7 +135,7 @@ export default function VideosPage() {
             <li className="px-4 py-3 text-sm text-muted-foreground">Loading…</li>
           ) : videos.data.items.length === 0 ? (
             <li className="px-4 py-3 text-sm text-muted-foreground">
-              {search || state || creativeTemplate
+              {search || state || creativeTemplate || flagged
                 ? "No Rendered Videos match."
                 : "No Rendered Videos yet. Render a Storyboard on a Variant's page to make one."}
             </li>
@@ -153,6 +169,7 @@ export default function VideosPage() {
                   <p className="text-sm font-medium">
                     <RenderedVideoStatus video={video} />
                   </p>
+                  <RenderedVideoFlag video={video} />
                   <RenderedVideoActions video={video} />
                 </div>
               </li>

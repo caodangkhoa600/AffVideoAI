@@ -20,6 +20,7 @@ internal sealed class ScopedRenderedVideos(
     ILogger<ScopedRenderedVideos> logger) : IRenderedVideos
 {
     private const string AlreadyApproved = "This Rendered Video is already approved.";
+    private const string NotFlagged = "This Rendered Video is not Flagged for Review.";
 
     public async Task<Page<RenderedVideoRecord>> ListAsync(RenderedVideoFilter filter, PageRequest page, CancellationToken cancellationToken)
     {
@@ -39,19 +40,26 @@ internal sealed class ScopedRenderedVideos(
         {
             all = all.Where(x => x.CreativeTemplate == template);
         }
+        if (filter.Flagged is { } flagged)
+        {
+            var raised = database.OnRenderedVideos();
+            all = all.Where(x => raised.Any(flag => flag.SubjectId == x.Video.Id) == flagged);
+        }
 
         var ordered = filter.Order == RenderedVideoOrder.OldestFirst
             ? all.OrderBy(x => x.Video.CreatedAt).ThenBy(x => x.Video.Id)
             : all.OrderByDescending(x => x.Video.CreatedAt).ThenByDescending(x => x.Video.Id);
         var items = await ordered.Skip(page.Skip).Take(page.PageSize).ToListAsync(cancellationToken);
+        var flags = await database.OnRenderedVideos().OfAsync(items.Select(x => x.Video.Id).ToList(), cancellationToken);
         return new Page<RenderedVideoRecord>(
-            items.Select(ToRecord).ToList(), page.Page, page.PageSize, await all.CountAsync(cancellationToken));
+            items.Select(x => ToRecord(x, flags.GetValueOrDefault(x.Video.Id, []))).ToList(),
+            page.Page, page.PageSize, await all.CountAsync(cancellationToken));
     }
 
     public async Task<RenderedVideoRecord?> FindAsync(Guid videoId, CancellationToken cancellationToken) =>
         await InContext(database.RenderedVideos.AsNoTracking().Where(v => v.Id == videoId))
             .SingleOrDefaultAsync(cancellationToken) is { } found
-            ? ToRecord(found)
+            ? ToRecord(found, await database.OnRenderedVideos().OfAsync(videoId, cancellationToken))
             : null;
 
     public async Task<Stream?> OpenPreviewAsync(Guid videoId, CancellationToken cancellationToken) =>
@@ -108,6 +116,30 @@ internal sealed class ScopedRenderedVideos(
         return await FindAsync(videoId, cancellationToken) is { } approved ? RenderedVideoChange.Made(approved) : null;
     }
 
+    public async Task<RenderedVideoChange?> ClearFlagAsync(Guid videoId, IReadOnlyCollection<Guid> factIds, CancellationToken cancellationToken)
+    {
+        var member = CallingMember();
+        // Someone may clear one of the flags, or delete the video, between their being read and cleared here; then they are read again.
+        for (var attempt = 1; ; attempt++)
+        {
+            if (await FindAsync(videoId, cancellationToken) is not { } found) return null;
+            if (found.Flags.Count == 0) return RenderedVideoChange.Refuse(NotFlagged);
+            // Only what the member saw is cleared: a Fact withdrawn since is a flag nobody has reviewed.
+            var reviewed = found.Flags.Where(flag => factIds.Contains(flag.FactId)).ToList();
+            if (reviewed.Count == 0) return RenderedVideoChange.Refuse(ReviewFlags.FlagsChanged);
+
+            var now = clock.GetUtcNow();
+            database.ClearedFlags.AddRange(reviewed.Select(flag => ClearedFlag.OnRenderedVideo(found.Video, flag.FactId, member, now)));
+            Record(AuditActions.RenderedVideoFlagCleared, found.Video, member, now);
+            // The clearing and its audit log entry are saved together, or neither is.
+            if (await database.SaveUnlessClearedMeanwhileAsync(cancellationToken))
+            {
+                return RenderedVideoChange.Made(found with { Flags = await database.OnRenderedVideos().OfAsync(videoId, cancellationToken) });
+            }
+            if (attempt == 3) return RenderedVideoChange.Refuse(ReviewFlags.ClearedMeanwhile);
+        }
+    }
+
     public async Task<bool> DeleteAsync(Guid videoId, CancellationToken cancellationToken)
     {
         var member = CallingMember();
@@ -150,7 +182,7 @@ internal sealed class ScopedRenderedVideos(
         database.AuditLog.Add(new AuditLogEntry(Guid.CreateVersion7(), video.OrganizationId, member, action, video.Id, now));
 
     private Guid CallingMember() =>
-        caller.MemberId ?? throw new InvalidOperationException("Only a member can approve or delete a Rendered Video.");
+        caller.MemberId ?? throw new InvalidOperationException("Only a member can approve, review or delete a Rendered Video.");
 
     // A Rendered Video is kept with its Storyboard, and so with the Variant, Project
     // and Product it was made from: every one of them is there to be joined.
@@ -176,9 +208,9 @@ internal sealed class ScopedRenderedVideos(
             ApprovedByEmail = approver.Email,
         };
 
-    private static RenderedVideoRecord ToRecord(VideoInContext found) => new(
+    private static RenderedVideoRecord ToRecord(VideoInContext found, IReadOnlyList<ReviewFlag> flags) => new(
         found.Video, found.ProductId, found.ProductName, found.ProjectId, found.ProjectObjective,
-        found.VariantId, found.CreativeTemplate, found.Hook, found.StoryboardVersion, found.ApprovedByEmail);
+        found.VariantId, found.CreativeTemplate, found.Hook, found.StoryboardVersion, found.ApprovedByEmail, flags);
 
     private sealed class VideoInContext
     {

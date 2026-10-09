@@ -296,6 +296,7 @@ public sealed class OrganizationIsolationTests(AffiVideoApp app)
         HttpResponseMessage[] responses =
         [
             await RenderedVideoTests.ApproveAsync(me, theirs.Flask.Id),
+            await FlaggedForReviewTests.ClearVideoAsync(me, theirs.Flask.Id, Guid.NewGuid()),
             await me.GetAsync($"{waiting}/download"),
             await me.GetAsync($"{approved}/download"),
             await me.GetAsync($"{approved}/content"),
@@ -313,6 +314,36 @@ public sealed class OrganizationIsolationTests(AffiVideoApp app)
         Assert.Equal(HttpStatusCode.OK, (await them.GetAsync($"{approved}/download")).StatusCode);
         Assert.Equal(2, (await app.StoredKeysAsync($"organizations/{theirs.OrganizationId}/rendered-videos/")).Length);
         Assert.Empty((await me.GetAsync<PagedResponse<AuditLogEntryResponse>>($"/api/v1/organizations/{mine.Id}/audit-log")).Items);
+    }
+
+    [Fact]
+    public async Task A_member_of_one_Organization_is_refused_clearing_the_flags_of_another()
+    {
+        var theirs = await app.CreateOrganizationAsync();
+        var mine = await app.CreateOrganizationAsync();
+        using var me = await app.SignedInAsync(mine.Owner);
+        using var them = await app.SignedInAsync(theirs.Owner);
+        using var stranger = app.NewBrowser();
+        var product = await StoryboardTests.NewProductAsync(them);
+        await StoryboardTests.UploadPhotoAsync(them, product);
+        var battery = await StoryboardTests.ConfirmedFactAsync(them, product, "Pin dùng liên tục 30 giờ");
+        var variant = await StoryboardTests.NewVariantAsync(them, product);
+        await StoryboardTests.GeneratedAsync(them, variant);
+        (await FactTests.WithdrawAsync(them, product, battery.Id)).EnsureSuccessStatusCode();
+        var myVariant = await StoryboardTests.ReadyVariantAsync(me);
+
+        var cleared = await FlaggedForReviewTests.ClearStoryboardAsync(me, variant, 1, battery.Id);
+        var underMyProject = await me.PostAsync(
+            $"{VariantTests.Variants(myVariant.ProjectId)}/{variant.Id}/storyboards/1/clear-flag", new ClearFlagRequest([battery.Id]));
+        var nobodys = await FlaggedForReviewTests.ClearStoryboardAsync(stranger, variant, 1, battery.Id);
+        var noSuchVersion = await FlaggedForReviewTests.ClearStoryboardAsync(them, variant, 2, battery.Id);
+
+        Assert.All([cleared, underMyProject, noSuchVersion], response => Assert.Equal(HttpStatusCode.NotFound, response.StatusCode));
+        Assert.Equal(HttpStatusCode.Unauthorized, nobodys.StatusCode);
+        Assert.Single((await them.GetAsync<StoryboardResponse>($"{StoryboardTests.Storyboards(variant)}/1")).Flags);
+        var myLog = await me.GetAsync<PagedResponse<AuditLogEntryResponse>>($"/api/v1/organizations/{mine.Id}/audit-log");
+        var theirLog = await them.GetAsync<PagedResponse<AuditLogEntryResponse>>($"/api/v1/organizations/{theirs.Id}/audit-log");
+        Assert.DoesNotContain(myLog.Items.Concat(theirLog.Items), entry => entry.Action == "storyboard.flag-cleared");
     }
 
     [Fact]

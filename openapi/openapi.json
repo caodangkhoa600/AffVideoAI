@@ -1890,6 +1890,79 @@
         }
       }
     },
+    "/api/v1/projects/{projectId}/variants/{variantId}/storyboards/{version}/clear-flag": {
+      "post": {
+        "tags": [
+          "Storyboards"
+        ],
+        "summary": "Clears the flags the named Withdrawn Facts put on a Storyboard version a member has reviewed, in the member's name. The version stays as it is, and so does the flag on any Rendered Video made from it. A Fact withdrawn afterwards flags the version again. Answers 409 for a version that is not flagged, or not by any of these Facts.",
+        "operationId": "ClearStoryboardFlag",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "variantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClearFlagRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoryboardResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/projects/{projectId}/variants/{variantId}/storyboards/{version}/renders": {
       "post": {
         "tags": [
@@ -2042,7 +2115,7 @@
         "tags": [
           "Rendered Videos"
         ],
-        "summary": "The Organization's Rendered Videos, newest first unless sort says otherwise. Search looks in the Product's name and the Project's objective; state and creative template narrow the list.",
+        "summary": "The Organization's Rendered Videos, newest first unless sort says otherwise. Search looks in the Product's name and the Project's objective; state and creative template narrow the list, and flagged=true leaves only those Flagged for Review.",
         "operationId": "ListRenderedVideos",
         "parameters": [
           {
@@ -2064,6 +2137,13 @@
             "in": "query",
             "schema": {
               "$ref": "#/components/schemas/CreativeTemplate"
+            }
+          },
+          {
+            "name": "flagged",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -2285,6 +2365,61 @@
           }
         }
       }
+    },
+    "/api/v1/rendered-videos/{videoId}/clear-flag": {
+      "post": {
+        "tags": [
+          "Rendered Videos"
+        ],
+        "summary": "Clears the flags the named Withdrawn Facts put on a Rendered Video a member has reviewed, in the member's name. Nothing else about the video changes. A Fact withdrawn afterwards flags it again. Answers 409 for one that is not flagged, or not by any of these Facts.",
+        "operationId": "ClearRenderedVideoFlag",
+        "parameters": [
+          {
+            "name": "videoId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClearFlagRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenderedVideoResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2355,6 +2490,21 @@
           "occurredAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "ClearFlagRequest": {
+        "required": [
+          "factIds"
+        ],
+        "type": "object",
+        "properties": {
+          "factIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         }
       },
@@ -3171,7 +3321,8 @@
           "storyboardVersion",
           "approvedByMemberId",
           "approvedByEmail",
-          "approvedAt"
+          "approvedAt",
+          "flags"
         ],
         "type": "object",
         "properties": {
@@ -3263,6 +3414,12 @@
               "string"
             ],
             "format": "date-time"
+          },
+          "flags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewFlagResponse"
+            }
           }
         }
       },
@@ -3389,6 +3546,27 @@
           "ProductLock",
           "Hybrid"
         ]
+      },
+      "ReviewFlagResponse": {
+        "required": [
+          "factId",
+          "text",
+          "withdrawnAt"
+        ],
+        "type": "object",
+        "properties": {
+          "factId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "text": {
+            "type": "string"
+          },
+          "withdrawnAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
       },
       "SceneEditRequest": {
         "required": [
@@ -3584,7 +3762,8 @@
           "planner",
           "renderMode",
           "scenes",
-          "createdAt"
+          "createdAt",
+          "flags"
         ],
         "type": "object",
         "properties": {
@@ -3622,6 +3801,12 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "flags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewFlagResponse"
+            }
           }
         }
       },

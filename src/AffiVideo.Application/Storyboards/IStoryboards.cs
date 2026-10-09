@@ -36,10 +36,32 @@ public interface IStoryboards
         Guid projectId, Guid variantId, int version, int position, CancellationToken cancellationToken);
 
     /// <summary>Newest version first. Null when the Project has no such Variant.</summary>
-    Task<Page<Storyboard>?> ListAsync(Guid projectId, Guid variantId, PageRequest page, CancellationToken cancellationToken);
+    Task<Page<StoryboardRecord>?> ListAsync(Guid projectId, Guid variantId, PageRequest page, CancellationToken cancellationToken);
 
     /// <summary>Null when the Variant has no such version.</summary>
-    Task<Storyboard?> FindAsync(Guid projectId, Guid variantId, int version, CancellationToken cancellationToken);
+    Task<StoryboardRecord?> FindAsync(Guid projectId, Guid variantId, int version, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Clears the flags these Withdrawn Facts put on a version, in the calling
+    /// member's name, and records it in the audit log. The version itself, any
+    /// other flag on it, and any Rendered Video made from it, stay as they are.
+    /// </summary>
+    /// <param name="factIds">The Facts whose flags the member has reviewed.</param>
+    /// <returns>Null when the Variant has no such version.</returns>
+    Task<StoryboardFlagClearing?> ClearFlagAsync(
+        Guid projectId, Guid variantId, int version, IReadOnlyCollection<Guid> factIds, CancellationToken cancellationToken);
+}
+
+/// <summary>A Storyboard version with what has happened around it since it was made.</summary>
+/// <param name="Flags">One for each Withdrawn Fact the version used, until a member clears it. Empty when it is not Flagged for Review.</param>
+public sealed record StoryboardRecord(Storyboard Storyboard, IReadOnlyList<ReviewFlag> Flags);
+
+/// <summary>Either the Storyboard version as it now is, or the reason no flag was cleared, in words for the member.</summary>
+public sealed record StoryboardFlagClearing(StoryboardRecord? Record, string? Refused)
+{
+    public static StoryboardFlagClearing Made(StoryboardRecord record) => new(record, null);
+
+    public static StoryboardFlagClearing Refuse(string reason) => new(null, reason);
 }
 
 /// <summary>Either the new Storyboard version, or the reason none was made, in words for the member.</summary>

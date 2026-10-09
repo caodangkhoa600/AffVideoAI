@@ -41,6 +41,8 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
 
     public DbSet<RenderedVideo> RenderedVideos => Set<RenderedVideo>();
 
+    public DbSet<ClearedFlag> ClearedFlags => Set<ClearedFlag>();
+
     /// <summary>The keys that protect session cookies and anti-forgery tokens, kept here so sessions outlive a restart of the API.</summary>
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
@@ -218,6 +220,22 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
             video.HasIndex(v => new { v.OrganizationId, v.CreatedAt });
             // A job makes one Rendered Video.
             video.HasIndex(v => v.RenderJobId).IsUnique();
+        });
+
+        builder.Entity<ClearedFlag>(cleared =>
+        {
+            cleared.HasOne<Organization>().WithMany().HasForeignKey(c => c.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            cleared.HasOne<Fact>().WithMany().HasForeignKey(c => c.FactId).OnDelete(DeleteBehavior.Restrict);
+            cleared.HasOne<Member>().WithMany().HasForeignKey(c => c.ClearedByMemberId).OnDelete(DeleteBehavior.Restrict);
+            // A clearing says something about the work it was made on, and goes with it.
+            cleared.HasOne<Storyboard>().WithMany().HasForeignKey(c => c.StoryboardId).OnDelete(DeleteBehavior.Cascade);
+            cleared.HasOne<RenderedVideo>().WithMany().HasForeignKey(c => c.RenderedVideoId).OnDelete(DeleteBehavior.Cascade);
+            // A flag is cleared once, even when two members clear it at the same moment.
+            cleared.HasIndex(c => new { c.StoryboardId, c.FactId }).IsUnique();
+            cleared.HasIndex(c => new { c.RenderedVideoId, c.FactId }).IsUnique();
+            cleared.ToTable(table => table.HasCheckConstraint(
+                "CK_ClearedFlags_OneSubject",
+                $"(\"{nameof(ClearedFlag.StoryboardId)}\" IS NULL) <> (\"{nameof(ClearedFlag.RenderedVideoId)}\" IS NULL)"));
         });
 
         var filter = typeof(AffiVideoDbContext).GetMethod(nameof(FilterToCallerOrganization), BindingFlags.NonPublic | BindingFlags.Instance)!;

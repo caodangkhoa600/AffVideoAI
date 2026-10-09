@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { api, problemDetail, type Scene, type SceneLayout, type Storyboard, type Technique, type Variant } from "@/lib/api/client";
+import { FlaggedForReview } from "../../../../flagged-for-review";
 import { creativeTemplateName } from "../../../creative-templates";
 import { SceneEditor } from "./scene-editor";
 import { StoryboardRender } from "./storyboard-render";
@@ -193,8 +194,10 @@ function VariantStoryboards({ variant }: { variant: Variant }) {
                   aria-pressed={storyboard.id === shown.id}
                   disabled={editing !== undefined}
                   onClick={() => setChosen(storyboard.version)}
+                  title={storyboard.flags.length > 0 ? "Flagged for Review" : undefined}
                 >
                   {storyboard.version}
+                  {storyboard.flags.length > 0 && <span data-testid="storyboard-version-flagged"> · Flagged</span>}
                 </Button>
               ))}
             </div>
@@ -217,6 +220,7 @@ function VariantStoryboards({ variant }: { variant: Variant }) {
                 productId={project.data?.productId}
                 onEdit={() => setEditing(shown.version)}
                 onAdded={added}
+                onFlagCleared={() => queryClient.invalidateQueries({ queryKey: key })}
               />
               {/* Keyed by the version, so a job being watched is never shown under another version. */}
               <StoryboardRender key={`render-${shown.id}`} variant={variant} storyboard={shown} />
@@ -234,12 +238,14 @@ function StoryboardVersion({
   productId,
   onEdit,
   onAdded,
+  onFlagCleared,
 }: {
   variant: Variant;
   storyboard: Storyboard;
   productId?: string;
   onEdit: () => void;
   onAdded: () => Promise<void>;
+  onFlagCleared: () => Promise<void>;
 }) {
   const total = storyboard.scenes.reduce((sum, scene) => sum + scene.durationMs, 0);
   // The position of the Scene being regenerated, while it is.
@@ -262,6 +268,18 @@ function StoryboardVersion({
     }
   };
 
+  const clearFlag = async (factIds: string[]) => {
+    const { data, error } = await api
+      .POST("/api/v1/projects/{projectId}/variants/{variantId}/storyboards/{version}/clear-flag", {
+        params: { path: { projectId: variant.projectId, variantId: variant.id, version: storyboard.version } },
+        body: { factIds },
+      })
+      .catch(() => ({ data: undefined, error: undefined }));
+    // A 409 is a flag someone else cleared meanwhile: asking again shows it gone.
+    await onFlagCleared();
+    return data ? undefined : (problemDetail(error) ?? "The flag could not be cleared.");
+  };
+
   return (
     <section className="flex flex-col gap-4" data-testid="storyboard">
       <div className="flex flex-col gap-1">
@@ -276,6 +294,7 @@ function StoryboardVersion({
             ? "Produced by the mock planner: fixed sentence patterns filled with Confirmed Facts. No AI wrote this."
             : `Produced by the ${storyboard.planner} planner.`}
         </p>
+        <FlaggedForReview flags={storyboard.flags} subject="Storyboard version" onClear={clearFlag} />
         <div>
           <Button variant="outline" onClick={onEdit} disabled={regenerating !== undefined} data-testid="storyboard-edit">
             Edit the Scenes

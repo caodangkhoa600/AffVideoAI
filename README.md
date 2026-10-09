@@ -103,8 +103,9 @@ Members page. Nothing is emailed, so the Owner chooses the Editor's password
 
 An Owner can do everything. An Editor can do all creative work but is refused
 when adding members, changing the Organiza tion's settings or reading the audit
-log. Adding a member, confirming or withdrawing a Fact, deleting a Project, and
-approving or deleting a Rendered Video are recorded in the audit log, which an
+log. Adding a member, confirming or withdrawing a Fact, deleting a Project,
+approving or deleting a Rendered Video, and clearing a Flagged for Review mark
+are recorded in the audit log, which an
 Owner reads at `GET /api/v1/organizations/{id}/audit-log`; it has no page yet.
 
 The session is a cookie that scripts cannot read (HttpOnly, Secure,
@@ -201,10 +202,11 @@ walking skeleton (ticket 02), sign in and Organizations (ticket 03),
 Products (ticket 04), Product assets (ticket 05), Facts (ticket 06),
 Projects and Variants (ticket 07), Storyboard generation (ticket 08),
 render and preview (ticket 09), job reliability (ticket 10), approve,
-download and the library (ticket 11) and Storyboard editing (ticket 12).
+download and the library (ticket 11), Storyboard editing (ticket 12) and
+flagging work built on Withdrawn Facts (ticket 13).
 
-Next: flagging work built on Withdrawn Facts (ticket 13) and the Affiliate Lab
-and Campaigns (ticket 18).
+Next: the Luxury and Problem/Solution templates (ticket 14) and the Affiliate
+Lab and Campaigns (ticket 18).
 
 Notes from the walking skeleton:
 
@@ -413,6 +415,35 @@ Notes from approve, download and the library:
 - The cut-out model is loaded with ONNX Runtime's memory arena off. With it on,
   the worker held over 13 GB while a photo was cut, and Docker's virtual
   machine killed it; it now peaks near 5 GB. Give Docker at least 8 GB.
+
+Notes from flagging work built on Withdrawn Facts:
+
+- A Storyboard version is Flagged for Review while a Scene of it lists a Fact
+  that is Withdrawn, and a Rendered Video while the version it was rendered
+  from does. Both say why in `flags`: one entry for each such Fact, with the
+  text as the work used it and when the Fact was withdrawn. Nothing is written
+  when a Fact is withdrawn: the flag is read from the Scenes' own record of the
+  Facts they used, so work made before this existed, or rendered after the
+  withdrawal, is flagged like any other.
+- Flagged work is kept as it is. It can still be read, played, approved,
+  downloaded and rendered. An edit of a flagged version is still refused while
+  a Scene rests on the Withdrawn Fact (see Storyboard editing).
+- `POST .../storyboards/{version}/clear-flag` and
+  `POST /api/v1/rendered-videos/{id}/clear-flag` clear the flags on that one
+  version or video, in the member's name, and write `storyboard.flag-cleared`
+  or `rendered-video.flag-cleared` to the audit log. The body names the
+  Withdrawn Facts whose flags the member saw (`factIds`), and only those are
+  cleared: a Fact withdrawn since the page was loaded keeps its flag. They
+  answer 409 for work that is not flagged, or not by any of those Facts. What
+  is kept is which Fact's flag was cleared (`ClearedFlags`), so a Fact
+  withdrawn afterwards flags the work again.
+- A version and each video rendered from it are reviewed separately: clearing
+  one leaves the others flagged. A video rendered from a version after its
+  flag was cleared is flagged, since it shows the Withdrawn Fact.
+- A Manually Edited Scene lists no Facts, so withdrawing a Fact its text was
+  once written from flags nothing.
+- `GET /api/v1/rendered-videos?flagged=true` is the library narrowed to
+  Flagged for Review; `flagged=false` is the rest.
 
 Notes from Storyboard editing:
 

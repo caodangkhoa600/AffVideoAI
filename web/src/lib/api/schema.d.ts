@@ -509,6 +509,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{projectId}/variants/{variantId}/storyboards/{version}/clear-flag": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Clears the flags the named Withdrawn Facts put on a Storyboard version a member has reviewed, in the member's name. The version stays as it is, and so does the flag on any Rendered Video made from it. A Fact withdrawn afterwards flags the version again. Answers 409 for a version that is not flagged, or not by any of these Facts. */
+        post: operations["ClearStoryboardFlag"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{projectId}/variants/{variantId}/storyboards/{version}/renders": {
         parameters: {
             query?: never;
@@ -534,7 +551,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The Organization's Rendered Videos, newest first unless sort says otherwise. Search looks in the Product's name and the Project's objective; state and creative template narrow the list. */
+        /** The Organization's Rendered Videos, newest first unless sort says otherwise. Search looks in the Product's name and the Project's objective; state and creative template narrow the list, and flagged=true leaves only those Flagged for Review. */
         get: operations["ListRenderedVideos"];
         put?: never;
         post?: never;
@@ -613,6 +630,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/rendered-videos/{videoId}/clear-flag": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Clears the flags the named Withdrawn Facts put on a Rendered Video a member has reviewed, in the member's name. Nothing else about the video changes. A Fact withdrawn afterwards flags it again. Answers 409 for one that is not flagged, or not by any of these Facts. */
+        post: operations["ClearRenderedVideoFlag"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -637,6 +671,9 @@ export interface components {
             subjectId: null | string;
             /** Format: date-time */
             occurredAt: string;
+        };
+        ClearFlagRequest: {
+            factIds: string[];
         };
         /** @enum {unknown} */
         CreativeTemplate: "LuxuryCinematic" | "ProductShowcase" | "ProblemSolution";
@@ -899,6 +936,7 @@ export interface components {
             approvedByEmail: null | string;
             /** Format: date-time */
             approvedAt: null | string;
+            flags: components["schemas"]["ReviewFlagResponse"][];
         };
         /** @enum {unknown} */
         RenderedVideoState: "ReadyForReview" | "Approved";
@@ -932,6 +970,13 @@ export interface components {
         RenderJobState: "Created" | "Queued" | "Validating" | "Planning" | "GeneratingAssets" | "GeneratingVideo" | "Rendering" | "QualityReview" | "Completed" | "Failed" | "Cancelled";
         /** @enum {unknown} */
         RenderMode: "ProductLock" | "Hybrid";
+        ReviewFlagResponse: {
+            /** Format: uuid */
+            factId: string;
+            text: string;
+            /** Format: date-time */
+            withdrawnAt: string;
+        };
         SceneEditRequest: {
             /** Format: int32 */
             position: number;
@@ -994,6 +1039,7 @@ export interface components {
             scenes: components["schemas"]["SceneResponse"][];
             /** Format: date-time */
             createdAt: string;
+            flags: components["schemas"]["ReviewFlagResponse"][];
         };
         /** @enum {unknown} */
         Technique: "StaticImage" | "ImageMotion" | "ImageToVideo" | "VideoAsset" | "TextAnimation" | "ThreeDRender";
@@ -2380,6 +2426,50 @@ export interface operations {
             };
         };
     };
+    ClearStoryboardFlag: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                variantId: string;
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClearFlagRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoryboardResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     ListRenderJobs: {
         parameters: {
             query?: {
@@ -2471,6 +2561,7 @@ export interface operations {
                 search?: string;
                 state?: components["schemas"]["RenderedVideoState"];
                 creativeTemplate?: components["schemas"]["CreativeTemplate"];
+                flagged?: boolean;
                 sort?: components["schemas"]["RenderedVideoOrder"];
                 page?: number;
                 pageSize?: number;
@@ -2630,6 +2721,48 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RenderedVideoResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ClearRenderedVideoFlag: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                videoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClearFlagRequest"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {

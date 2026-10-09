@@ -8,6 +8,7 @@ namespace AffiVideo.Contracts;
 /// <param name="TemplateVersion">The version of the creative template the Scenes were planned with.</param>
 /// <param name="Planner">What wrote the text. <c>Mock</c> is fixed sentence patterns filled with Confirmed Facts, and no AI.</param>
 /// <param name="Scenes">In the order they play. Their durations sum to the Project's target duration.</param>
+/// <param name="Flags">Why the version is Flagged for Review: one for each Withdrawn Fact it used, until a member clears it. Empty when it is not flagged.</param>
 public sealed record StoryboardResponse(
     Guid Id,
     Guid VariantId,
@@ -17,7 +18,13 @@ public sealed record StoryboardResponse(
     StoryboardPlanner Planner,
     RenderMode RenderMode,
     IReadOnlyList<SceneResponse> Scenes,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    IReadOnlyList<ReviewFlagResponse> Flags);
+
+/// <summary>The mark a Withdrawn Fact puts on a Storyboard version or a Rendered Video that used it.</summary>
+/// <param name="FactId">The Withdrawn Fact.</param>
+/// <param name="Text">The Fact's text as the work used it.</param>
+public sealed record ReviewFlagResponse(Guid FactId, string Text, DateTimeOffset WithdrawnAt);
 
 /// <param name="Position">Counted from 1 within the Storyboard.</param>
 /// <param name="Layout">Which layout of the creative template draws the Scene.</param>
@@ -40,6 +47,12 @@ public sealed record SceneResponse(
 
 /// <param name="Text">The Fact's text as the Scene used it, kept with the Scene.</param>
 public sealed record SceneFactResponse(Guid FactId, string Text);
+
+/// <summary>What a member has reviewed on a Storyboard version or a Rendered Video that is Flagged for Review.</summary>
+/// <param name="FactIds">The Withdrawn Facts whose flags the member saw and is clearing. A flag that is not named stays.</param>
+public sealed record ClearFlagRequest(
+    [Required, MinLength(1, ErrorMessage = "Name the Withdrawn Facts whose flags are to be cleared.")]
+    IReadOnlyList<Guid> FactIds);
 
 /// <summary>An edit of one Storyboard version, which makes the Variant's next version and leaves this one as it is.</summary>
 /// <param name="Scenes">Every Scene of the version being edited, once, in the order the next version plays them.</param>

@@ -19,7 +19,7 @@ internal static class RenderedVideoEndpoints
         var videos = routes.MapGroup("/rendered-videos").WithTags("Rendered Videos");
 
         videos.MapGet("", async Task<Results<Ok<PagedResponse<RenderedVideoResponse>>, ValidationProblem>> (
-                string? search, RenderedVideoState? state, CreativeTemplate? creativeTemplate, RenderedVideoOrder? sort,
+                string? search, RenderedVideoState? state, CreativeTemplate? creativeTemplate, bool? flagged, RenderedVideoOrder? sort,
                 int? page, int? pageSize, IRenderedVideos library, CancellationToken cancellationToken) =>
             {
                 // A number is read as one of these too, and "7" is none of them.
@@ -33,14 +33,15 @@ internal static class RenderedVideoEndpoints
                 if (refused.Count > 0) return TypedResults.ValidationProblem(refused);
 
                 var found = await library.ListAsync(
-                    new RenderedVideoFilter(search, state, creativeTemplate, sort ?? RenderedVideoOrder.NewestFirst),
+                    new RenderedVideoFilter(search, state, creativeTemplate, flagged, sort ?? RenderedVideoOrder.NewestFirst),
                     new PageRequest(page, pageSize), cancellationToken);
                 return TypedResults.Ok(found.ToResponse(ToResponse));
             })
             .WithName("ListRenderedVideos")
             .WithSummary(
                 "The Organization's Rendered Videos, newest first unless sort says otherwise. Search looks in the " +
-                "Product's name and the Project's objective; state and creative template narrow the list.");
+                "Product's name and the Project's objective; state and creative template narrow the list, and " +
+                "flagged=true leaves only those Flagged for Review.");
 
         videos.MapGet("/{videoId:guid}", async Task<Results<Ok<RenderedVideoResponse>, NotFound>> (
                 Guid videoId, IRenderedVideos library, CancellationToken cancellationToken) =>
@@ -104,6 +105,21 @@ internal static class RenderedVideoEndpoints
                 "Approves a Rendered Video that is ready for review, in the member's name: it is fit to publish " +
                 "and can be downloaded. Answers 409 for one that is already approved.");
 
+        videos.MapPost("/{videoId:guid}/clear-flag", async Task<Results<Ok<RenderedVideoResponse>, NotFound, ProblemHttpResult>> (
+                Guid videoId, ClearFlagRequest request, IRenderedVideos library, CancellationToken cancellationToken) =>
+                await library.ClearFlagAsync(videoId, request.FactIds, cancellationToken) switch
+                {
+                    null => TypedResults.NotFound(),
+                    { Record: { } cleared } => TypedResults.Ok(ToResponse(cleared)),
+                    var refused => TypedResults.Problem(refused.Refused, statusCode: StatusCodes.Status409Conflict),
+                })
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .WithName("ClearRenderedVideoFlag")
+            .WithSummary(
+                "Clears the flags the named Withdrawn Facts put on a Rendered Video a member has reviewed, in the member's name. " +
+                "Nothing else about the video changes. A Fact withdrawn afterwards flags it again. Answers 409 for one that is " +
+                "not flagged, or not by any of these Facts.");
+
         videos.MapDelete("/{videoId:guid}", async Task<Results<NoContent, NotFound>> (
                 Guid videoId, IRenderedVideos library, CancellationToken cancellationToken) =>
                 await library.DeleteAsync(videoId, cancellationToken)
@@ -152,5 +168,6 @@ internal static class RenderedVideoEndpoints
         record.StoryboardVersion,
         record.Video.ApprovedByMemberId,
         record.ApprovedByEmail,
-        record.Video.ApprovedAt);
+        record.Video.ApprovedAt,
+        record.Flags.Select(StoryboardEndpoints.ToResponse).ToList());
 }

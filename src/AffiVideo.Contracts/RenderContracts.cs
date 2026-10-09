@@ -41,6 +41,7 @@ public sealed record RenderFailureResponse(RenderJobState Stage, RenderFailureCa
 /// <param name="Hook">Of the Variant it was made for.</param>
 /// <param name="StoryboardVersion">The version of the Variant's Storyboard that was rendered.</param>
 /// <param name="ApprovedByMemberId">The member who approved it. Only an approved Rendered Video has one.</param>
+/// <param name="Flags">Why the video is Flagged for Review: one for each Withdrawn Fact it used, until a member clears it. Empty when it is not flagged.</param>
 public sealed record RenderedVideoResponse(
     Guid Id,
     Guid StoryboardId,
@@ -61,4 +62,5 @@ public sealed record RenderedVideoResponse(
     int StoryboardVersion,
     Guid? ApprovedByMemberId,
     string? ApprovedByEmail,
-    DateTimeOffset? ApprovedAt);
+    DateTimeOffset? ApprovedAt,
+    IReadOnlyList<ReviewFlagResponse> Flags);

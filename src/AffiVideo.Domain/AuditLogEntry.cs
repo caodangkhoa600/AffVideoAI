@@ -33,4 +33,6 @@ public static class AuditActions
     public const string ProjectDeleted = "project.deleted";
     public const string RenderedVideoApproved = "rendered-video.approved";
     public const string RenderedVideoDeleted = "rendered-video.deleted";
+    public const string StoryboardFlagCleared = "storyboard.flag-cleared";
+    public const string RenderedVideoFlagCleared = "rendered-video.flag-cleared";
 }
