@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { useId, useState } from "react";
 import { Field } from "@/components/field";
 import { Button } from "@/components/ui/button";
@@ -117,11 +118,19 @@ function VariantRow({ variant, onDuplicated }: { variant: Variant; onDuplicated:
             {variant.id}
           </p>
         </div>
-        {!duplicating && (
-          <Button variant="outline" size="sm" onClick={() => setDuplicating(true)}>
-            Duplicate
-          </Button>
-        )}
+        <div className="flex items-center gap-3">
+          <Link
+            href={`/projects/${variant.projectId}/variants/${variant.id}`}
+            className="text-sm font-medium underline underline-offset-4"
+          >
+            Storyboard
+          </Link>
+          {!duplicating && (
+            <Button variant="outline" size="sm" onClick={() => setDuplicating(true)}>
+              Duplicate
+            </Button>
+          )}
+        </div>
       </div>
       {duplicating && (
         <>

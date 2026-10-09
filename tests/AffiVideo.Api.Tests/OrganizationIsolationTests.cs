@@ -193,6 +193,34 @@ public sealed class OrganizationIsolationTests(AffiVideoApp app)
     }
 
     [Fact]
+    public async Task A_member_of_one_Organization_is_refused_reading_and_generating_the_Storyboards_of_another()
+    {
+        var theirs = await app.CreateOrganizationAsync();
+        var mine = await app.CreateOrganizationAsync();
+        using var me = await app.SignedInAsync(mine.Owner);
+        using var them = await app.SignedInAsync(theirs.Owner);
+        var theirVariant = await StoryboardTests.ReadyVariantAsync(them);
+        var theirStoryboard = await StoryboardTests.GeneratedAsync(them, theirVariant);
+        var myVariant = await StoryboardTests.ReadyVariantAsync(me);
+        var theirVariantUnderMyProject = $"{VariantTests.Variants(myVariant.ProjectId)}/{theirVariant.Id}/storyboards";
+
+        var list = await me.GetAsync(StoryboardTests.Storyboards(theirVariant));
+        var read = await me.GetAsync($"{StoryboardTests.Storyboards(theirVariant)}/1");
+        var generate = await StoryboardTests.GenerateAsync(me, theirVariant);
+        var listUnderMyProject = await me.GetAsync(theirVariantUnderMyProject);
+        var readUnderMyProject = await me.GetAsync($"{theirVariantUnderMyProject}/1");
+        var generateUnderMyProject = await me.PostAsync(theirVariantUnderMyProject, new { });
+        // My Variant has no Storyboard: version 1 under it must not find theirs.
+        var readUnderMyVariant = await me.GetAsync($"{StoryboardTests.Storyboards(myVariant)}/1");
+
+        Assert.All(
+            [list, read, generate, listUnderMyProject, readUnderMyProject, generateUnderMyProject, readUnderMyVariant],
+            response => Assert.Equal(HttpStatusCode.NotFound, response.StatusCode));
+        Assert.Equal(0, (await StoryboardTests.ListAsync(me, myVariant)).Total);
+        Assert.Equal([theirStoryboard.Id], (await StoryboardTests.ListAsync(them, theirVariant)).Items.Select(s => s.Id));
+    }
+
+    [Fact]
     public async Task A_Product_list_and_its_categories_hold_only_what_belongs_to_that_Organization()
     {
         var theirs = await app.CreateOrganizationAsync();

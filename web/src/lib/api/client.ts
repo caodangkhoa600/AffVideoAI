@@ -18,6 +18,10 @@ export type FactState = components["schemas"]["FactState"];
 export type Project = components["schemas"]["ProjectResponse"];
 export type Variant = components["schemas"]["VariantResponse"];
 export type CreativeTemplate = components["schemas"]["CreativeTemplate"];
+export type Storyboard = components["schemas"]["StoryboardResponse"];
+export type Scene = components["schemas"]["SceneResponse"];
+export type SceneLayout = components["schemas"]["SceneLayout"];
+export type Technique = components["schemas"]["Technique"];
 
 const CHANGES_STATE = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 

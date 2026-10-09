@@ -182,10 +182,10 @@ it is a deliberate act that includes re-reading the licence (ADR 0002).
 Done: the look prototypes (tickets 01, 25, 26, in `prototypes/`), the affiliate
 experiment plan (ticket 24, `docs/business/affiliate-experiment.md`), the
 walking skeleton (ticket 02), sign in and Organizations (ticket 03),
-Products (ticket 04), Product assets (ticket 05), Facts (ticket 06) and
-Projects and Variants (ticket 07).
+Products (ticket 04), Product assets (ticket 05), Facts (ticket 06),
+Projects and Variants (ticket 07) and Storyboard generation (ticket 08).
 
-Next: Storyboard generation (ticket 08).
+Next: render and preview (ticket 09).
 
 Notes from the walking skeleton:
 
@@ -260,3 +260,36 @@ Notes from Projects and Variants:
   template, and refuses the Hook the duplicated Variant already has.
 - Deleting a Project deletes its Variants with it and is recorded in the audit
   log as `project.deleted`. The Product is kept.
+
+Notes from Storyboard generation:
+
+- `POST /api/v1/projects/{projectId}/variants/{variantId}/storyboards` plans
+  the Variant's next Storyboard version. It takes no body. Generating again
+  adds a version; nothing changes or removes one.
+- The text is written by the mock planner (`MockLanguageModel`): fixed
+  Vietnamese sentence patterns with the Hook, the Product's name and Confirmed
+  Facts placed in them whole. No AI and no credentials are involved, the same
+  inputs always give the same Scenes, and every Storyboard says `Mock` as its
+  planner. It is the only implementation of `ILanguageModel`; the video
+  generation, text-to-speech and image-processing interfaces beside it in
+  `AffiVideo.Application/Providers` have none.
+- Only Product Showcase can be planned. Its four Scenes (Hook, Reveal, Facts,
+  Closing) share the target duration as 3 : 5 : 7 : 5, in tenths of a second,
+  and always sum to it exactly. The definition is `CreativeTemplates` in the
+  domain, and its version is recorded on each Storyboard.
+- A Storyboard uses the oldest Confirmed Facts in the Project's language: up
+  to three, and fewer when three could not each be read in the time a shorter
+  video gives them (three Facts of twelve words fit 20 seconds, two fit 15).
+  Each Scene keeps the identifier and a copy of the text of the Facts it
+  used. A usable photo is a photo (not the logo) of at least 400
+  pixels on each side; the Facts Scene shows the newest, the others the oldest.
+- Every Storyboard is planned in Product Lock, where the planning engine
+  assigns only static image, image motion and text animation. Hybrid exists as
+  a value and chooses nothing else until there is a provider to generate with.
+- When a Storyboard cannot be planned the answer is 409 with the reason: no
+  Confirmed Fact in the language, no usable photo, another creative template,
+  a Fact with too many words to be read even alone, or a Hook, Fact or Product
+  name too long for its layout. A Hook holds at most
+  13 words (more would not all be on screen within two seconds) and 60
+  characters; a Fact 120 characters.
+- Deleting a Project deletes its Variants' Storyboards with them.

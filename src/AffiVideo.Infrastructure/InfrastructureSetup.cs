@@ -2,14 +2,18 @@ using AffiVideo.Application;
 using AffiVideo.Application.Organizations;
 using AffiVideo.Application.Products;
 using AffiVideo.Application.Projects;
+using AffiVideo.Application.Providers;
 using AffiVideo.Application.Storage;
+using AffiVideo.Application.Storyboards;
 using AffiVideo.Application.SystemStatus;
 using AffiVideo.Infrastructure.Identity;
 using AffiVideo.Infrastructure.Organizations;
 using AffiVideo.Infrastructure.Persistence;
+using AffiVideo.Infrastructure.Planning;
 using AffiVideo.Infrastructure.Products;
 using AffiVideo.Infrastructure.Projects;
 using AffiVideo.Infrastructure.Storage;
+using AffiVideo.Infrastructure.Storyboards;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -53,6 +57,9 @@ public static class InfrastructureSetup
         services.AddScoped<IFacts, ScopedFacts>();
         services.AddScoped<IProjects, ScopedProjects>();
         services.AddScoped<IVariants, ScopedVariants>();
+        // The only planner there is. A real language model is registered in its place, never beside it.
+        services.AddSingleton<ILanguageModel, MockLanguageModel>();
+        services.AddScoped<IStoryboards, ScopedStoryboards>();
         services.AddScoped<DemonstrationSeed>();
         return services;
     }

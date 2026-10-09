@@ -35,6 +35,8 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
 
     public DbSet<Variant> Variants => Set<Variant>();
 
+    public DbSet<Storyboard> Storyboards => Set<Storyboard>();
+
     /// <summary>The keys that protect session cookies and anti-forgery tokens, kept here so sessions outlive a restart of the API.</summary>
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
@@ -93,6 +95,7 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
             asset.HasOne<Product>().WithMany().HasForeignKey(a => a.ProductId).OnDelete(DeleteBehavior.Restrict);
             asset.Property(a => a.Kind).HasConversion<string>().HasMaxLength(20);
             asset.Ignore(a => a.StorageKey);
+            asset.Ignore(a => a.IsUsableInVideo);
             asset.HasIndex(a => new { a.ProductId, a.CreatedAt });
             // A Product has at most one logo, even when two are uploaded at the same moment.
             asset.HasIndex(a => a.ProductId, "IX_ProductAssets_OneLogoPerProduct")
@@ -133,6 +136,41 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
             variant.Property(v => v.CreativeTemplate).HasConversion<string>().HasMaxLength(30);
             variant.Property(v => v.Hook).HasMaxLength(Variant.HookMaxLength);
             variant.HasIndex(v => new { v.ProjectId, v.CreatedAt });
+        });
+
+        builder.Entity<Storyboard>(storyboard =>
+        {
+            storyboard.HasOne<Organization>().WithMany().HasForeignKey(s => s.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            // Deleting a Project deletes its Variants, and their Storyboards with them.
+            storyboard.HasOne<Variant>().WithMany().HasForeignKey(s => s.VariantId).OnDelete(DeleteBehavior.Cascade);
+            storyboard.Property(s => s.CreativeTemplate).HasConversion<string>().HasMaxLength(30);
+            storyboard.Property(s => s.Planner).HasConversion<string>().HasMaxLength(30);
+            storyboard.Property(s => s.RenderMode).HasConversion<string>().HasMaxLength(20);
+            // Two Storyboards generated at the same moment cannot both be the same version.
+            storyboard.HasIndex(s => new { s.VariantId, s.Version }).IsUnique();
+
+            // Scenes and the Facts they used are part of the version: read and written with it, never on their own.
+            storyboard.OwnsMany(s => s.Scenes, scene =>
+            {
+                scene.ToTable("StoryboardScenes");
+                scene.WithOwner().HasForeignKey("StoryboardId");
+                scene.HasKey("StoryboardId", nameof(Scene.Position));
+                scene.Property(s => s.Position).ValueGeneratedNever();
+                scene.Property(s => s.Layout).HasConversion<string>().HasMaxLength(30);
+                scene.Property(s => s.Technique).HasConversion<string>().HasMaxLength(20);
+
+                scene.OwnsMany(s => s.Facts, fact =>
+                {
+                    fact.ToTable("StoryboardSceneFacts");
+                    fact.WithOwner().HasForeignKey("StoryboardId", "ScenePosition");
+                    fact.HasKey("StoryboardId", "ScenePosition", nameof(SceneFact.Position));
+                    fact.Property(f => f.Position).ValueGeneratedNever();
+                    fact.Property(f => f.Text).HasMaxLength(Fact.TextMaxLength);
+                    fact.HasOne<Fact>().WithMany().HasForeignKey(f => f.FactId).OnDelete(DeleteBehavior.Restrict);
+                    // Every Storyboard that used a Fact is found from the Fact.
+                    fact.HasIndex(f => f.FactId);
+                });
+            });
         });
 
         var filter = typeof(AffiVideoDbContext).GetMethod(nameof(FilterToCallerOrganization), BindingFlags.NonPublic | BindingFlags.Instance)!;

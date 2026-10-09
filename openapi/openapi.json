@@ -1479,6 +1479,171 @@
           }
         }
       }
+    },
+    "/api/v1/projects/{projectId}/variants/{variantId}/storyboards": {
+      "get": {
+        "tags": [
+          "Storyboards"
+        ],
+        "summary": "The Variant's Storyboard versions, newest first.",
+        "operationId": "ListStoryboards",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "variantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResponseOfStoryboardResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Storyboards"
+        ],
+        "summary": "Plans the Variant's next Storyboard version in Product Lock from the Product's Confirmed Facts and photos, with the mock planner and no AI. Answers 409 with the reason when it cannot: no Confirmed Fact, no usable photo, a creative template other than Product Showcase, or a Hook, Fact or Product name too long for its layout.",
+        "operationId": "GenerateStoryboard",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "variantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoryboardResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/variants/{variantId}/storyboards/{version}": {
+      "get": {
+        "tags": [
+          "Storyboards"
+        ],
+        "summary": "One version of the Variant's Storyboard.",
+        "operationId": "GetStoryboard",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "variantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoryboardResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1917,6 +2082,35 @@
           }
         }
       },
+      "PagedResponseOfStoryboardResponse": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StoryboardResponse"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "PagedResponseOfVariantResponse": {
         "required": [
           "items",
@@ -2250,6 +2444,87 @@
           }
         }
       },
+      "RenderMode": {
+        "enum": [
+          "ProductLock",
+          "Hybrid"
+        ]
+      },
+      "SceneFactResponse": {
+        "required": [
+          "factId",
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "factId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      },
+      "SceneLayout": {
+        "enum": [
+          "Hook",
+          "Reveal",
+          "Facts",
+          "Closing"
+        ]
+      },
+      "SceneResponse": {
+        "required": [
+          "position",
+          "layout",
+          "technique",
+          "durationMs",
+          "onScreenText",
+          "narrationText",
+          "assetIds",
+          "facts"
+        ],
+        "type": "object",
+        "properties": {
+          "position": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "layout": {
+            "$ref": "#/components/schemas/SceneLayout"
+          },
+          "technique": {
+            "$ref": "#/components/schemas/Technique"
+          },
+          "durationMs": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "onScreenText": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "narrationText": {
+            "type": "string"
+          },
+          "assetIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "facts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SceneFactResponse"
+            }
+          }
+        }
+      },
       "SessionResponse": {
         "required": [
           "member",
@@ -2294,6 +2569,72 @@
             "$ref": "#/components/schemas/DependencyStatusResponse"
           }
         }
+      },
+      "StoryboardPlanner": {
+        "enum": [
+          "Mock"
+        ]
+      },
+      "StoryboardResponse": {
+        "required": [
+          "id",
+          "variantId",
+          "version",
+          "creativeTemplate",
+          "templateVersion",
+          "planner",
+          "renderMode",
+          "scenes",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "variantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "creativeTemplate": {
+            "$ref": "#/components/schemas/CreativeTemplate"
+          },
+          "templateVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "planner": {
+            "$ref": "#/components/schemas/StoryboardPlanner"
+          },
+          "renderMode": {
+            "$ref": "#/components/schemas/RenderMode"
+          },
+          "scenes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SceneResponse"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Technique": {
+        "enum": [
+          "StaticImage",
+          "ImageMotion",
+          "ImageToVideo",
+          "VideoAsset",
+          "TextAnimation",
+          "ThreeDRender"
+        ]
       },
       "UpdateOrganizationRequest": {
         "required": [
@@ -2377,6 +2718,9 @@
     },
     {
       "name": "Variants"
+    },
+    {
+      "name": "Storyboards"
     }
   ]
 }

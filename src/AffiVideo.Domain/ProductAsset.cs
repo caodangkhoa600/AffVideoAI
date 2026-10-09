@@ -15,6 +15,9 @@ public sealed class ProductAsset : IOwnedByOrganization
     /// <summary>The most photos one Product may have. It has at most one logo.</summary>
     public const int MaxPhotos = 30;
 
+    /// <summary>The fewest pixels along either side of a photo that a video can show without it looking soft.</summary>
+    public const int MinVideoPhotoSide = 400;
+
     /// <summary>What every stored asset is.</summary>
     public const string ContentType = "image/png";
 
@@ -54,6 +57,9 @@ public sealed class ProductAsset : IOwnedByOrganization
     public long SizeInBytes { get; private set; }
 
     public DateTimeOffset CreatedAt { get; private set; }
+
+    /// <summary>Whether a video can show the Product from this: a photo, not the logo, and large enough.</summary>
+    public bool IsUsableInVideo => Kind == ProductAssetKind.Photo && Math.Min(Width, Height) >= MinVideoPhotoSide;
 
     /// <summary>
     /// Where the file is in object storage. It starts with the Organization, so

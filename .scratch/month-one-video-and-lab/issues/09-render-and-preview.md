@@ -26,3 +26,4 @@
 ## Comments
 
 - 2026-10-08: Rewritten after ticket 26. What was learned about the look is in the comments of tickets 25 (cut-out, model, checks, shadow) and 26 (layouts, Remotion flags, joining Scenes). Two things there were not proven and fall to this ticket: rendering Scene by Scene with Remotion (the prototype rendered the whole video in one pass), and running the cut-out model from .NET (the prototype used Python). The cut-out makes this ticket larger than it was; it can be split off if it proves slow.
+- 2026-10-09: Ticket 08 is done; its comments say what a Storyboard version holds and what it leaves to this ticket: the text limits the template must honour, the pacing of the Facts Scene that decides how many Facts are shown, and a Storyboard whose photo has since been removed.

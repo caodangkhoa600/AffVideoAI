@@ -406,6 +406,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{projectId}/variants/{variantId}/storyboards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The Variant's Storyboard versions, newest first. */
+        get: operations["ListStoryboards"];
+        put?: never;
+        /** Plans the Variant's next Storyboard version in Product Lock from the Product's Confirmed Facts and photos, with the mock planner and no AI. Answers 409 with the reason when it cannot: no Confirmed Fact, no usable photo, a creative template other than Product Showcase, or a Hook, Fact or Product name too long for its layout. */
+        post: operations["GenerateStoryboard"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/variants/{variantId}/storyboards/{version}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One version of the Variant's Storyboard. */
+        get: operations["GetStoryboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -536,6 +571,15 @@ export interface components {
             /** Format: int32 */
             total: number;
         };
+        PagedResponseOfStoryboardResponse: {
+            items: components["schemas"]["StoryboardResponse"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+            /** Format: int32 */
+            total: number;
+        };
         PagedResponseOfVariantResponse: {
             items: components["schemas"]["VariantResponse"][];
             /** Format: int32 */
@@ -630,6 +674,27 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
         };
+        /** @enum {unknown} */
+        RenderMode: "ProductLock" | "Hybrid";
+        SceneFactResponse: {
+            /** Format: uuid */
+            factId: string;
+            text: string;
+        };
+        /** @enum {unknown} */
+        SceneLayout: "Hook" | "Reveal" | "Facts" | "Closing";
+        SceneResponse: {
+            /** Format: int32 */
+            position: number;
+            layout: components["schemas"]["SceneLayout"];
+            technique: components["schemas"]["Technique"];
+            /** Format: int32 */
+            durationMs: number;
+            onScreenText: string[];
+            narrationText: string;
+            assetIds: string[];
+            facts: components["schemas"]["SceneFactResponse"][];
+        };
         SessionResponse: {
             member: components["schemas"]["MemberResponse"];
             organization: components["schemas"]["OrganizationResponse"];
@@ -642,6 +707,26 @@ export interface components {
             database: components["schemas"]["DependencyStatusResponse"];
             objectStorage: components["schemas"]["DependencyStatusResponse"];
         };
+        /** @enum {unknown} */
+        StoryboardPlanner: "Mock";
+        StoryboardResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            variantId: string;
+            /** Format: int32 */
+            version: number;
+            creativeTemplate: components["schemas"]["CreativeTemplate"];
+            /** Format: int32 */
+            templateVersion: number;
+            planner: components["schemas"]["StoryboardPlanner"];
+            renderMode: components["schemas"]["RenderMode"];
+            scenes: components["schemas"]["SceneResponse"][];
+            /** Format: date-time */
+            createdAt: string;
+        };
+        /** @enum {unknown} */
+        Technique: "StaticImage" | "ImageMotion" | "ImageToVideo" | "VideoAsset" | "TextAnimation" | "ThreeDRender";
         UpdateOrganizationRequest: {
             name: string;
         };
@@ -1741,6 +1826,109 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ListStoryboards: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path: {
+                projectId: string;
+                variantId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagedResponseOfStoryboardResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GenerateStoryboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                variantId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoryboardResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetStoryboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                variantId: string;
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoryboardResponse"];
                 };
             };
             /** @description Not Found */
