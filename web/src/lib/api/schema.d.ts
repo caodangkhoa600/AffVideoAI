@@ -493,6 +493,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/rendered-videos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The Organization's Rendered Videos, newest first unless sort says otherwise. Search looks in the Product's name and the Project's objective; state and creative template narrow the list. */
+        get: operations["ListRenderedVideos"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/rendered-videos/{videoId}": {
         parameters: {
             query?: never;
@@ -504,7 +521,8 @@ export interface paths {
         get: operations["GetRenderedVideo"];
         put?: never;
         post?: never;
-        delete?: never;
+        /** Deletes a Rendered Video and its file, approved or not. Nothing brings it back. The Storyboard version it was rendered from is kept and can be rendered again. */
+        delete: operations["DeleteRenderedVideo"];
         options?: never;
         head?: never;
         patch?: never;
@@ -517,10 +535,44 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The MP4, to preview in the browser. */
+        /** The MP4, to preview in the browser. It needs no approval. */
         get: operations["GetRenderedVideoContent"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rendered-videos/{videoId}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The same MP4 as the preview, to save as a file. Answers 409 until the Rendered Video is approved. */
+        get: operations["DownloadRenderedVideo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rendered-videos/{videoId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approves a Rendered Video that is ready for review, in the member's name: it is fit to publish and can be downloaded. Answers 409 for one that is already approved. */
+        post: operations["ApproveRenderedVideo"];
         delete?: never;
         options?: never;
         head?: never;
@@ -657,6 +709,15 @@ export interface components {
             /** Format: int32 */
             total: number;
         };
+        PagedResponseOfRenderedVideoResponse: {
+            items: components["schemas"]["RenderedVideoResponse"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+            /** Format: int32 */
+            total: number;
+        };
         PagedResponseOfRenderJobResponse: {
             items: components["schemas"]["RenderJobResponse"][];
             /** Format: int32 */
@@ -769,6 +830,8 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
         };
+        /** @enum {unknown} */
+        RenderedVideoOrder: "NewestFirst" | "OldestFirst" | null;
         RenderedVideoResponse: {
             /** Format: uuid */
             id: string;
@@ -784,9 +847,26 @@ export interface components {
             uncutAssetIds: string[];
             /** Format: date-time */
             createdAt: string;
+            /** Format: uuid */
+            productId: string;
+            productName: string;
+            /** Format: uuid */
+            projectId: string;
+            projectObjective: string;
+            /** Format: uuid */
+            variantId: string;
+            creativeTemplate: components["schemas"]["CreativeTemplate"];
+            hook: string;
+            /** Format: int32 */
+            storyboardVersion: number;
+            /** Format: uuid */
+            approvedByMemberId: null | string;
+            approvedByEmail: null | string;
+            /** Format: date-time */
+            approvedAt: null | string;
         };
         /** @enum {unknown} */
-        RenderedVideoState: "ReadyForReview";
+        RenderedVideoState: "ReadyForReview" | "Approved";
         /** @enum {unknown} */
         RenderFailureCategory: "InvalidInput" | "Internal" | "Timeout" | "WorkerLost";
         RenderFailureResponse: {
@@ -2242,6 +2322,42 @@ export interface operations {
             };
         };
     };
+    ListRenderedVideos: {
+        parameters: {
+            query?: {
+                search?: string;
+                state?: components["schemas"]["RenderedVideoState"];
+                creativeTemplate?: components["schemas"]["CreativeTemplate"];
+                sort?: components["schemas"]["RenderedVideoOrder"];
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagedResponseOfRenderedVideoResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+        };
+    };
     GetRenderedVideo: {
         parameters: {
             query?: never;
@@ -2261,6 +2377,33 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["RenderedVideoResponse"];
                 };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DeleteRenderedVideo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                videoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Not Found */
             404: {
@@ -2295,6 +2438,80 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    DownloadRenderedVideo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                videoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ApproveRenderedVideo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                videoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RenderedVideoResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
             };
         };
     };

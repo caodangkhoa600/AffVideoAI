@@ -63,6 +63,7 @@ public static class InfrastructureSetup
         services.AddSingleton<ILanguageModel, MockLanguageModel>();
         services.AddScoped<IStoryboards, ScopedStoryboards>();
         services.AddScoped<IRenders, ScopedRenders>();
+        services.AddScoped<IRenderedVideos, ScopedRenderedVideos>();
         services.AddScoped<DemonstrationSeed>();
         return services;
     }

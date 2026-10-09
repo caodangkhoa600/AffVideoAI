@@ -19,7 +19,13 @@ internal sealed class OnnxCutOut(IOptions<RenderingOptions> options) : IImagePro
     private static readonly float[] Deviation = [0.229f, 0.224f, 0.225f];
 
     // Loaded when the first photo needs it, and kept: loading takes seconds.
-    private readonly Lazy<InferenceSession> _model = new(() => new InferenceSession(options.Value.CutOutModelPath));
+    private readonly Lazy<InferenceSession> _model = new(() =>
+    {
+        // Without these ONNX Runtime keeps every block it has ever asked for and asks for twice what it
+        // needs, and the worker holds over 13 GB for a model that works in far less.
+        using var frugal = new SessionOptions { EnableCpuMemArena = false, EnableMemoryPattern = false };
+        return new InferenceSession(options.Value.CutOutModelPath, frugal);
+    });
 
     // The model needs gigabytes while it runs, so one photo at a time.
     private readonly SemaphoreSlim _oneAtATime = new(1, 1);

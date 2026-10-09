@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { api, problemDetail, type RenderJob, type RenderJobState, type Storyboard, type Variant } from "@/lib/api/client";
+import { RenderedVideoActions, RenderedVideoStatus } from "../../../../videos/rendered-video-actions";
 
 /** Where a render job is (RenderJobState in the domain), as a member reads it. There is no percentage to show. */
 const STAGES: Record<RenderJobState, string> = {
@@ -15,7 +16,7 @@ const STAGES: Record<RenderJobState, string> = {
   GeneratingVideo: "Generating video",
   Rendering: "Rendering",
   QualityReview: "Checking the video",
-  Completed: "Ready for review",
+  Completed: "Rendered",
   Failed: "Failed",
   Cancelled: "Cancelled",
 };
@@ -135,6 +136,11 @@ export function StoryboardRender({ variant, storyboard }: { variant: Variant; st
         </p>
       )}
       {job?.renderedVideoId && <RenderedVideoPreview videoId={job.renderedVideoId} />}
+      {job?.state === "Completed" && !job.renderedVideoId && (
+        <p className="text-sm text-muted-foreground" data-testid="rendered-video-deleted">
+          The Rendered Video this render made has been deleted. Render again to make another.
+        </p>
+      )}
     </section>
   );
 }
@@ -142,12 +148,15 @@ export function StoryboardRender({ variant, storyboard }: { variant: Variant; st
 function RenderedVideoPreview({ videoId }: { videoId: string }) {
   const video = useQuery({
     queryKey: ["rendered-videos", "one", videoId],
+    // `data` is null when the Rendered Video was deleted after the job was last asked for.
     queryFn: async () => {
       const { data, response } = await api.GET("/api/v1/rendered-videos/{videoId}", { params: { path: { videoId } } });
+      if (response.status === 404) return null;
       if (!data) throw new Error(`The API answered ${response.status}`);
       return data;
     },
   });
+  if (video.data === null) return null;
   const uncut = video.data?.uncutAssetIds.length ?? 0;
 
   return (
@@ -162,6 +171,11 @@ function RenderedVideoPreview({ videoId }: { videoId: string }) {
         data-testid="rendered-video"
       />
       {video.data && (
+        <p className="text-sm font-medium">
+          <RenderedVideoStatus video={video.data} />
+        </p>
+      )}
+      {video.data && (
         <p className="text-sm text-muted-foreground">
           {video.data.durationMs / 1000} s · {(video.data.sizeInBytes / (1024 * 1024)).toFixed(1)} MB · no narration or
           music, so the audio track is silent
@@ -173,6 +187,7 @@ function RenderedVideoPreview({ videoId }: { videoId: string }) {
           out cleanly. A photo of the Product alone on a plain background cuts out best.
         </p>
       )}
+      {video.data && <RenderedVideoActions video={video.data} />}
     </div>
   );
 }

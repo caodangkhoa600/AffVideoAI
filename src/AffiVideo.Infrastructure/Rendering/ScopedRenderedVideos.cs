@@ -1,0 +1,205 @@
+using AffiVideo.Application;
+using AffiVideo.Application.Rendering;
+using AffiVideo.Application.Storage;
+using AffiVideo.Domain;
+using AffiVideo.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+
+namespace AffiVideo.Infrastructure.Rendering;
+
+// No method names an Organization: the context's filter leaves only the caller's
+// Rendered Videos, and a file is only ever looked up by the key of a Rendered
+// Video found that way. A change and its audit log entry are saved together, and
+// the save fails if the video's state is no longer the one that was read.
+internal sealed class ScopedRenderedVideos(
+    AffiVideoDbContext database,
+    IObjectStorage storage,
+    Caller caller,
+    TimeProvider clock,
+    ILogger<ScopedRenderedVideos> logger) : IRenderedVideos
+{
+    private const string AlreadyApproved = "This Rendered Video is already approved.";
+
+    public async Task<Page<RenderedVideoRecord>> ListAsync(RenderedVideoFilter filter, PageRequest page, CancellationToken cancellationToken)
+    {
+        var all = InContext(database.RenderedVideos.AsNoTracking());
+        if (!string.IsNullOrWhiteSpace(filter.Search))
+        {
+            var contains = LikePattern.Containing(filter.Search);
+            all = all.Where(x =>
+                EF.Functions.ILike(x.ProductName, contains, LikePattern.Escape) ||
+                EF.Functions.ILike(x.ProjectObjective, contains, LikePattern.Escape));
+        }
+        if (filter.State is { } state)
+        {
+            all = all.Where(x => x.Video.State == state);
+        }
+        if (filter.CreativeTemplate is { } template)
+        {
+            all = all.Where(x => x.CreativeTemplate == template);
+        }
+
+        var ordered = filter.Order == RenderedVideoOrder.OldestFirst
+            ? all.OrderBy(x => x.Video.CreatedAt).ThenBy(x => x.Video.Id)
+            : all.OrderByDescending(x => x.Video.CreatedAt).ThenByDescending(x => x.Video.Id);
+        var items = await ordered.Skip(page.Skip).Take(page.PageSize).ToListAsync(cancellationToken);
+        return new Page<RenderedVideoRecord>(
+            items.Select(ToRecord).ToList(), page.Page, page.PageSize, await all.CountAsync(cancellationToken));
+    }
+
+    public async Task<RenderedVideoRecord?> FindAsync(Guid videoId, CancellationToken cancellationToken) =>
+        await InContext(database.RenderedVideos.AsNoTracking().Where(v => v.Id == videoId))
+            .SingleOrDefaultAsync(cancellationToken) is { } found
+            ? ToRecord(found)
+            : null;
+
+    public async Task<Stream?> OpenPreviewAsync(Guid videoId, CancellationToken cancellationToken) =>
+        await database.RenderedVideos.AsNoTracking().SingleOrDefaultAsync(v => v.Id == videoId, cancellationToken) is { } video
+            ? await OpenFileAsync(video, cancellationToken)
+            : null;
+
+    public async Task<RenderedVideoDownload?> DownloadAsync(Guid videoId, CancellationToken cancellationToken)
+    {
+        var found = await FindAsync(videoId, cancellationToken);
+        if (found is null) return null;
+        if (!found.Video.CanBeDownloaded)
+        {
+            return new RenderedVideoDownload(found, null, "This Rendered Video has not been approved. Approve it, then download it.");
+        }
+
+        return await OpenFileAsync(found.Video, cancellationToken) is { } content
+            ? new RenderedVideoDownload(found, content, null)
+            : null;
+    }
+
+    private async Task<Stream?> OpenFileAsync(RenderedVideo video, CancellationToken cancellationToken)
+    {
+        var content = await storage.OpenAsync(video.StorageKey, cancellationToken);
+        if (content is null)
+        {
+            logger.LogError("The file of Rendered Video {VideoId} is missing from storage at {StorageKey}", video.Id, video.StorageKey);
+        }
+        return content;
+    }
+
+    public async Task<RenderedVideoChange?> ApproveAsync(Guid videoId, CancellationToken cancellationToken)
+    {
+        var video = await database.RenderedVideos.SingleOrDefaultAsync(v => v.Id == videoId, cancellationToken);
+        if (video is null) return null;
+        var member = CallingMember();
+
+        var now = clock.GetUtcNow();
+        if (!video.Approve(member, now)) return RenderedVideoChange.Refuse(AlreadyApproved);
+        Record(AuditActions.RenderedVideoApproved, video, member, now);
+        try
+        {
+            await database.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Approved or deleted by someone else after it was read. Nothing of this attempt is saved.
+            database.ChangeTracker.Clear();
+            return await FindAsync(videoId, cancellationToken) is null
+                ? null
+                : RenderedVideoChange.Refuse(AlreadyApproved);
+        }
+
+        return await FindAsync(videoId, cancellationToken) is { } approved ? RenderedVideoChange.Made(approved) : null;
+    }
+
+    public async Task<bool> DeleteAsync(Guid videoId, CancellationToken cancellationToken)
+    {
+        var member = CallingMember();
+        // Someone may approve the video between its being read and deleted here; then it is read again.
+        for (var attempt = 1; ; attempt++)
+        {
+            var video = await database.RenderedVideos.SingleOrDefaultAsync(v => v.Id == videoId, cancellationToken);
+            if (video is null) return false;
+
+            database.RenderedVideos.Remove(video);
+            var job = await database.RenderJobs.SingleOrDefaultAsync(j => j.Id == video.RenderJobId, cancellationToken);
+            job?.ForgetRenderedVideo();
+            Record(AuditActions.RenderedVideoDeleted, video, member, clock.GetUtcNow());
+            try
+            {
+                await database.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException) when (attempt < 5)
+            {
+                database.ChangeTracker.Clear();
+                continue;
+            }
+
+            // The record is what makes the file reachable, and it is gone. A file left
+            // behind is wasted space, not a reason to fail the request, and it is
+            // deleted even if the member has stopped waiting.
+            try
+            {
+                await storage.DeleteAsync(video.StorageKey, CancellationToken.None);
+            }
+            catch (Exception exception)
+            {
+                logger.LogWarning(exception, "The file at {StorageKey} could not be deleted and is left behind", video.StorageKey);
+            }
+            return true;
+        }
+    }
+
+    private void Record(string action, RenderedVideo video, Guid member, DateTimeOffset now) =>
+        database.AuditLog.Add(new AuditLogEntry(Guid.CreateVersion7(), video.OrganizationId, member, action, video.Id, now));
+
+    private Guid CallingMember() =>
+        caller.MemberId ?? throw new InvalidOperationException("Only a member can approve or delete a Rendered Video.");
+
+    // A Rendered Video is kept with its Storyboard, and so with the Variant, Project
+    // and Product it was made from: every one of them is there to be joined.
+    private IQueryable<VideoInContext> InContext(IQueryable<RenderedVideo> videos) =>
+        from video in videos
+        join storyboard in database.Storyboards on video.StoryboardId equals storyboard.Id
+        join variant in database.Variants on storyboard.VariantId equals variant.Id
+        join project in database.Projects on variant.ProjectId equals project.Id
+        join product in database.Products on project.ProductId equals product.Id
+        join member in database.Members on video.ApprovedByMemberId equals (Guid?)member.Id into approvers
+        from approver in approvers.DefaultIfEmpty()
+        select new VideoInContext
+        {
+            Video = video,
+            ProductId = product.Id,
+            ProductName = product.Name,
+            ProjectId = project.Id,
+            ProjectObjective = project.Objective,
+            VariantId = variant.Id,
+            CreativeTemplate = variant.CreativeTemplate,
+            Hook = variant.Hook,
+            StoryboardVersion = storyboard.Version,
+            ApprovedByEmail = approver.Email,
+        };
+
+    private static RenderedVideoRecord ToRecord(VideoInContext found) => new(
+        found.Video, found.ProductId, found.ProductName, found.ProjectId, found.ProjectObjective,
+        found.VariantId, found.CreativeTemplate, found.Hook, found.StoryboardVersion, found.ApprovedByEmail);
+
+    private sealed class VideoInContext
+    {
+        public required RenderedVideo Video { get; init; }
+
+        public required Guid ProductId { get; init; }
+
+        public required string ProductName { get; init; }
+
+        public required Guid ProjectId { get; init; }
+
+        public required string ProjectObjective { get; init; }
+
+        public required Guid VariantId { get; init; }
+
+        public required CreativeTemplate CreativeTemplate { get; init; }
+
+        public required string Hook { get; init; }
+
+        public required int StoryboardVersion { get; init; }
+
+        public required string? ApprovedByEmail { get; init; }
+    }
+}

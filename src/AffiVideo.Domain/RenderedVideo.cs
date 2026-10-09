@@ -1,6 +1,9 @@
 namespace AffiVideo.Domain;
 
-/// <summary>The MP4 produced from one specific Storyboard version. Nothing about the file ever changes.</summary>
+/// <summary>
+/// The MP4 produced from one specific Storyboard version. Nothing about the file
+/// ever changes; the only thing that does is that a member approves it.
+/// </summary>
 public sealed class RenderedVideo : IOwnedByOrganization
 {
     public const int Width = 1080;
@@ -54,6 +57,26 @@ public sealed class RenderedVideo : IOwnedByOrganization
 
     public DateTimeOffset CreatedAt { get; private set; }
 
+    /// <summary>The member who approved it. Only an approved Rendered Video has one.</summary>
+    public Guid? ApprovedByMemberId { get; private set; }
+
+    public DateTimeOffset? ApprovedAt { get; private set; }
+
+    /// <summary>Whether the MP4 may leave as a file. It can be previewed in either state.</summary>
+    public bool CanBeDownloaded => State == RenderedVideoState.Approved;
+
+    /// <summary>Marks the video as fit to publish, in this member's name.</summary>
+    /// <returns>False, with nothing changed, when it is already approved.</returns>
+    public bool Approve(Guid memberId, DateTimeOffset now)
+    {
+        if (State != RenderedVideoState.ReadyForReview) return false;
+
+        State = RenderedVideoState.Approved;
+        ApprovedByMemberId = memberId;
+        ApprovedAt = now;
+        return true;
+    }
+
     /// <summary>
     /// Where the file is in object storage. It starts with the Organization, so
     /// everything one Organization has stored is under one prefix of its own.
@@ -65,4 +88,7 @@ public enum RenderedVideoState
 {
     /// <summary>Rendered and checked, and waiting for a member to watch it.</summary>
     ReadyForReview,
+
+    /// <summary>A member has watched it and marked it as fit to publish. It can be downloaded.</summary>
+    Approved,
 }

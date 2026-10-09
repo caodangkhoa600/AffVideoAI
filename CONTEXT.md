@@ -91,6 +91,18 @@ A mark on a Storyboard or Rendered Video that used a Fact which has since been W
 The MP4 produced from one specific Storyboard version.
 _Avoid_: Output, export, video file
 
+**Ready for review**:
+The state of a Rendered Video that no member has approved yet. It can be previewed but not downloaded.
+_Avoid_: Pending, draft
+
+**Approved**:
+The state of a Rendered Video that a member has marked as fit to publish. It records who and when, and only an approved Rendered Video can be downloaded or recorded as a Published Post. A Fact is Confirmed, never approved.
+_Avoid_: Published, final, accepted
+
+**Library**:
+All the Rendered Videos of an Organization, in one list.
+_Avoid_: Gallery, media library
+
 ### Rendering
 
 **Technique**:

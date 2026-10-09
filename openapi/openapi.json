@@ -1882,6 +1882,83 @@
         }
       }
     },
+    "/api/v1/rendered-videos": {
+      "get": {
+        "tags": [
+          "Rendered Videos"
+        ],
+        "summary": "The Organization's Rendered Videos, newest first unless sort says otherwise. Search looks in the Product's name and the Project's objective; state and creative template narrow the list.",
+        "operationId": "ListRenderedVideos",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/RenderedVideoState"
+            }
+          },
+          {
+            "name": "creativeTemplate",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/CreativeTemplate"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/RenderedVideoOrder"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResponseOfRenderedVideoResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/rendered-videos/{videoId}": {
       "get": {
         "tags": [
@@ -1915,6 +1992,32 @@
             "description": "Not Found"
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "Rendered Videos"
+        ],
+        "summary": "Deletes a Rendered Video and its file, approved or not. Nothing brings it back. The Storyboard version it was rendered from is kept and can be rendered again.",
+        "operationId": "DeleteRenderedVideo",
+        "parameters": [
+          {
+            "name": "videoId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
       }
     },
     "/api/v1/rendered-videos/{videoId}/content": {
@@ -1922,7 +2025,7 @@
         "tags": [
           "Rendered Videos"
         ],
-        "summary": "The MP4, to preview in the browser.",
+        "summary": "The MP4, to preview in the browser. It needs no approval.",
         "operationId": "GetRenderedVideoContent",
         "parameters": [
           {
@@ -1941,6 +2044,89 @@
           },
           "200": {
             "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v1/rendered-videos/{videoId}/download": {
+      "get": {
+        "tags": [
+          "Rendered Videos"
+        ],
+        "summary": "The same MP4 as the preview, to save as a file. Answers 409 until the Rendered Video is approved.",
+        "operationId": "DownloadRenderedVideo",
+        "parameters": [
+          {
+            "name": "videoId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "404": {
+            "description": "Not Found"
+          },
+          "200": {
+            "description": "OK"
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rendered-videos/{videoId}/approve": {
+      "post": {
+        "tags": [
+          "Rendered Videos"
+        ],
+        "summary": "Approves a Rendered Video that is ready for review, in the member's name: it is fit to publish and can be downloaded. Answers 409 for one that is already approved.",
+        "operationId": "ApproveRenderedVideo",
+        "parameters": [
+          {
+            "name": "videoId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenderedVideoResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -2382,6 +2568,35 @@
           }
         }
       },
+      "PagedResponseOfRenderedVideoResponse": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RenderedVideoResponse"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "PagedResponseOfRenderJobResponse": {
         "required": [
           "items",
@@ -2773,6 +2988,13 @@
           }
         }
       },
+      "RenderedVideoOrder": {
+        "enum": [
+          "NewestFirst",
+          "OldestFirst",
+          null
+        ]
+      },
       "RenderedVideoResponse": {
         "required": [
           "id",
@@ -2782,7 +3004,18 @@
           "durationMs",
           "sizeInBytes",
           "uncutAssetIds",
-          "createdAt"
+          "createdAt",
+          "productId",
+          "productName",
+          "projectId",
+          "projectObjective",
+          "variantId",
+          "creativeTemplate",
+          "hook",
+          "storyboardVersion",
+          "approvedByMemberId",
+          "approvedByEmail",
+          "approvedAt"
         ],
         "type": "object",
         "properties": {
@@ -2819,12 +3052,61 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "productId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "projectObjective": {
+            "type": "string"
+          },
+          "variantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "creativeTemplate": {
+            "$ref": "#/components/schemas/CreativeTemplate"
+          },
+          "hook": {
+            "type": "string"
+          },
+          "storyboardVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "approvedByMemberId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "approvedByEmail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "approvedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           }
         }
       },
       "RenderedVideoState": {
         "enum": [
-          "ReadyForReview"
+          "ReadyForReview",
+          "Approved"
         ]
       },
       "RenderFailureCategory": {

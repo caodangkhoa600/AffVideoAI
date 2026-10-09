@@ -3,9 +3,9 @@ using AffiVideo.Domain;
 namespace AffiVideo.Application.Rendering;
 
 /// <summary>
-/// The render jobs and Rendered Videos of the caller's Organization. A Storyboard,
-/// a job or a video of another Organization is answered exactly as one that does
-/// not exist. Nothing here renders: a job waits for the worker.
+/// The render jobs of the caller's Organization. A Storyboard or a job of another
+/// Organization is answered exactly as one that does not exist. Nothing here
+/// renders: a job waits for the worker. What a job makes is in <see cref="IRenderedVideos"/>.
 /// </summary>
 public interface IRenders
 {
@@ -27,14 +27,7 @@ public interface IRenders
     /// </summary>
     /// <returns>The job as it now is: cancelled, unless it had already ended otherwise. Null when there is no such job.</returns>
     Task<RenderJob?> CancelJobAsync(Guid jobId, CancellationToken cancellationToken);
-
-    Task<RenderedVideo?> FindVideoAsync(Guid videoId, CancellationToken cancellationToken);
-
-    /// <summary>The MP4, for the caller to dispose. Null when there is no such Rendered Video.</summary>
-    Task<RenderedVideoContent?> OpenVideoAsync(Guid videoId, CancellationToken cancellationToken);
 }
 
 /// <param name="Queued">False when the job was already there, queued by an earlier request with the same key.</param>
 public sealed record SubmittedRender(RenderJob Job, bool Queued);
-
-public sealed record RenderedVideoContent(RenderedVideo Video, Stream Content);

@@ -1,23 +1,15 @@
 using AffiVideo.Application;
 using AffiVideo.Application.Rendering;
-using AffiVideo.Application.Storage;
 using AffiVideo.Domain;
 using AffiVideo.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using Npgsql;
 
 namespace AffiVideo.Infrastructure.Rendering;
 
 // No method names an Organization: the context's filter leaves only the caller's
-// Storyboards, jobs and Rendered Videos, and a file is only ever looked up by
-// the key of a Rendered Video found that way.
-internal sealed class ScopedRenders(
-    AffiVideoDbContext database,
-    IObjectStorage storage,
-    Caller caller,
-    TimeProvider clock,
-    ILogger<ScopedRenders> logger) : IRenders
+// Storyboards and jobs.
+internal sealed class ScopedRenders(AffiVideoDbContext database, Caller caller, TimeProvider clock) : IRenders
 {
     public async Task<SubmittedRender?> SubmitAsync(
         Guid projectId, Guid variantId, int version, string idempotencyKey, CancellationToken cancellationToken)
@@ -82,23 +74,6 @@ internal sealed class ScopedRenders(
                 database.ChangeTracker.Clear();
             }
         }
-    }
-
-    public Task<RenderedVideo?> FindVideoAsync(Guid videoId, CancellationToken cancellationToken) =>
-        database.RenderedVideos.AsNoTracking().SingleOrDefaultAsync(v => v.Id == videoId, cancellationToken);
-
-    public async Task<RenderedVideoContent?> OpenVideoAsync(Guid videoId, CancellationToken cancellationToken)
-    {
-        var video = await FindVideoAsync(videoId, cancellationToken);
-        if (video is null) return null;
-
-        var content = await storage.OpenAsync(video.StorageKey, cancellationToken);
-        if (content is null)
-        {
-            logger.LogError("The file of Rendered Video {VideoId} is missing from storage at {StorageKey}", video.Id, video.StorageKey);
-            return null;
-        }
-        return new RenderedVideoContent(video, content);
     }
 
     private Task<RenderJob?> FindByKeyAsync(Guid storyboardId, string idempotencyKey, CancellationToken cancellationToken) =>

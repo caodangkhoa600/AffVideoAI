@@ -7,13 +7,13 @@ marketing video. The vocabulary is in [CONTEXT.md](CONTEXT.md), the decisions in
 
 ## What runs
 
-| Service    | What it is                                              | Address on this machine         |
-| ---------- | ------------------------------------------------------- | ------------------------------- |
-| `web`      | Next.js web app (`web/`)                                | http://localhost:3000           |
-| `api`      | ASP.NET Core API (`src/AffiVideo.Api`)                  | http://localhost:8080           |
-| `worker`   | .NET worker that renders: FFmpeg, Remotion and the cut-out model (`src/AffiVideo.Worker`, `remotion/`) | none |
-| `postgres` | PostgreSQL 17                                           | localhost:5432                  |
-| `minio`    | S3-compatible object storage                            | http://localhost:9000, console on 9001 |
+| Service    | What it is                                                                                             | Address on this machine                |
+| ---------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------- |
+| `web`      | Next.js web app (`web/`)                                                                               | http://localhost:3000                  |
+| `api`      | ASP.NET Core API (`src/AffiVideo.Api`)                                                                 | http://localhost:8080                  |
+| `worker`   | .NET worker that renders: FFmpeg, Remotion and the cut-out model (`src/AffiVideo.Worker`, `remotion/`) | none                                   |
+| `postgres` | PostgreSQL 17                                                                                          | localhost:5432                         |
+| `minio`    | S3-compatible object storage                                                                           | http://localhost:9000, console on 9001 |
 
 The only things needed on the host are Docker, and the .NET 10 SDK and Node 22
 for running tests and tools. FFmpeg, Remotion, Chrome Headless Shell and the
@@ -102,10 +102,10 @@ Members page. Nothing is emailed, so the Owner chooses the Editor's password
 (at least 12 characters) and passes it on.
 
 An Owner can do everything. An Editor can do all creative work but is refused
-when adding members, changing the Organization's settings or reading the audit
-log. Adding a member, confirming or withdrawing a Fact, and deleting a Project
-are recorded in the audit log, which an Owner reads at
-`GET /api/v1/organizations/{id}/audit-log`; it has no page yet.
+when adding members, changing the Organiza tion's settings or reading the audit
+log. Adding a member, confirming or withdrawing a Fact, deleting a Project, and
+approving or deleting a Rendered Video are recorded in the audit log, which an
+Owner reads at `GET /api/v1/organizations/{id}/audit-log`; it has no page yet.
 
 The session is a cookie that scripts cannot read (HttpOnly, Secure,
 SameSite=Lax); nothing is kept in browser storage. Chrome, Edge and Firefox
@@ -200,10 +200,11 @@ experiment plan (ticket 24, `docs/business/affiliate-experiment.md`), the
 walking skeleton (ticket 02), sign in and Organizations (ticket 03),
 Products (ticket 04), Product assets (ticket 05), Facts (ticket 06),
 Projects and Variants (ticket 07), Storyboard generation (ticket 08),
-render and preview (ticket 09) and job reliability (ticket 10).
+render and preview (ticket 09), job reliability (ticket 10) and approve,
+download and the library (ticket 11).
 
-Next: approve, download and the library (ticket 11) and Storyboard editing
-(ticket 12).
+Next: Storyboard editing (ticket 12) and the Affiliate Lab and Campaigns
+(ticket 18).
 
 Notes from the walking skeleton:
 
@@ -347,9 +348,8 @@ Notes from render and preview:
 - A Rendered Video is stored at
   `organizations/{id}/rendered-videos/{id}.mp4` and previewed at
   `GET /api/v1/rendered-videos/{id}/content`, which authorises every request.
-  It is ready for review; approving and downloading are ticket 11.
-- A Project that has a Rendered Video cannot be deleted (409). Nothing deletes
-  a Rendered Video yet.
+- A Project that has a Rendered Video cannot be deleted (409) until its
+  Rendered Videos have been deleted.
 
 Notes from job reliability:
 
@@ -388,3 +388,28 @@ Notes from job reliability:
   same time. In Compose they are environment variables on the worker, such as
   `Rendering__JobsAtOnce`. Several workers can serve one queue.
 - A job's temporary files are in `/tmp/affivideo-render/{job id}-{attempt}`.
+
+Notes from approve, download and the library:
+
+- A Rendered Video is ready for review, then approved:
+  `POST /api/v1/rendered-videos/{id}/approve` records who and when, and writes
+  `rendered-video.approved` to the audit log. Any member can approve, the one
+  who rendered it included. Nothing takes an approval back; approving twice is
+  answered 409.
+- `GET /api/v1/rendered-videos/{id}/download` is the same file as the preview,
+  sent to be saved under the Product's name and the time it was rendered. It
+  answers 409 until the Rendered Video is approved. The preview needs no
+  approval.
+- The library is `GET /api/v1/rendered-videos` and the Videos page. `search`
+  looks in the Product's name and in the Project's objective, which is what a
+  Project is called by since it has no name of its own; `state` and
+  `creativeTemplate` narrow the list; `sort` is `NewestFirst` (the default) or
+  `OldestFirst`. Each Rendered Video says the Product, Project, Variant and
+  Storyboard version it was made from.
+- `DELETE /api/v1/rendered-videos/{id}` deletes a Rendered Video in either
+  state, with its file, and writes `rendered-video.deleted` to the audit log.
+  The web app asks once more first. The job that made it is kept, completed and
+  with no Rendered Video, and the Storyboard version can be rendered again.
+- The cut-out model is loaded with ONNX Runtime's memory arena off. With it on,
+  the worker held over 13 GB while a photo was cut, and Docker's virtual
+  machine killed it; it now peaks near 5 GB. Give Docker at least 8 GB.

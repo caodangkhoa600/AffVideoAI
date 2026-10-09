@@ -76,7 +76,7 @@ public sealed class RenderJob : IOwnedByOrganization
     /// <summary>What went wrong as the program reported it, for whoever looks into it.</summary>
     public string? FailureDetail { get; private set; }
 
-    /// <summary>What the job made. Only a completed job has one.</summary>
+    /// <summary>What the job made. Only a completed job has one, until a member deletes it.</summary>
     public Guid? RenderedVideoId { get; private set; }
 
     public DateTimeOffset CreatedAt { get; private set; }
@@ -122,6 +122,12 @@ public sealed class RenderJob : IOwnedByOrganization
         RenderedVideoId = renderedVideoId;
         return true;
     }
+
+    /// <summary>
+    /// The Rendered Video the job made has been deleted. The job stays completed,
+    /// as the record of the render, with nothing to show for it.
+    /// </summary>
+    public void ForgetRenderedVideo() => RenderedVideoId = null;
 
     private bool Become(RenderJobState state, DateTimeOffset now)
     {

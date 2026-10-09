@@ -207,9 +207,15 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
             // A Rendered Video is kept: its Storyboard, and so its Variant and Project, cannot be deleted from under it.
             video.HasOne<Storyboard>().WithMany().HasForeignKey(v => v.StoryboardId).OnDelete(DeleteBehavior.Restrict);
             video.HasOne<RenderJob>().WithMany().HasForeignKey(v => v.RenderJobId).OnDelete(DeleteBehavior.Restrict);
-            video.Property(v => v.State).HasConversion<string>().HasMaxLength(20);
+            video.HasOne<Member>().WithMany().HasForeignKey(v => v.ApprovedByMemberId).OnDelete(DeleteBehavior.Restrict);
+            // An approval is only saved if the state is still the one that was read,
+            // so two approvals made at the same moment cannot both be recorded.
+            video.Property(v => v.State).HasConversion<string>().HasMaxLength(20).IsConcurrencyToken();
             video.Ignore(v => v.StorageKey);
+            video.Ignore(v => v.CanBeDownloaded);
             video.HasIndex(v => new { v.StoryboardId, v.CreatedAt });
+            // The library: an Organization's Rendered Videos by date.
+            video.HasIndex(v => new { v.OrganizationId, v.CreatedAt });
             // A job makes one Rendered Video.
             video.HasIndex(v => v.RenderJobId).IsUnique();
         });

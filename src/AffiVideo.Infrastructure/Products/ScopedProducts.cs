@@ -48,8 +48,8 @@ internal sealed class ScopedProducts(AffiVideoDbContext database, Caller caller,
         var all = database.Products.AsNoTracking();
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
-            var contains = $"%{EscapeLike(filter.Search.Trim())}%";
-            all = all.Where(p => EF.Functions.ILike(p.Name, contains, LikeEscape));
+            var contains = LikePattern.Containing(filter.Search);
+            all = all.Where(p => EF.Functions.ILike(p.Name, contains, LikePattern.Escape));
         }
         if (!string.IsNullOrWhiteSpace(filter.Category))
         {
@@ -70,12 +70,4 @@ internal sealed class ScopedProducts(AffiVideoDbContext database, Caller caller,
 
     public async Task<IReadOnlyList<string>> ListCategoriesAsync(CancellationToken cancellationToken) =>
         await database.Products.Select(p => p.Category).Distinct().OrderBy(category => category).ToListAsync(cancellationToken);
-
-    private const string LikeEscape = "\\";
-
-    // What a member searches for is text, never a pattern.
-    private static string EscapeLike(string text) => text
-        .Replace(LikeEscape, LikeEscape + LikeEscape, StringComparison.Ordinal)
-        .Replace("%", LikeEscape + "%", StringComparison.Ordinal)
-        .Replace("_", LikeEscape + "_", StringComparison.Ordinal);
 }

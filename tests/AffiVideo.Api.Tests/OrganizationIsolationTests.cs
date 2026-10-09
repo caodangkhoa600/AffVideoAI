@@ -251,6 +251,38 @@ public sealed class OrganizationIsolationTests(AffiVideoApp app)
     }
 
     [Fact]
+    public async Task A_member_of_one_Organization_is_refused_approving_downloading_and_deleting_a_Rendered_Video_of_another()
+    {
+        var theirs = await RenderedVideoTests.LibraryAsync(app);
+        var mine = await app.CreateOrganizationAsync();
+        using var me = await app.SignedInAsync(mine.Owner);
+        using var them = await app.SignedInAsync(theirs.Owner);
+        var waiting = $"{RenderedVideoTests.Videos}/{theirs.Flask.Id}";
+        var approved = $"{RenderedVideoTests.Videos}/{theirs.Earbuds.Id}";
+
+        HttpResponseMessage[] responses =
+        [
+            await RenderedVideoTests.ApproveAsync(me, theirs.Flask.Id),
+            await me.GetAsync($"{waiting}/download"),
+            await me.GetAsync($"{approved}/download"),
+            await me.GetAsync($"{approved}/content"),
+            await me.DeleteAsync(waiting),
+            await me.DeleteAsync(approved),
+        ];
+
+        Assert.All(responses, response => Assert.Equal(HttpStatusCode.NotFound, response.StatusCode));
+        // My library is empty, whatever I search for; theirs is as it was, files included.
+        Assert.Equal(0, (await RenderedVideoTests.ListAsync(me)).Total);
+        Assert.Equal(0, (await RenderedVideoTests.ListAsync(me, "?search=lumo&state=ReadyForReview")).Total);
+        Assert.Equal(
+            [(theirs.Flask.Id, Domain.RenderedVideoState.ReadyForReview), (theirs.Earbuds.Id, Domain.RenderedVideoState.Approved)],
+            (await RenderedVideoTests.ListAsync(them)).Items.Select(video => (video.Id, video.State)));
+        Assert.Equal(HttpStatusCode.OK, (await them.GetAsync($"{approved}/download")).StatusCode);
+        Assert.Equal(2, (await app.StoredKeysAsync($"organizations/{theirs.OrganizationId}/rendered-videos/")).Length);
+        Assert.Empty((await me.GetAsync<PagedResponse<AuditLogEntryResponse>>($"/api/v1/organizations/{mine.Id}/audit-log")).Items);
+    }
+
+    [Fact]
     public async Task A_Product_list_and_its_categories_hold_only_what_belongs_to_that_Organization()
     {
         var theirs = await app.CreateOrganizationAsync();
