@@ -154,6 +154,45 @@ public sealed class OrganizationIsolationTests(AffiVideoApp app)
     }
 
     [Fact]
+    public async Task A_member_of_one_Organization_is_refused_the_Projects_and_Variants_of_another()
+    {
+        var theirs = await app.CreateOrganizationAsync();
+        var mine = await app.CreateOrganizationAsync();
+        using var me = await app.SignedInAsync(mine.Owner);
+        using var them = await app.SignedInAsync(theirs.Owner);
+        var theirProduct = (await ProductTests.CreateAsync(them, ProductTests.Valid(name: "Theirs"))).Id;
+        var theirProject = await ProjectTests.CreateAsync(them, ProjectTests.Valid(theirProduct));
+        var theirVariant = await VariantTests.AddAsync(them, theirProject.Id);
+        var myProduct = (await ProductTests.CreateAsync(me, ProductTests.Valid(name: "Mine"))).Id;
+        var myProject = await ProjectTests.CreateAsync(me, ProjectTests.Valid(myProduct));
+        var theirProjectPath = $"{ProjectTests.Projects}/{theirProject.Id}";
+
+        var read = await me.GetAsync(theirProjectPath);
+        var delete = await me.DeleteAsync(theirProjectPath);
+        var listVariants = await me.GetAsync(VariantTests.Variants(theirProject.Id));
+        var readVariant = await me.GetAsync($"{VariantTests.Variants(theirProject.Id)}/{theirVariant.Id}");
+        var readVariantUnderMyProject = await me.GetAsync($"{VariantTests.Variants(myProject.Id)}/{theirVariant.Id}");
+        var addVariant = await me.PostAsync(VariantTests.Variants(theirProject.Id), VariantTests.Valid());
+        var duplicate = await VariantTests.DuplicateAsync(me, theirProject.Id, theirVariant.Id, "Taken over");
+        var duplicateUnderMyProject = await VariantTests.DuplicateAsync(me, myProject.Id, theirVariant.Id, "Taken over");
+        // A Project is made from a Product of the member's own Organization, or not at all.
+        var fromTheirProduct = await me.PostAsync(ProjectTests.Projects, ProjectTests.Valid(theirProduct));
+        var fromNoProduct = await me.PostAsync(ProjectTests.Projects, ProjectTests.Valid(Guid.NewGuid()));
+
+        Assert.All(
+            [read, delete, listVariants, readVariant, readVariantUnderMyProject, addVariant, duplicate, duplicateUnderMyProject],
+            response => Assert.Equal(HttpStatusCode.NotFound, response.StatusCode));
+        Assert.Equal(HttpStatusCode.BadRequest, fromTheirProduct.StatusCode);
+        Assert.Equal(fromNoProduct.StatusCode, fromTheirProduct.StatusCode);
+        Assert.Equal([myProject.Id], (await ProjectTests.ListAsync(me)).Items.Select(p => p.Id));
+        Assert.Empty((await ProjectTests.ListAsync(me, $"?productId={theirProduct}")).Items);
+        Assert.Equal(0, (await VariantTests.ListAsync(me, myProject.Id)).Total);
+        Assert.Equal([theirProject.Id], (await ProjectTests.ListAsync(them)).Items.Select(p => p.Id));
+        Assert.Equal([theirVariant.Id], (await VariantTests.ListAsync(them, theirProject.Id)).Items.Select(v => v.Id));
+        Assert.Empty((await them.GetAsync<PagedResponse<AuditLogEntryResponse>>($"/api/v1/organizations/{theirs.Id}/audit-log")).Items);
+    }
+
+    [Fact]
     public async Task A_Product_list_and_its_categories_hold_only_what_belongs_to_that_Organization()
     {
         var theirs = await app.CreateOrganizationAsync();

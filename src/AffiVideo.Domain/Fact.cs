@@ -104,4 +104,7 @@ public static class ContentLanguages
     public const int CodeMaxLength = 10;
 
     public static IReadOnlyList<string> Codes { get; } = [Vietnamese, English];
+
+    /// <summary>The languages a video can be made in. Facts can be kept in more than these.</summary>
+    public static IReadOnlyList<string> VideoCodes { get; } = [Vietnamese];
 }

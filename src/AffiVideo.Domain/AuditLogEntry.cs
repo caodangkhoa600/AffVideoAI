@@ -30,4 +30,5 @@ public static class AuditActions
     public const string MemberAdded = "member.added";
     public const string FactConfirmed = "fact.confirmed";
     public const string FactWithdrawn = "fact.withdrawn";
+    public const string ProjectDeleted = "project.deleted";
 }

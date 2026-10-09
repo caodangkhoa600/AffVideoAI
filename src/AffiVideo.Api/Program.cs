@@ -31,7 +31,8 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.RespectNullableAnnotations = true;
     // A number is a number: without this the description offers "integer or string" for every count.
     options.SerializerOptions.NumberHandling = JsonNumberHandling.Strict;
-    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    // And a name is a name: a creative template is "ProductShowcase", never 1.
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(allowIntegerValues: false));
 });
 
 var app = builder.Build();
@@ -70,6 +71,8 @@ v1.MapOrganizations();
 v1.MapProducts();
 v1.MapProductAssets();
 v1.MapFacts();
+v1.MapProjects();
+v1.MapVariants();
 
 app.Run();
 

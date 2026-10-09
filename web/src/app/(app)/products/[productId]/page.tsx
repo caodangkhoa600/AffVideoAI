@@ -46,6 +46,9 @@ function ProductDetails({ product }: { product: Product }) {
           </p>
         </div>
         <div className="flex gap-3">
+          <Button asChild>
+            <Link href={`/projects/new?productId=${product.id}`}>New Project</Link>
+          </Button>
           <Button variant="outline" asChild>
             <Link href={`/products/${product.id}/edit`}>Edit</Link>
           </Button>

@@ -14,6 +14,11 @@ export default function Home() {
           </Link>
         </li>
         <li>
+          <Link href="/projects" className="font-medium underline underline-offset-4">
+            Projects
+          </Link>
+        </li>
+        <li>
           <Link href="/members" className="font-medium underline underline-offset-4">
             Members
           </Link>

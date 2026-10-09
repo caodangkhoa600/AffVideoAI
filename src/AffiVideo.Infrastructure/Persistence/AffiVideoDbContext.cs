@@ -31,6 +31,10 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
 
     public DbSet<Fact> Facts => Set<Fact>();
 
+    public DbSet<Project> Projects => Set<Project>();
+
+    public DbSet<Variant> Variants => Set<Variant>();
+
     /// <summary>The keys that protect session cookies and anti-forgery tokens, kept here so sessions outlive a restart of the API.</summary>
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
@@ -108,6 +112,27 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
             // so two changes made at the same moment cannot both be recorded.
             fact.Property(f => f.State).HasConversion<string>().HasMaxLength(20).IsConcurrencyToken();
             fact.HasIndex(f => new { f.ProductId, f.State, f.CreatedAt });
+        });
+
+        builder.Entity<Project>(project =>
+        {
+            project.HasOne<Organization>().WithMany().HasForeignKey(p => p.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            project.HasOne<Product>().WithMany().HasForeignKey(p => p.ProductId).OnDelete(DeleteBehavior.Restrict);
+            project.Property(p => p.Audience).HasMaxLength(Project.AudienceMaxLength);
+            project.Property(p => p.Language).HasMaxLength(ContentLanguages.CodeMaxLength);
+            project.Property(p => p.Objective).HasMaxLength(Project.ObjectiveMaxLength);
+            project.HasIndex(p => new { p.OrganizationId, p.CreatedAt });
+            project.HasIndex(p => new { p.ProductId, p.CreatedAt });
+        });
+
+        builder.Entity<Variant>(variant =>
+        {
+            variant.HasOne<Organization>().WithMany().HasForeignKey(v => v.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            // Deleting a Project deletes its Variants with it.
+            variant.HasOne<Project>().WithMany().HasForeignKey(v => v.ProjectId).OnDelete(DeleteBehavior.Cascade);
+            variant.Property(v => v.CreativeTemplate).HasConversion<string>().HasMaxLength(30);
+            variant.Property(v => v.Hook).HasMaxLength(Variant.HookMaxLength);
+            variant.HasIndex(v => new { v.ProjectId, v.CreatedAt });
         });
 
         var filter = typeof(AffiVideoDbContext).GetMethod(nameof(FilterToCallerOrganization), BindingFlags.NonPublic | BindingFlags.Instance)!;

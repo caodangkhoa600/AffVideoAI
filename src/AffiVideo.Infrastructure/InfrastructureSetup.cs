@@ -1,12 +1,14 @@
 using AffiVideo.Application;
 using AffiVideo.Application.Organizations;
 using AffiVideo.Application.Products;
+using AffiVideo.Application.Projects;
 using AffiVideo.Application.Storage;
 using AffiVideo.Application.SystemStatus;
 using AffiVideo.Infrastructure.Identity;
 using AffiVideo.Infrastructure.Organizations;
 using AffiVideo.Infrastructure.Persistence;
 using AffiVideo.Infrastructure.Products;
+using AffiVideo.Infrastructure.Projects;
 using AffiVideo.Infrastructure.Storage;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -49,6 +51,8 @@ public static class InfrastructureSetup
         services.AddScoped<IProducts, ScopedProducts>();
         services.AddScoped<IProductAssets, ScopedProductAssets>();
         services.AddScoped<IFacts, ScopedFacts>();
+        services.AddScoped<IProjects, ScopedProjects>();
+        services.AddScoped<IVariants, ScopedVariants>();
         services.AddScoped<DemonstrationSeed>();
         return services;
     }

@@ -15,6 +15,9 @@ export type ProductAssetKind = components["schemas"]["ProductAssetKind"];
 export type Fact = components["schemas"]["FactResponse"];
 export type FactRequest = components["schemas"]["FactRequest"];
 export type FactState = components["schemas"]["FactState"];
+export type Project = components["schemas"]["ProjectResponse"];
+export type Variant = components["schemas"]["VariantResponse"];
+export type CreativeTemplate = components["schemas"]["CreativeTemplate"];
 
 const CHANGES_STATE = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 

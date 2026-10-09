@@ -98,8 +98,8 @@ Members page. Nothing is emailed, so the Owner chooses the Editor's password
 
 An Owner can do everything. An Editor can do all creative work but is refused
 when adding members, changing the Organization's settings or reading the audit
-log. Adding a member, and confirming or withdrawing a Fact, is recorded in the
-audit log, which an Owner reads at
+log. Adding a member, confirming or withdrawing a Fact, and deleting a Project
+are recorded in the audit log, which an Owner reads at
 `GET /api/v1/organizations/{id}/audit-log`; it has no page yet.
 
 The session is a cookie that scripts cannot read (HttpOnly, Secure,
@@ -182,9 +182,10 @@ it is a deliberate act that includes re-reading the licence (ADR 0002).
 Done: the look prototypes (tickets 01, 25, 26, in `prototypes/`), the affiliate
 experiment plan (ticket 24, `docs/business/affiliate-experiment.md`), the
 walking skeleton (ticket 02), sign in and Organizations (ticket 03),
-Products (ticket 04), Product assets (ticket 05) and Facts (ticket 06).
+Products (ticket 04), Product assets (ticket 05), Facts (ticket 06) and
+Projects and Variants (ticket 07).
 
-Next: Projects and Variants (ticket 07).
+Next: Storyboard generation (ticket 08).
 
 Notes from the walking skeleton:
 
@@ -242,3 +243,20 @@ Notes from Facts:
   is answered 409 and nothing of it is recorded.
 - The seeded Facts are Confirmed in the demonstration Owner's name, and the
   audit log says so.
+
+Notes from Projects and Variants:
+
+- A Project is one Product plus a brief: audience, language, target duration
+  and objective. The brief is fixed when the Project is created; no endpoint
+  changes it.
+- The target duration is a whole number of seconds from 15 to 30, and the
+  language is Vietnamese (`vi`): `ContentLanguages.VideoCodes` in the domain.
+  Facts can still be kept in English.
+- A Variant is a creative template (`LuxuryCinematic`, `ProductShowcase` or
+  `ProblemSolution`) and a Hook. Nothing changes or removes a Variant, so its
+  identifier is its identifier for life.
+- Duplicating is `POST /api/v1/projects/{projectId}/variants/{variantId}/duplicate`
+  with the new Hook. It adds a separate Variant with the same creative
+  template, and refuses the Hook the duplicated Variant already has.
+- Deleting a Project deletes its Variants with it and is recorded in the audit
+  log as `project.deleted`. The Product is kept.
