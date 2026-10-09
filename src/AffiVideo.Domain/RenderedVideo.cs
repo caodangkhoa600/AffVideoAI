@@ -21,7 +21,7 @@ public sealed class RenderedVideo : IOwnedByOrganization
     public RenderedVideo(
         Guid id, Guid organizationId, Guid storyboardId, Guid renderJobId,
         int durationMs, long sizeInBytes, IEnumerable<Guid> uncutAssetIds, IEnumerable<int> drawnScenePositions,
-        DateTimeOffset createdAt)
+        IEnumerable<VariantAudio> audio, DateTimeOffset createdAt)
     {
         Id = id;
         OrganizationId = organizationId;
@@ -32,6 +32,18 @@ public sealed class RenderedVideo : IOwnedByOrganization
         SizeInBytes = sizeInBytes;
         UncutAssetIds = [.. uncutAssetIds];
         DrawnScenePositions = [.. drawnScenePositions];
+        foreach (var mixed in audio)
+        {
+            if (mixed.Kind == VariantAudioKind.Narration)
+            {
+                NarrationAudioId = mixed.Id;
+            }
+            else
+            {
+                MusicAudioId = mixed.Id;
+                MusicVolumePercent = mixed.VolumePercent;
+            }
+        }
         CreatedAt = createdAt;
     }
 
@@ -62,6 +74,18 @@ public sealed class RenderedVideo : IOwnedByOrganization
     /// Scene was reused from an earlier render in which it was the same.
     /// </summary>
     public int[] DrawnScenePositions { get; private set; } = [];
+
+    /// <summary>
+    /// The narration mixed into the video, when the Variant had one as it was rendered.
+    /// The audio may since have been replaced or removed; the video keeps its sound.
+    /// </summary>
+    public Guid? NarrationAudioId { get; private set; }
+
+    /// <summary>The music mixed into the video, when the Variant had one as it was rendered.</summary>
+    public Guid? MusicAudioId { get; private set; }
+
+    /// <summary>How loud that music was mixed, from 0 to 100. Only a video with music has one.</summary>
+    public int? MusicVolumePercent { get; private set; }
 
     public DateTimeOffset CreatedAt { get; private set; }
 

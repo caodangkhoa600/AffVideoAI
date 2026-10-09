@@ -41,6 +41,9 @@ public sealed record RenderFailureResponse(RenderJobState Stage, RenderFailureCa
 /// <param name="Hook">Of the Variant it was made for.</param>
 /// <param name="StoryboardVersion">The version of the Variant's Storyboard that was rendered.</param>
 /// <param name="ApprovedByMemberId">The member who approved it. Only an approved Rendered Video has one.</param>
+/// <param name="NarrationAudioId">The narration mixed into the video, when the Variant had one as it was rendered. It may since have been replaced or removed.</param>
+/// <param name="MusicAudioId">The music mixed into the video, when the Variant had one as it was rendered.</param>
+/// <param name="MusicVolumePercent">How loud that music was mixed, from 0 to 100. Only a video with music has one.</param>
 /// <param name="Flags">Why the video is Flagged for Review: one for each Withdrawn Fact it used, until a member clears it. Empty when it is not flagged.</param>
 public sealed record RenderedVideoResponse(
     Guid Id,
@@ -63,4 +66,7 @@ public sealed record RenderedVideoResponse(
     Guid? ApprovedByMemberId,
     string? ApprovedByEmail,
     DateTimeOffset? ApprovedAt,
+    Guid? NarrationAudioId,
+    Guid? MusicAudioId,
+    int? MusicVolumePercent,
     IReadOnlyList<ReviewFlagResponse> Flags);

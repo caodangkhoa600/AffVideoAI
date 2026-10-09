@@ -12,6 +12,13 @@ internal static class Processes
     /// <returns>What the program wrote to its output.</returns>
     public static async Task<string> RunAsync(
         string program, IReadOnlyList<string> arguments, string workingDirectory, string temporaryDirectory,
+        TimeSpan timeout, CancellationToken cancellationToken) =>
+        (await RunForBothAsync(program, arguments, workingDirectory, temporaryDirectory, timeout, cancellationToken)).Output;
+
+    /// <summary>For a program that reports what it found beside its output, as FFmpeg does what a filter measured.</summary>
+    /// <returns>What the program wrote to its output, and what it wrote beside it.</returns>
+    public static async Task<(string Output, string Said)> RunForBothAsync(
+        string program, IReadOnlyList<string> arguments, string workingDirectory, string temporaryDirectory,
         TimeSpan timeout, CancellationToken cancellationToken)
     {
         var start = new ProcessStartInfo(program)
@@ -50,6 +57,6 @@ internal static class Processes
             throw new InvalidOperationException(
                 $"{program} failed with exit code {process.ExitCode}: {(said.Length > 4000 ? said[^4000..] : said)}");
         }
-        return await output;
+        return (await output, await errors);
     }
 }

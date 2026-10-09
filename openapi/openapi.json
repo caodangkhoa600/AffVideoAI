@@ -1570,6 +1570,317 @@
         }
       }
     },
+    "/api/v1/projects/{projectId}/variants/{variantId}/audio": {
+      "get": {
+        "tags": [
+          "Variant audio"
+        ],
+        "summary": "The Variant's narration and music: at most one of each, narration first.",
+        "operationId": "ListVariantAudio",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "variantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/VariantAudioResponse"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Variant audio"
+        ],
+        "summary": "Sets the Variant's narration or music from an MP3 or WAV file, in place of what it had. The member must say rightsConfirmed=true: that they hold the rights to it, which is recorded in their name. The file is decoded and kept as a WAV. Music takes a volumePercent from 0 to 100.",
+        "operationId": "UploadVariantAudio",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "variantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "required": [
+                  "kind"
+                ],
+                "type": "object",
+                "allOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "$ref": "#/components/schemas/VariantAudioKind"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "file": {
+                        "$ref": "#/components/schemas/IFormFile"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "rightsConfirmed": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "volumePercent": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VariantAudioResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/variants/{variantId}/audio/{audioId}/content": {
+      "get": {
+        "tags": [
+          "Variant audio"
+        ],
+        "summary": "The sound, as a WAV, to listen to.",
+        "operationId": "GetVariantAudioContent",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "variantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "audioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "404": {
+            "description": "Not Found"
+          },
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/variants/{variantId}/audio/{audioId}/volume": {
+      "put": {
+        "tags": [
+          "Variant audio"
+        ],
+        "summary": "Sets how loud the music is beside narration, from 0 to 100. A video rendered afterwards is mixed at it. Narration has no volume to set.",
+        "operationId": "SetVariantAudioVolume",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "variantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "audioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AudioVolumeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VariantAudioResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/variants/{variantId}/audio/{audioId}": {
+      "delete": {
+        "tags": [
+          "Variant audio"
+        ],
+        "summary": "Removes the narration or the music, and its file. Videos already rendered keep their sound.",
+        "operationId": "RemoveVariantAudio",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "variantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "audioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
     "/api/v1/projects/{projectId}/variants/{variantId}/storyboards": {
       "get": {
         "tags": [
@@ -2450,6 +2761,18 @@
           }
         }
       },
+      "AudioVolumeRequest": {
+        "required": [
+          "volumePercent"
+        ],
+        "type": "object",
+        "properties": {
+          "volumePercent": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "AuditLogEntryResponse": {
         "required": [
           "id",
@@ -3322,6 +3645,9 @@
           "approvedByMemberId",
           "approvedByEmail",
           "approvedAt",
+          "narrationAudioId",
+          "musicAudioId",
+          "musicVolumePercent",
           "flags"
         ],
         "type": "object",
@@ -3414,6 +3740,27 @@
               "string"
             ],
             "format": "date-time"
+          },
+          "narrationAudioId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "musicAudioId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "musicVolumePercent": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
           },
           "flags": {
             "type": "array",
@@ -3832,6 +4179,80 @@
           }
         }
       },
+      "VariantAudioKind": {
+        "enum": [
+          "Narration",
+          "Music"
+        ]
+      },
+      "VariantAudioResponse": {
+        "required": [
+          "id",
+          "variantId",
+          "kind",
+          "durationMs",
+          "sampleRate",
+          "channels",
+          "sizeInBytes",
+          "volumePercent",
+          "rightsConfirmedByMemberId",
+          "rightsConfirmedByEmail",
+          "rightsConfirmedAt",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "variantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/VariantAudioKind"
+          },
+          "durationMs": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sampleRate": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "channels": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sizeInBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "volumePercent": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rightsConfirmedByMemberId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rightsConfirmedByEmail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "rightsConfirmedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "VariantRequest": {
         "required": [
           "creativeTemplate",
@@ -3906,6 +4327,9 @@
     },
     {
       "name": "Variants"
+    },
+    {
+      "name": "Variant audio"
     },
     {
       "name": "Storyboards"

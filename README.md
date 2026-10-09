@@ -104,7 +104,8 @@ Members page. Nothing is emailed, so the Owner chooses the Editor's password
 An Owner can do everything. An Editor can do all creative work but is refused
 when adding members, changing the Organiza tion's settings or reading the audit
 log. Adding a member, confirming or withdrawing a Fact, deleting a Project,
-approving or deleting a Rendered Video, and clearing a Flagged for Review mark
+approving or deleting a Rendered Video, clearing a Flagged for Review mark,
+and confirming the rights to uploaded audio
 are recorded in the audit log, which an
 Owner reads at `GET /api/v1/organizations/{id}/audit-log`; it has no page yet.
 
@@ -203,10 +204,11 @@ Products (ticket 04), Product assets (ticket 05), Facts (ticket 06),
 Projects and Variants (ticket 07), Storyboard generation (ticket 08),
 render and preview (ticket 09), job reliability (ticket 10), approve,
 download and the library (ticket 11), Storyboard editing (ticket 12),
-flagging work built on Withdrawn Facts (ticket 13) and the Luxury Cinematic
-and Problem–Solution templates (ticket 14).
+flagging work built on Withdrawn Facts (ticket 13), the Luxury Cinematic
+and Problem–Solution templates (ticket 14) and uploaded narration and music
+(ticket 15).
 
-Next: uploaded narration and music (ticket 15) and the Affiliate Lab and
+Next: production cost records (ticket 16) and the Affiliate Lab and
 Campaigns (ticket 18).
 
 Notes from the walking skeleton:
@@ -452,6 +454,56 @@ Notes from the Luxury Cinematic and Problem–Solution templates:
   Cinematic.
 - In a Product whose colour is grey, Luxury Cinematic's dark and coloured
   grounds are close to one another; the layouts still differ.
+
+Notes from uploaded narration and music:
+
+- A Variant has at most one Narration and one Music, under
+  `/api/v1/projects/{projectId}/variants/{variantId}/audio`. `POST` there is a
+  form with `kind` (`Narration` or `Music`), `file`, `rightsConfirmed` and, for
+  Music, `volumePercent`. A new file takes the place of the one of its kind.
+  `DELETE .../audio/{audioId}` removes one, and `GET .../audio/{audioId}/content`
+  is the sound, to listen to.
+- An upload is refused (400) unless `rightsConfirmed` is `true`. The member and
+  the time are kept on the audio (`rightsConfirmedByMemberId`,
+  `rightsConfirmedAt`) and written to the audit log as
+  `audio.rights-confirmed`, which stays when the audio is replaced or removed.
+- An upload is an MP3 or a WAV of at most 20 MB, lasting from 1 second to 5
+  minutes, in mono or stereo, and a WAV has from 8000 to 48000 samples a
+  second. It is judged by decoding the whole of it; its name and declared type
+  are ignored. A WAV is read as PCM of 8, 16, 24 or 32 bits or 32-bit float.
+- What is stored is a 16-bit PCM WAV of the decoded sound, at
+  `organizations/{id}/variants/{id}/audio/{id}.wav`. Nothing else of the file
+  is kept: its title, artist and cover are left behind. Five minutes in stereo
+  is about 50 MB.
+- An MP3 is decoded in the API by NLayer (MIT licence), in managed code, so
+  the API needs no FFmpeg, and FFmpeg in the worker is only ever handed a WAV
+  this system wrote, and is told it is one.
+- Music has a volume from 0 to 100: 100 is as loud as Narration, 0 is not
+  heard. It is 30 unless the upload says otherwise, a new file keeps the volume
+  of the one it replaces, and `PUT .../audio/{audioId}/volume` changes it.
+  Narration is always at 100.
+- A render mixes in the Narration and Music the Variant has when the worker
+  takes the job, not when it was queued. Changing the audio makes no new
+  Storyboard version; render the version again to hear it. A Rendered Video
+  says what it was mixed with (`narrationAudioId`, `musicAudioId`,
+  `musicVolumePercent`) and keeps its sound when the audio is later removed.
+- Each track is measured by FFmpeg (the `loudnorm` filter, only to measure)
+  over the part the video has room for, and brought to -16 LUFS by one gain
+  over its whole length, of at most 30 dB. A limiter holds the peaks that
+  gain sends over -1.5 dB. Music is then turned down to its volume, the two
+  are added, and a limiter holds the sum under -1.5 dB too. The numbers are
+  `AudioMix` in the worker.
+- A track longer than the video is cut where the video ends, fading out over
+  the last half second. A shorter one is followed by silence: the audio is
+  always as long as the Scenes. With no audio, or only Music at volume 0, the
+  track is silent.
+- The Scene clips are not drawn again for a change of audio: their key has
+  nothing of the audio in it.
+- Duplicating a Variant does not copy its audio. Deleting a Project deletes
+  its Variants' audio and the files.
+- The whole upload and the decoded sound are held in memory while the API
+  decodes. For one MP3 at the limits that is the 20 MB file, the samples as
+  they are decoded and the WAV made of them: about 200 MB at worst.
 
 Notes from flagging work built on Withdrawn Facts:
 

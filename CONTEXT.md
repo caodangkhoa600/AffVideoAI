@@ -80,6 +80,18 @@ _Avoid_: Shot plan, script, timeline
 One timed segment of a Storyboard, with its text, source assets and Technique.
 _Avoid_: Shot, clip, segment
 
+**Narration**:
+A recording of a voice that a member uploads for a Variant, heard over every video rendered for it afterwards. A Scene's narration text is words; Narration is sound, and nothing makes one from the other.
+_Avoid_: Voiceover, voice track
+
+**Music**:
+A recording that a member uploads for a Variant, mixed under its videos at a volume the member chooses. A Variant has at most one Narration and one Music.
+_Avoid_: Soundtrack, background track, BGM
+
+**Rights confirmation**:
+A member's statement, made on uploading Narration or Music, that they hold the rights to use it. It records who and when; the Organization is responsible for its truth.
+_Avoid_: Licence check, clearance
+
 **Manually Edited**:
 A mark on a Scene whose text a person changed. Its text is no longer traceable to Facts and is the Organization's responsibility. The mark stays through later versions until the Scene is regenerated.
 _Avoid_: Overridden, custom

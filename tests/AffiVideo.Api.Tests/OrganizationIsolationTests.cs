@@ -221,6 +221,40 @@ public sealed class OrganizationIsolationTests(AffiVideoApp app)
     }
 
     [Fact]
+    public async Task A_member_of_one_Organization_is_refused_the_narration_and_music_of_a_Variant_of_another()
+    {
+        var theirs = await app.CreateOrganizationAsync();
+        var mine = await app.CreateOrganizationAsync();
+        using var me = await app.SignedInAsync(mine.Owner);
+        using var them = await app.SignedInAsync(theirs.Owner);
+        var sound = VariantAudioTests.Tone(seconds: 2);
+        var theirVariant = await StoryboardTests.NewVariantAsync(them, await StoryboardTests.NewProductAsync(them));
+        var theirMusic = await VariantAudioTests.UploadedAsync(them, theirVariant, Domain.VariantAudioKind.Music, sound);
+        var myVariant = await StoryboardTests.NewVariantAsync(me, await StoryboardTests.NewProductAsync(me));
+        var theirVariantUnderMyProject = theirVariant with { ProjectId = myVariant.ProjectId };
+
+        HttpResponseMessage[] responses =
+        [
+            await me.GetAsync(VariantAudioTests.Audio(theirVariant)),
+            await me.GetAsync(VariantAudioTests.Content(theirVariant, theirMusic.Id)),
+            await VariantAudioTests.UploadAsync(me, theirVariant, Domain.VariantAudioKind.Narration, sound),
+            await me.PutAsync($"{VariantAudioTests.Audio(theirVariant)}/{theirMusic.Id}/volume", new AudioVolumeRequest(0)),
+            await me.DeleteAsync($"{VariantAudioTests.Audio(theirVariant)}/{theirMusic.Id}"),
+            await me.GetAsync(VariantAudioTests.Audio(theirVariantUnderMyProject)),
+            await VariantAudioTests.UploadAsync(me, theirVariantUnderMyProject, Domain.VariantAudioKind.Narration, sound),
+            // Their audio is not found under my own Variant either.
+            await me.GetAsync(VariantAudioTests.Content(myVariant, theirMusic.Id)),
+            await me.DeleteAsync($"{VariantAudioTests.Audio(myVariant)}/{theirMusic.Id}"),
+        ];
+
+        Assert.All(responses, response => Assert.Equal(HttpStatusCode.NotFound, response.StatusCode));
+        var kept = Assert.Single(await them.GetAsync<VariantAudioResponse[]>(VariantAudioTests.Audio(theirVariant)));
+        Assert.Equal((theirMusic.Id, theirMusic.VolumePercent), (kept.Id, kept.VolumePercent));
+        Assert.Equal(HttpStatusCode.OK, (await them.GetAsync(VariantAudioTests.Content(theirVariant, theirMusic.Id))).StatusCode);
+        Assert.Empty(await app.StoredKeysAsync($"organizations/{mine.Id}/"));
+    }
+
+    [Fact]
     public async Task A_member_of_one_Organization_is_refused_editing_the_Storyboards_of_another_and_showing_its_photos_in_their_own()
     {
         var theirs = await app.CreateOrganizationAsync();

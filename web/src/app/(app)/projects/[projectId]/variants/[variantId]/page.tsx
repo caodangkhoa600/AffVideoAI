@@ -10,6 +10,7 @@ import { FlaggedForReview } from "../../../../flagged-for-review";
 import { creativeTemplateName } from "../../../creative-templates";
 import { SceneEditor } from "./scene-editor";
 import { StoryboardRender } from "./storyboard-render";
+import { VariantAudioSection } from "./variant-audio";
 
 const LOADING = <p className="text-sm text-muted-foreground">Loading…</p>;
 
@@ -229,6 +230,8 @@ function VariantStoryboards({ variant }: { variant: Variant }) {
           )}
         </>
       )}
+      {/* The audio is the Variant's, not a version's: it is there whichever version is read, and before there is one. */}
+      <VariantAudioSection variant={variant} />
     </>
   );
 }

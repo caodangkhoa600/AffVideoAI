@@ -73,6 +73,7 @@ v1.MapProductAssets();
 v1.MapFacts();
 v1.MapProjects();
 v1.MapVariants();
+v1.MapVariantAudio();
 v1.MapStoryboards();
 v1.MapRenders();
 v1.MapRenderedVideos();

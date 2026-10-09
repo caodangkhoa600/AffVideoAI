@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using AffiVideo.Application.Rendering;
+using AffiVideo.Application.Storage;
 using AffiVideo.Domain;
 using Microsoft.Extensions.Options;
 
@@ -14,6 +15,7 @@ internal sealed class RenderJobRunner(
     VideoLayers layers,
     Remotion remotion,
     SceneClips keptClips,
+    IObjectStorage storage,
     Ffmpeg ffmpeg,
     IOptions<RenderingOptions> options,
     ILogger<RenderJobRunner> logger)
@@ -141,7 +143,24 @@ internal sealed class RenderJobRunner(
 
         var durationMs = scenes.Sum(scene => scene.DurationMs);
         var video = Path.Combine(jobDirectory, "video.mp4");
-        await ffmpeg.JoinAsync(jobDirectory, clips, durationMs, video, cancellationToken);
+        var tracks = new List<AudioTrack>();
+        foreach (var audio in work.Audio)
+        {
+            // Named here, by its kind: nothing of what the member's file was called gets this far.
+            var file = Path.Combine(jobDirectory, $"{audio.Kind.ToString().ToLowerInvariant()}.wav");
+            await using (var kept = await storage.OpenAsync(audio.StorageKey, cancellationToken))
+            {
+                if (kept is null)
+                {
+                    throw new RenderFailedException(
+                        $"The Variant's {audio.Kind.ToString().ToLowerInvariant()} was removed or replaced while the video was being rendered. Render again.");
+                }
+                await using var written = File.Create(file);
+                await kept.CopyToAsync(written, cancellationToken);
+            }
+            tracks.Add(new AudioTrack(file, audio.DurationMs, audio.VolumePercent));
+        }
+        await ffmpeg.JoinAsync(jobDirectory, clips, tracks, durationMs, video, cancellationToken);
 
         await queue.MoveAsync(work, RenderJobState.QualityReview, cancellationToken);
         var wrong = await ffmpeg.ProblemsAsync(video, durationMs, cancellationToken);

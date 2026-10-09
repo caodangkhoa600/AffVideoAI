@@ -45,7 +45,10 @@ public interface IRenderQueue
     /// <param name="detail">What went wrong as the program reported it.</param>
     Task FailAsync(RenderWork work, RenderFailureCategory category, string message, string? detail, CancellationToken cancellationToken);
 
-    /// <summary>Stores the MP4 as the Storyboard version's Rendered Video, ready for review, and completes the job.</summary>
+    /// <summary>
+    /// Stores the MP4 as the Storyboard version's Rendered Video, ready for review, and completes the job.
+    /// The video records the audio of the work as what was mixed into it.
+    /// </summary>
     /// <param name="uncutAssetIds">The photos the video shows whole, on a card.</param>
     /// <param name="drawnScenePositions">The Scenes that were drawn for this video. The others were reused from an earlier render.</param>
     Task CompleteAsync(
@@ -57,7 +60,9 @@ public interface IRenderQueue
 /// <param name="LeaseId">The lease this claim holds the job under.</param>
 /// <param name="Storyboard">The version to render, with its Scenes.</param>
 /// <param name="Assets">Those of the assets the Scenes show that the Product still has.</param>
-public sealed record RenderWork(RenderJob Job, Guid LeaseId, Storyboard Storyboard, IReadOnlyList<ProductAsset> Assets);
+/// <param name="Audio">The narration and music the Variant has as the job is claimed, to be mixed into the video.</param>
+public sealed record RenderWork(
+    RenderJob Job, Guid LeaseId, Storyboard Storyboard, IReadOnlyList<ProductAsset> Assets, IReadOnlyList<VariantAudio> Audio);
 
 /// <summary>
 /// The job is no longer this worker's: a member cancelled it, it was deleted with

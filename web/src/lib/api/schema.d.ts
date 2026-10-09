@@ -440,6 +440,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{projectId}/variants/{variantId}/audio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The Variant's narration and music: at most one of each, narration first. */
+        get: operations["ListVariantAudio"];
+        put?: never;
+        /** Sets the Variant's narration or music from an MP3 or WAV file, in place of what it had. The member must say rightsConfirmed=true: that they hold the rights to it, which is recorded in their name. The file is decoded and kept as a WAV. Music takes a volumePercent from 0 to 100. */
+        post: operations["UploadVariantAudio"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/variants/{variantId}/audio/{audioId}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The sound, as a WAV, to listen to. */
+        get: operations["GetVariantAudioContent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/variants/{variantId}/audio/{audioId}/volume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Sets how loud the music is beside narration, from 0 to 100. A video rendered afterwards is mixed at it. Narration has no volume to set. */
+        put: operations["SetVariantAudioVolume"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/variants/{variantId}/audio/{audioId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Removes the narration or the music, and its file. Videos already rendered keep their sound. */
+        delete: operations["RemoveVariantAudio"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{projectId}/variants/{variantId}/storyboards": {
         parameters: {
             query?: never;
@@ -657,6 +726,10 @@ export interface components {
         };
         AntiforgeryTokenResponse: {
             requestToken: string;
+        };
+        AudioVolumeRequest: {
+            /** Format: int32 */
+            volumePercent: number;
         };
         AuditLogEntryResponse: {
             /** Format: uuid */
@@ -936,6 +1009,12 @@ export interface components {
             approvedByEmail: null | string;
             /** Format: date-time */
             approvedAt: null | string;
+            /** Format: uuid */
+            narrationAudioId: null | string;
+            /** Format: uuid */
+            musicAudioId: null | string;
+            /** Format: int32 */
+            musicVolumePercent: null | number;
             flags: components["schemas"]["ReviewFlagResponse"][];
         };
         /** @enum {unknown} */
@@ -1045,6 +1124,32 @@ export interface components {
         Technique: "StaticImage" | "ImageMotion" | "ImageToVideo" | "VideoAsset" | "TextAnimation" | "ThreeDRender";
         UpdateOrganizationRequest: {
             name: string;
+        };
+        /** @enum {unknown} */
+        VariantAudioKind: "Narration" | "Music";
+        VariantAudioResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            variantId: string;
+            kind: components["schemas"]["VariantAudioKind"];
+            /** Format: int32 */
+            durationMs: number;
+            /** Format: int32 */
+            sampleRate: number;
+            /** Format: int32 */
+            channels: number;
+            /** Format: int64 */
+            sizeInBytes: number;
+            /** Format: int32 */
+            volumePercent: number;
+            /** Format: uuid */
+            rightsConfirmedByMemberId: string;
+            rightsConfirmedByEmail: null | string;
+            /** Format: date-time */
+            rightsConfirmedAt: string;
+            /** Format: date-time */
+            createdAt: string;
         };
         VariantRequest: {
             creativeTemplate: components["schemas"]["CreativeTemplate"];
@@ -2219,6 +2324,189 @@ export interface operations {
                 content: {
                     "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
                 };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ListVariantAudio: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                variantId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VariantAudioResponse"][];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    UploadVariantAudio: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                variantId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    kind: components["schemas"]["VariantAudioKind"];
+                } & {
+                    file?: components["schemas"]["IFormFile"];
+                } & {
+                    rightsConfirmed?: string;
+                } & {
+                    volumePercent?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VariantAudioResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GetVariantAudioContent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                variantId: string;
+                audioId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    SetVariantAudioVolume: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                variantId: string;
+                audioId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AudioVolumeRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VariantAudioResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    RemoveVariantAudio: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                variantId: string;
+                audioId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Not Found */
             404: {

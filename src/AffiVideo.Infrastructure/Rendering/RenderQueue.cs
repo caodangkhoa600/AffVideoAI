@@ -60,7 +60,8 @@ internal sealed class RenderQueue(
         var storyboard = await database.Storyboards.AsNoTracking().SingleAsync(s => s.Id == job.StoryboardId, cancellationToken);
         var shown = storyboard.Scenes.SelectMany(scene => scene.AssetIds).Distinct().ToList();
         var assets = await database.ProductAssets.AsNoTracking().Where(a => shown.Contains(a.Id)).ToListAsync(cancellationToken);
-        return new RenderWork(job, leaseId, storyboard, assets);
+        var audio = await database.VariantAudio.AsNoTracking().Where(a => a.VariantId == storyboard.VariantId).ToListAsync(cancellationToken);
+        return new RenderWork(job, leaseId, storyboard, assets, [.. audio.OrderBy(a => a.Kind)]);
     }
 
     public async Task<bool> RenewAsync(RenderWork work, CancellationToken cancellationToken)
@@ -130,7 +131,7 @@ internal sealed class RenderQueue(
         var now = clock.GetUtcNow();
         var video = new RenderedVideo(
             Guid.CreateVersion7(), job.OrganizationId, job.StoryboardId, job.Id,
-            work.Storyboard.Scenes.Sum(scene => scene.DurationMs), mp4.Length, uncutAssetIds, drawnScenePositions, now);
+            work.Storyboard.Scenes.Sum(scene => scene.DurationMs), mp4.Length, uncutAssetIds, drawnScenePositions, work.Audio, now);
         if (!job.Complete(video.Id, now))
         {
             throw new InvalidOperationException($"Render job {job.Id} cannot be completed from {job.State}.");

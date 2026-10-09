@@ -3,7 +3,15 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { api, problemDetail, type RenderJob, type RenderJobState, type Storyboard, type Variant } from "@/lib/api/client";
+import {
+  api,
+  problemDetail,
+  type RenderedVideo,
+  type RenderJob,
+  type RenderJobState,
+  type Storyboard,
+  type Variant,
+} from "@/lib/api/client";
 import { RenderedVideoActions, RenderedVideoFlag, RenderedVideoStatus } from "../../../../videos/rendered-video-actions";
 
 /** Where a render job is (RenderJobState in the domain), as a member reads it. There is no percentage to show. */
@@ -94,7 +102,8 @@ export function StoryboardRender({ variant, storyboard }: { variant: Variant; st
       <h3 className="text-lg font-semibold tracking-tight">Rendered Video</h3>
       <p className="text-sm text-muted-foreground">
         Rendering makes a 1080 by 1920 MP4 of this version in Product Lock: the Product is cut out of its photo and only
-        ever scaled, moved and rotated. It runs in the background, so this page can be left and come back to.
+        ever scaled, moved and rotated. The narration and music this Variant has when the render starts are mixed in. It
+        runs in the background, so this page can be left and come back to.
       </p>
       <div className="flex gap-2">
         <Button onClick={render} disabled={submitting || running || newest.isPending}>
@@ -145,6 +154,13 @@ export function StoryboardRender({ variant, storyboard }: { variant: Variant; st
   );
 }
 
+/** What a Rendered Video has to be heard, as it was mixed when it was rendered. */
+function soundOf(video: RenderedVideo): string {
+  const music = video.musicAudioId ? `music at ${video.musicVolumePercent}%` : undefined;
+  if (video.narrationAudioId) return music ? `narration and ${music}` : "narration";
+  return music ?? "no narration or music, so the audio track is silent";
+}
+
 function RenderedVideoPreview({ videoId }: { videoId: string }) {
   const video = useQuery({
     queryKey: ["rendered-videos", "one", videoId],
@@ -179,8 +195,8 @@ function RenderedVideoPreview({ videoId }: { videoId: string }) {
       {video.data && (
         <p className="text-sm text-muted-foreground">
           Rendered from Storyboard version <span data-testid="rendered-video-version">{video.data.storyboardVersion}</span> ·{" "}
-          {video.data.durationMs / 1000} s · {(video.data.sizeInBytes / (1024 * 1024)).toFixed(1)} MB · no narration or
-          music, so the audio track is silent
+          {video.data.durationMs / 1000} s · {(video.data.sizeInBytes / (1024 * 1024)).toFixed(1)} MB ·{" "}
+          <span data-testid="rendered-video-audio">{soundOf(video.data)}</span>
         </p>
       )}
       {video.data && (

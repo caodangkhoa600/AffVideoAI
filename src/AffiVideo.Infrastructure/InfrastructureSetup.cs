@@ -59,6 +59,7 @@ public static class InfrastructureSetup
         services.AddScoped<IFacts, ScopedFacts>();
         services.AddScoped<IProjects, ScopedProjects>();
         services.AddScoped<IVariants, ScopedVariants>();
+        services.AddScoped<IVariantAudio, ScopedVariantAudio>();
         // The only planner there is. A real language model is registered in its place, never beside it.
         services.AddSingleton<ILanguageModel, MockLanguageModel>();
         services.AddScoped<IStoryboards, ScopedStoryboards>();

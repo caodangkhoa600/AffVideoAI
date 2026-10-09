@@ -55,3 +55,30 @@ public sealed class VideoLanguageAttribute() : ValidationAttribute("Videos are m
         value is null
         || (value is string code && (string.IsNullOrWhiteSpace(code) || ContentLanguages.VideoCodes.Contains(code)));
 }
+
+/// <summary>
+/// The narration or the music a member uploaded for a Variant. What is kept is a
+/// WAV of the sound the upload decodes to.
+/// </summary>
+/// <param name="DurationMs">Of the stored sound, in milliseconds.</param>
+/// <param name="SampleRate">Samples a second.</param>
+/// <param name="Channels">One for mono, two for stereo.</param>
+/// <param name="SizeInBytes">Of the stored WAV, not of the file that was sent.</param>
+/// <param name="VolumePercent">How loud it is in a video, from 0 to 100. Narration is always at 100; music is as loud as narration at 100.</param>
+/// <param name="RightsConfirmedByMemberId">The member who confirmed, on uploading it, that they hold the rights to it.</param>
+public sealed record VariantAudioResponse(
+    Guid Id,
+    Guid VariantId,
+    VariantAudioKind Kind,
+    int DurationMs,
+    int SampleRate,
+    int Channels,
+    long SizeInBytes,
+    int VolumePercent,
+    Guid RightsConfirmedByMemberId,
+    string? RightsConfirmedByEmail,
+    DateTimeOffset RightsConfirmedAt,
+    DateTimeOffset CreatedAt);
+
+/// <param name="VolumePercent">How loud the music is beside narration, from 0, not heard, to 100, as loud.</param>
+public sealed record AudioVolumeRequest([Range(0, VariantAudio.MaxVolumePercent)] int VolumePercent);

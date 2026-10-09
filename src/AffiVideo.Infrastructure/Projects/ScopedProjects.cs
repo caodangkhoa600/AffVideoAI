@@ -1,15 +1,22 @@
 using AffiVideo.Application;
 using AffiVideo.Application.Projects;
+using AffiVideo.Application.Storage;
 using AffiVideo.Domain;
 using AffiVideo.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 
 namespace AffiVideo.Infrastructure.Projects;
 
 // No method names an Organization: the context's filter leaves only the caller's
 // Products, Projects and Variants.
-internal sealed class ScopedProjects(AffiVideoDbContext database, Caller caller, TimeProvider clock) : IProjects
+internal sealed class ScopedProjects(
+    AffiVideoDbContext database,
+    IObjectStorage storage,
+    Caller caller,
+    TimeProvider clock,
+    ILogger<ScopedProjects> logger) : IProjects
 {
     public async Task<ProjectRecord?> CreateAsync(Guid productId, ProjectBrief brief, CancellationToken cancellationToken)
     {
@@ -59,7 +66,13 @@ internal sealed class ScopedProjects(AffiVideoDbContext database, Caller caller,
         if (await rendered.AnyAsync(cancellationToken)) return ProjectDeletion.HasRenderedVideos;
         var member = caller.MemberId ?? throw new InvalidOperationException("Only a member can delete a Project.");
 
-        // The database deletes the Project's Variants with it, and their Storyboards and render jobs.
+        // The database deletes the Project's Variants with it, and their Storyboards, render jobs and audio.
+        // The audio's files are not the database's to delete: they are deleted here, once the records are gone.
+        var audioFiles = await (
+            from audio in database.VariantAudio.AsNoTracking()
+            join variant in database.Variants on audio.VariantId equals variant.Id
+            where variant.ProjectId == projectId
+            select audio).ToListAsync(cancellationToken);
         database.Projects.Remove(project);
         database.AuditLog.Add(new AuditLogEntry(
             Guid.CreateVersion7(), project.OrganizationId, member, AuditActions.ProjectDeleted, project.Id, clock.GetUtcNow()));
@@ -76,6 +89,19 @@ internal sealed class ScopedProjects(AffiVideoDbContext database, Caller caller,
         {
             // A render finished after the check above. The database kept the Project for its Rendered Video.
             return ProjectDeletion.HasRenderedVideos;
+        }
+
+        // A file left behind is wasted space, not a reason to fail the request.
+        foreach (var key in audioFiles.Select(audio => audio.StorageKey))
+        {
+            try
+            {
+                await storage.DeleteAsync(key, CancellationToken.None);
+            }
+            catch (Exception exception)
+            {
+                logger.LogWarning(exception, "The file at {StorageKey} could not be deleted and is left behind", key);
+            }
         }
         return ProjectDeletion.Deleted;
     }

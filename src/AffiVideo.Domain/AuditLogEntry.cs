@@ -35,4 +35,7 @@ public static class AuditActions
     public const string RenderedVideoDeleted = "rendered-video.deleted";
     public const string StoryboardFlagCleared = "storyboard.flag-cleared";
     public const string RenderedVideoFlagCleared = "rendered-video.flag-cleared";
+
+    /// <summary>A member uploaded narration or music, and confirmed they hold the rights to it.</summary>
+    public const string AudioRightsConfirmed = "audio.rights-confirmed";
 }

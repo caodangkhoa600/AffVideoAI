@@ -35,6 +35,8 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
 
     public DbSet<Variant> Variants => Set<Variant>();
 
+    public DbSet<VariantAudio> VariantAudio => Set<VariantAudio>();
+
     public DbSet<Storyboard> Storyboards => Set<Storyboard>();
 
     public DbSet<RenderJob> RenderJobs => Set<RenderJob>();
@@ -144,6 +146,19 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
             variant.Property(v => v.CreativeTemplate).HasConversion<string>().HasMaxLength(30);
             variant.Property(v => v.Hook).HasMaxLength(Variant.HookMaxLength);
             variant.HasIndex(v => new { v.ProjectId, v.CreatedAt });
+        });
+
+        builder.Entity<VariantAudio>(audio =>
+        {
+            audio.ToTable("VariantAudio");
+            audio.HasOne<Organization>().WithMany().HasForeignKey(a => a.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            // Deleting a Project deletes its Variants, and their audio with them.
+            audio.HasOne<Variant>().WithMany().HasForeignKey(a => a.VariantId).OnDelete(DeleteBehavior.Cascade);
+            audio.HasOne<Member>().WithMany().HasForeignKey(a => a.RightsConfirmedByMemberId).OnDelete(DeleteBehavior.Restrict);
+            audio.Property(a => a.Kind).HasConversion<string>().HasMaxLength(20);
+            audio.Ignore(a => a.StorageKey);
+            // A Variant has at most one narration and one music, even when two are uploaded at the same moment.
+            audio.HasIndex(a => new { a.VariantId, a.Kind }).IsUnique();
         });
 
         builder.Entity<Storyboard>(storyboard =>

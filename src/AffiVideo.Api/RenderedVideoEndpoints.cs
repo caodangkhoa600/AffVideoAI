@@ -169,5 +169,8 @@ internal static class RenderedVideoEndpoints
         record.Video.ApprovedByMemberId,
         record.ApprovedByEmail,
         record.Video.ApprovedAt,
+        record.Video.NarrationAudioId,
+        record.Video.MusicAudioId,
+        record.Video.MusicVolumePercent,
         record.Flags.Select(StoryboardEndpoints.ToResponse).ToList());
 }
