@@ -65,7 +65,4 @@ internal static class OrganizationEndpoints
     public static OrganizationResponse ToResponse(this Organization organization) => new(organization.Id, organization.Name);
 
     private static MemberResponse ToResponse(MemberSummary member) => new(member.Id, member.Email, member.Role);
-
-    private static PagedResponse<TResponse> ToResponse<T, TResponse>(this Page<T> page, Func<T, TResponse> item) =>
-        new(page.Items.Select(item).ToList(), page.Number, page.PageSize, page.Total);
 }

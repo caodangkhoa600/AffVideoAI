@@ -25,6 +25,8 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
 
     public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();
 
+    public DbSet<Product> Products => Set<Product>();
+
     /// <summary>The keys that protect session cookies and anti-forgery tokens, kept here so sessions outlive a restart of the API.</summary>
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
@@ -59,6 +61,22 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
             entry.HasOne<Member>().WithMany().HasForeignKey(e => e.ActorMemberId).OnDelete(DeleteBehavior.Restrict);
             entry.Property(e => e.Action).HasMaxLength(100);
             entry.HasIndex(e => new { e.OrganizationId, e.OccurredAt });
+        });
+
+        builder.Entity<Product>(product =>
+        {
+            product.HasOne<Organization>().WithMany().HasForeignKey(p => p.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            product.Property(p => p.Name).HasMaxLength(Product.NameMaxLength);
+            product.Property(p => p.Category).HasMaxLength(Product.CategoryMaxLength);
+            product.Property(p => p.Brand).HasMaxLength(Product.BrandMaxLength);
+            product.Property(p => p.Description).HasMaxLength(Product.DescriptionMaxLength);
+            product.Property(p => p.Price).HasPrecision(Product.PricePrecision, Product.PriceDecimals);
+            product.Property(p => p.Currency).HasMaxLength(Product.CurrencyLength);
+            product.Property(p => p.OriginalUrl).HasMaxLength(Product.UrlMaxLength);
+            product.Property(p => p.AffiliateUrl).HasMaxLength(Product.UrlMaxLength);
+            product.Property(p => p.TargetAudience).HasMaxLength(Product.TargetAudienceMaxLength);
+            product.Property(p => p.Status).HasConversion<string>().HasMaxLength(20);
+            product.HasIndex(p => new { p.OrganizationId, p.Name });
         });
 
         var filter = typeof(AffiVideoDbContext).GetMethod(nameof(FilterToCallerOrganization), BindingFlags.NonPublic | BindingFlags.Instance)!;

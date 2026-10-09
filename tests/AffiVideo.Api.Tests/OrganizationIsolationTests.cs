@@ -69,6 +69,46 @@ public sealed class OrganizationIsolationTests(AffiVideoApp app)
     }
 
     [Fact]
+    public async Task A_member_of_one_Organization_is_refused_reading_editing_and_archiving_a_Product_of_another()
+    {
+        var theirs = await app.CreateOrganizationAsync();
+        var mine = await app.CreateOrganizationAsync();
+        using var me = await app.SignedInAsync(mine.Owner);
+        using var them = await app.SignedInAsync(theirs.Owner);
+        var product = await ProductTests.CreateAsync(them, ProductTests.Valid(name: "Theirs"));
+        var path = $"/api/v1/products/{product.Id}";
+
+        var read = await me.GetAsync(path);
+        var edit = await me.PutAsync(path, ProductTests.Valid(name: "Taken over"));
+        var archive = await me.PostAsync($"{path}/archive", new { });
+
+        Assert.Equal(HttpStatusCode.NotFound, read.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, edit.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, archive.StatusCode);
+        var after = await them.GetAsync<ProductResponse>(path);
+        Assert.Equal("Theirs", after.Name);
+        Assert.Equal(Domain.ProductStatus.Active, after.Status);
+    }
+
+    [Fact]
+    public async Task A_Product_list_and_its_categories_hold_only_what_belongs_to_that_Organization()
+    {
+        var theirs = await app.CreateOrganizationAsync();
+        var mine = await app.CreateOrganizationAsync();
+        using var me = await app.SignedInAsync(mine.Owner);
+        using var them = await app.SignedInAsync(theirs.Owner);
+        await ProductTests.CreateAsync(them, ProductTests.Valid(name: "Theirs", category: "Their category"));
+        await ProductTests.CreateAsync(me, ProductTests.Valid(name: "Mine", category: "My category"));
+
+        var products = await me.GetAsync<PagedResponse<ProductResponse>>("/api/v1/products?search=");
+        var categories = await me.GetAsync<string[]>("/api/v1/products/categories");
+
+        Assert.Equal(["Mine"], products.Items.Select(p => p.Name));
+        Assert.Equal(1, products.Total);
+        Assert.Equal(["My category"], categories);
+    }
+
+    [Fact]
     public async Task A_member_list_holds_only_the_members_of_that_Organization()
     {
         var theirs = await app.CreateOrganizationAsync();

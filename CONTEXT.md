@@ -34,6 +34,10 @@ _Avoid_: Admin area, internal module
 A thing being advertised, described by its details, assets and Facts. The same concept inside and outside the Affiliate Lab.
 _Avoid_: Item, listing, SKU
 
+**Archived**:
+The state of a Product that is out of the way of day-to-day work. It is kept, with everything made from it.
+_Avoid_: Deleted, inactive, hidden
+
 **Fact**:
 A single statement about a Product, written in one language, that a script may use only once it is Confirmed.
 _Avoid_: Claim, feature, verified fact

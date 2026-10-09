@@ -1,9 +1,11 @@
 using AffiVideo.Application;
 using AffiVideo.Application.Organizations;
+using AffiVideo.Application.Products;
 using AffiVideo.Application.SystemStatus;
 using AffiVideo.Infrastructure.Identity;
 using AffiVideo.Infrastructure.Organizations;
 using AffiVideo.Infrastructure.Persistence;
+using AffiVideo.Infrastructure.Products;
 using AffiVideo.Infrastructure.Storage;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -42,6 +44,8 @@ public static class InfrastructureSetup
             .AddClaimsPrincipalFactory<MemberClaimsPrincipalFactory>();
         services.AddScoped<IOrganizations, ScopedOrganizations>();
         services.AddScoped<IOrganizationProvisioner, OrganizationProvisioner>();
+        services.AddScoped<IProducts, ScopedProducts>();
+        services.AddScoped<DemonstrationSeed>();
         return services;
     }
 
@@ -58,18 +62,13 @@ public static class InfrastructureSetup
     }
 
     /// <summary>
-    /// Creates the demonstration Organization and its Owner unless they are already
-    /// there. Only the explicit seed command calls this.
+    /// Creates the demonstration Organization, its Owner and its sample Product,
+    /// each unless it is already there. Only the explicit seed command calls this.
     /// </summary>
     /// <returns>Whether anything was created.</returns>
     public static async Task<bool> SeedAsync(this IServiceProvider services, CancellationToken cancellationToken)
     {
         await using var scope = services.CreateAsyncScope();
-        var created = await scope.ServiceProvider.GetRequiredService<IOrganizationProvisioner>().CreateAsync(
-            DemonstrationOrganization.Name,
-            DemonstrationOrganization.OwnerEmail,
-            DemonstrationOrganization.OwnerPassword,
-            cancellationToken);
-        return created is not null;
+        return await scope.ServiceProvider.GetRequiredService<DemonstrationSeed>().RunAsync(cancellationToken);
     }
 }

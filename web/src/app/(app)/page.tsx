@@ -9,6 +9,11 @@ export default function Home() {
       </p>
       <ul className="flex flex-col gap-2">
         <li>
+          <Link href="/products" className="font-medium underline underline-offset-4">
+            Products
+          </Link>
+        </li>
+        <li>
           <Link href="/members" className="font-medium underline underline-offset-4">
             Members
           </Link>

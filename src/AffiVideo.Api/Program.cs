@@ -1,12 +1,26 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using AffiVideo.Api;
 using AffiVideo.Infrastructure;
+using Microsoft.AspNetCore.Routing;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddSessions();
-builder.Services.AddProblemDetails();
+builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = context =>
+{
+    // A field is named in a 400 as it is named in the request: "originalUrl", not "OriginalUrl".
+    if (context.ProblemDetails is HttpValidationProblemDetails { Errors: var errors } refused)
+    {
+        refused.Errors = errors
+            .GroupBy(field => JsonNamingPolicy.CamelCase.ConvertName(field.Key), field => field.Value)
+            .ToDictionary(field => field.Key, field => field.SelectMany(messages => messages).ToArray());
+    }
+});
+// A request that cannot be read (a status that does not exist, a page that is not
+// a number) is a 400 in every environment, not an exception in Development.
+builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = false);
 builder.Services.AddValidation();
 builder.Services.AddOpenApi();
 builder.Services.ConfigureHttpJsonOptions(options =>
@@ -35,8 +49,8 @@ if (args is ["seed"])
 {
     var created = await app.Services.SeedAsync(CancellationToken.None);
     app.Logger.LogInformation("{Outcome}", created
-        ? "Demonstration Organization created"
-        : "Demonstration Organization already present; nothing changed");
+        ? "Demonstration data created"
+        : "Demonstration data already present; nothing changed");
     return;
 }
 
@@ -53,6 +67,7 @@ var v1 = app.MapGroup("/api/v1");
 v1.MapStatus();
 v1.MapSession();
 v1.MapOrganizations();
+v1.MapProducts();
 
 app.Run();
 

@@ -35,8 +35,10 @@ build downloads Chrome Headless Shell and takes a few minutes.
 the only thing that changes the schema; nothing does so at startup. Run it again
 after pulling changes that add a migration.
 
-`seed` creates the demonstration Organization and its Owner. Running it again
-changes nothing.
+`seed` creates the demonstration Organization, its Owner and a fictional sample
+Product, the AirBeat X1. It adds only what is missing, so run it again after
+pulling changes that add to the seed; otherwise running it again changes
+nothing.
 
 Then open http://localhost:3000 and sign in (see [Sign in](#sign-in)).
 http://localhost:3000/status needs no sign-in and shows the API, the database
@@ -178,9 +180,10 @@ it is a deliberate act that includes re-reading the licence (ADR 0002).
 
 Done: the look prototypes (tickets 01, 25, 26, in `prototypes/`), the affiliate
 experiment plan (ticket 24, `docs/business/affiliate-experiment.md`), the
-walking skeleton (ticket 02) and sign in and Organizations (ticket 03).
+walking skeleton (ticket 02), sign in and Organizations (ticket 03) and
+Products (ticket 04).
 
-Next: Products (ticket 04).
+Next: Product assets (ticket 05) and Facts (ticket 06).
 
 Notes from the walking skeleton:
 
@@ -198,4 +201,14 @@ Notes from sign in and Organizations:
   them yet; the ticket that does must end the member's sessions.
 - The keys that protect cookies are stored in the database, so rebuilding the
   API does not sign anyone out.
-- The seeded Organization has no sample Product yet; ticket 04 adds it.
+
+Notes from Products:
+
+- Product URLs are text. Nothing requests them; the API only checks that they
+  are `http://` or `https://` addresses.
+- A price is a decimal with at most two decimal places and always has a
+  currency beside it.
+- An archived Product is kept and can still be read and edited. Nothing
+  brings one back yet.
+- A 400 names each field as the request does (`originalUrl`), and the web
+  app shows the message next to that field.

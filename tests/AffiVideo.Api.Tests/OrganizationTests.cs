@@ -127,7 +127,7 @@ public sealed class OrganizationTests(AffiVideoApp app)
         var response = await owner.PutAsync($"/api/v1/organizations/{organization.Id}", new UpdateOrganizationRequest(name));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Contains("Name", await ErrorFields(response));
+        Assert.Contains("name", await ErrorFields(response));
     }
 
     [Fact]

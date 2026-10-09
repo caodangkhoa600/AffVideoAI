@@ -7,6 +7,9 @@ export const api = createClient<paths>({ baseUrl: "/" });
 
 export type Session = components["schemas"]["SessionResponse"];
 export type Member = components["schemas"]["MemberResponse"];
+export type Product = components["schemas"]["ProductResponse"];
+export type ProductRequest = components["schemas"]["ProductRequest"];
+export type ProductStatus = components["schemas"]["ProductStatus"];
 
 const CHANGES_STATE = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
@@ -22,8 +25,7 @@ api.use({
   },
 });
 
-/** The messages of a 400 from the API, by field, with the field names in lower case. */
+/** The messages of a 400 from the API, by field, named as the request names them. */
 export function fieldErrors(error: unknown): Record<string, string[]> {
-  const errors = (error as components["schemas"]["HttpValidationProblemDetails"] | undefined)?.errors ?? {};
-  return Object.fromEntries(Object.entries(errors).map(([field, messages]) => [field.toLowerCase(), messages]));
+  return (error as components["schemas"]["HttpValidationProblemDetails"] | undefined)?.errors ?? {};
 }
