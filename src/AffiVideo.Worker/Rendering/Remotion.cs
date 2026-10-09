@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AffiVideo.Domain;
@@ -21,7 +23,20 @@ internal sealed class Remotion(IOptions<RenderingOptions> options)
         Converters = { new JsonStringEnumConverter() },
     };
 
+    // Goes up whenever a clip is drawn another way than through the templates: the arguments below.
+    private const int ClipVersion = 1;
+
     private readonly RenderingOptions _options = options.Value;
+    private readonly Lazy<string> _look = new(() => LookOf(Path.Combine(options.Value.RemotionDirectory, "bundle")));
+
+    /// <summary>
+    /// What every clip drawn by this worker has in common, as a hash: the bundled
+    /// templates and how they are run. A clip drawn with another look is another clip.
+    /// </summary>
+    public string Look => _look.Value;
+
+    /// <summary>The Scene as a template is handed it: the file of data a render reads.</summary>
+    public static byte[] Describe(SceneInput scene) => JsonSerializer.SerializeToUtf8Bytes(scene, Json);
 
     /// <summary>Copies the bundle into the job's folder.</summary>
     /// <returns>Where the job's images go, to be named in a Scene as <c>render/…</c>.</returns>
@@ -46,10 +61,11 @@ internal sealed class Remotion(IOptions<RenderingOptions> options)
     }
 
     /// <summary>Renders the Scene to an H.264 clip with no audio, tagged BT.709.</summary>
-    public async Task RenderAsync(string jobDirectory, int position, SceneInput scene, string clip, CancellationToken cancellationToken)
+    /// <param name="scene">The Scene, as <see cref="Describe"/> wrote it.</param>
+    public async Task RenderAsync(string jobDirectory, int position, byte[] scene, string clip, CancellationToken cancellationToken)
     {
         var props = Path.Combine(jobDirectory, $"scene-{position}.json");
-        await File.WriteAllBytesAsync(props, JsonSerializer.SerializeToUtf8Bytes(scene, Json), cancellationToken);
+        await File.WriteAllBytesAsync(props, scene, cancellationToken);
 
         await Processes.RunAsync(
             "node",
@@ -64,6 +80,24 @@ internal sealed class Remotion(IOptions<RenderingOptions> options)
     }
 
     private static string BundleOf(string jobDirectory) => Path.Combine(jobDirectory, "bundle");
+
+    // Every file of the bundle, by name and content, in a fixed order.
+    private static string LookOf(string bundle)
+    {
+        if (!Directory.Exists(bundle))
+        {
+            throw new InvalidOperationException($"There is no Remotion bundle at {bundle}. It is made when the worker image is built.");
+        }
+
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        hash.AppendData(BitConverter.GetBytes(ClipVersion));
+        foreach (var file in Directory.EnumerateFiles(bundle, "*", SearchOption.AllDirectories).Order(StringComparer.Ordinal))
+        {
+            hash.AppendData(SHA256.HashData(Encoding.UTF8.GetBytes(Path.GetRelativePath(bundle, file))));
+            hash.AppendData(SHA256.HashData(File.ReadAllBytes(file)));
+        }
+        return Convert.ToHexStringLower(hash.GetHashAndReset());
+    }
 }
 
 /// <summary>One Scene as a template is handed it: <c>SceneInput</c> in remotion/src/scene.ts.</summary>

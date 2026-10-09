@@ -15,6 +15,7 @@ builder.Services.AddSingleton<IImageProcessor, OnnxCutOut>();
 builder.Services.AddSingleton<Remotion>();
 builder.Services.AddSingleton<Ffmpeg>();
 builder.Services.AddScoped<VideoLayers>();
+builder.Services.AddScoped<SceneClips>();
 builder.Services.AddScoped<RenderJobRunner>();
 builder.Services.AddHostedService<RenderWorker>();
 

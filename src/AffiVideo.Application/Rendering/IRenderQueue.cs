@@ -47,7 +47,10 @@ public interface IRenderQueue
 
     /// <summary>Stores the MP4 as the Storyboard version's Rendered Video, ready for review, and completes the job.</summary>
     /// <param name="uncutAssetIds">The photos the video shows whole, on a card.</param>
-    Task CompleteAsync(RenderWork work, Stream mp4, IReadOnlyCollection<Guid> uncutAssetIds, CancellationToken cancellationToken);
+    /// <param name="drawnScenePositions">The Scenes that were drawn for this video. The others were reused from an earlier render.</param>
+    Task CompleteAsync(
+        RenderWork work, Stream mp4, IReadOnlyCollection<Guid> uncutAssetIds, IReadOnlyCollection<int> drawnScenePositions,
+        CancellationToken cancellationToken);
 }
 
 /// <summary>A claimed job and what it renders.</summary>

@@ -200,11 +200,11 @@ experiment plan (ticket 24, `docs/business/affiliate-experiment.md`), the
 walking skeleton (ticket 02), sign in and Organizations (ticket 03),
 Products (ticket 04), Product assets (ticket 05), Facts (ticket 06),
 Projects and Variants (ticket 07), Storyboard generation (ticket 08),
-render and preview (ticket 09), job reliability (ticket 10) and approve,
-download and the library (ticket 11).
+render and preview (ticket 09), job reliability (ticket 10), approve,
+download and the library (ticket 11) and Storyboard editing (ticket 12).
 
-Next: Storyboard editing (ticket 12) and the Affiliate Lab and Campaigns
-(ticket 18).
+Next: flagging work built on Withdrawn Facts (ticket 13) and the Affiliate Lab
+and Campaigns (ticket 18).
 
 Notes from the walking skeleton:
 
@@ -413,3 +413,44 @@ Notes from approve, download and the library:
 - The cut-out model is loaded with ONNX Runtime's memory arena off. With it on,
   the worker held over 13 GB while a photo was cut, and Docker's virtual
   machine killed it; it now peaks near 5 GB. Give Docker at least 8 GB.
+
+Notes from Storyboard editing:
+
+- `POST /api/v1/projects/{projectId}/variants/{variantId}/storyboards/{version}/edits`
+  makes the Variant's next version from that one, edited, and leaves that one
+  as it is. The body names every Scene of the version once, in the order the
+  next version plays them, each with what to change about it: `onScreenText`,
+  `narrationText`, `assetId` (the photo it shows) and `durationMs`. Whatever is
+  left out stays. Any version can be edited, not only the newest.
+- A Scene whose on-screen or narration text changes is marked Manually Edited
+  (`manuallyEdited`), and stays marked through later versions. Its text is the
+  Organization's own: the Scene no longer lists Facts, and nothing checks what
+  it says against them. Text sent back as it was is no edit.
+- `POST .../storyboards/{version}/scenes/{position}/regenerate` makes the next
+  version with that one Scene planned again from the Product's Confirmed Facts
+  and photos as they are now. The Scene keeps its place and its duration and
+  loses its mark; every other Scene is as it was.
+- An edit or a regeneration that would make an unacceptable version is
+  answered 409 with every reason, and makes nothing: Scenes that do not sum to
+  the target duration; a photo the Product does not have, or an image that is
+  the logo or under 400 pixels a side; a Scene that still rests on a Fact which
+  is no longer Confirmed; the Hook's Scene anywhere but first; a Scene shorter
+  than its layout needs (2 seconds, 2.5 for the closing); more or fewer lines
+  than the layout sets (one, two for the closing, one to three Facts); a line
+  too long for its layout; Facts given too little time to be read; narration
+  over 500 characters; or an edit that changes nothing. The limits are
+  `CreativeTemplates` and `StoryboardRules` in the domain.
+- The worker keeps the Scene clips it draws, once the video they were drawn
+  for has passed its checks, in object storage at
+  `organizations/{id}/scene-clips/{key}.mp4`. The key is a hash of everything
+  that decides the clip's frames: the bundled templates, the file of data the
+  Scene's template is handed, and the images that names. A Scene with the same
+  key is not drawn again, in the next version or in the same one rendered
+  again. A Rendered Video says which Scenes were drawn for it
+  (`drawnScenePositions`). A Scene is handed the layout and photo of the Scene
+  before it, so moving a Scene or changing its photo also redraws the Scene
+  after it; changing its text or duration does not.
+- Nothing removes a kept clip. They are the Organization's until its storage is
+  cleared by hand.
+- On the Variant's page, "Edit the Scenes" opens the Scene editor on the
+  version being read, and each Scene has "Regenerate this Scene".

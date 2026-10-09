@@ -34,6 +34,7 @@ public sealed record RenderFailureResponse(RenderJobState Stage, RenderFailureCa
 /// <param name="RenderJobId">The job that made it.</param>
 /// <param name="DurationMs">In milliseconds: the sum of the Scene durations.</param>
 /// <param name="UncutAssetIds">The photos shown whole, on a card, because the Product could not be cut out of them cleanly.</param>
+/// <param name="DrawnScenePositions">The Scenes that were drawn to make this video. Every other Scene was reused from an earlier render in which it was the same.</param>
 /// <param name="ProductName">As the Product is named now.</param>
 /// <param name="ProjectObjective">What the Project it was made in is called by.</param>
 /// <param name="CreativeTemplate">Of the Variant it was made for.</param>
@@ -48,6 +49,7 @@ public sealed record RenderedVideoResponse(
     int DurationMs,
     long SizeInBytes,
     IReadOnlyList<Guid> UncutAssetIds,
+    IReadOnlyList<int> DrawnScenePositions,
     DateTimeOffset CreatedAt,
     Guid ProductId,
     string ProductName,

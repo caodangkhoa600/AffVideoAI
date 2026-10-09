@@ -81,7 +81,7 @@ One timed segment of a Storyboard, with its text, source assets and Technique.
 _Avoid_: Shot, clip, segment
 
 **Manually Edited**:
-A mark on a Scene whose text a person changed. Its text is no longer traceable to Facts and is the Organization's responsibility.
+A mark on a Scene whose text a person changed. Its text is no longer traceable to Facts and is the Organization's responsibility. The mark stays through later versions until the Scene is regenerated.
 _Avoid_: Overridden, custom
 
 **Flagged for Review**:

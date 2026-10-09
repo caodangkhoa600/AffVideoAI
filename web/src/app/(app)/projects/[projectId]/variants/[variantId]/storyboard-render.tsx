@@ -158,6 +158,7 @@ function RenderedVideoPreview({ videoId }: { videoId: string }) {
   });
   if (video.data === null) return null;
   const uncut = video.data?.uncutAssetIds.length ?? 0;
+  const drawn = video.data?.drawnScenePositions ?? [];
 
   return (
     <div className="flex flex-col gap-2">
@@ -177,8 +178,16 @@ function RenderedVideoPreview({ videoId }: { videoId: string }) {
       )}
       {video.data && (
         <p className="text-sm text-muted-foreground">
+          Rendered from Storyboard version <span data-testid="rendered-video-version">{video.data.storyboardVersion}</span> ·{" "}
           {video.data.durationMs / 1000} s · {(video.data.sizeInBytes / (1024 * 1024)).toFixed(1)} MB · no narration or
           music, so the audio track is silent
+        </p>
+      )}
+      {video.data && (
+        <p className="text-sm text-muted-foreground" data-testid="rendered-video-drawn">
+          {drawn.length === 0
+            ? "No Scene had to be drawn again: every one was the same as in an earlier render."
+            : `${drawn.length === 1 ? "Scene" : "Scenes"} ${drawn.join(", ")} ${drawn.length === 1 ? "was" : "were"} drawn for this video. Any other was reused from an earlier render, where it was the same.`}
         </p>
       )}
       {uncut > 0 && (

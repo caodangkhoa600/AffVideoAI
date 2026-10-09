@@ -20,6 +20,7 @@ export type Variant = components["schemas"]["VariantResponse"];
 export type CreativeTemplate = components["schemas"]["CreativeTemplate"];
 export type Storyboard = components["schemas"]["StoryboardResponse"];
 export type Scene = components["schemas"]["SceneResponse"];
+export type SceneEdit = components["schemas"]["SceneEditRequest"];
 export type SceneLayout = components["schemas"]["SceneLayout"];
 export type Technique = components["schemas"]["Technique"];
 export type RenderJob = components["schemas"]["RenderJobResponse"];

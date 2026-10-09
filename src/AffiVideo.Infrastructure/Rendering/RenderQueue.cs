@@ -122,13 +122,15 @@ internal sealed class RenderQueue(
         }
     }
 
-    public async Task CompleteAsync(RenderWork work, Stream mp4, IReadOnlyCollection<Guid> uncutAssetIds, CancellationToken cancellationToken)
+    public async Task CompleteAsync(
+        RenderWork work, Stream mp4, IReadOnlyCollection<Guid> uncutAssetIds, IReadOnlyCollection<int> drawnScenePositions,
+        CancellationToken cancellationToken)
     {
         var job = work.Job;
         var now = clock.GetUtcNow();
         var video = new RenderedVideo(
             Guid.CreateVersion7(), job.OrganizationId, job.StoryboardId, job.Id,
-            work.Storyboard.Scenes.Sum(scene => scene.DurationMs), mp4.Length, uncutAssetIds, now);
+            work.Storyboard.Scenes.Sum(scene => scene.DurationMs), mp4.Length, uncutAssetIds, drawnScenePositions, now);
         if (!job.Complete(video.Id, now))
         {
             throw new InvalidOperationException($"Render job {job.Id} cannot be completed from {job.State}.");

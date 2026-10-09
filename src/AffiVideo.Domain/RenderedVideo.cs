@@ -20,7 +20,8 @@ public sealed class RenderedVideo : IOwnedByOrganization
 
     public RenderedVideo(
         Guid id, Guid organizationId, Guid storyboardId, Guid renderJobId,
-        int durationMs, long sizeInBytes, IEnumerable<Guid> uncutAssetIds, DateTimeOffset createdAt)
+        int durationMs, long sizeInBytes, IEnumerable<Guid> uncutAssetIds, IEnumerable<int> drawnScenePositions,
+        DateTimeOffset createdAt)
     {
         Id = id;
         OrganizationId = organizationId;
@@ -30,6 +31,7 @@ public sealed class RenderedVideo : IOwnedByOrganization
         DurationMs = durationMs;
         SizeInBytes = sizeInBytes;
         UncutAssetIds = [.. uncutAssetIds];
+        DrawnScenePositions = [.. drawnScenePositions];
         CreatedAt = createdAt;
     }
 
@@ -54,6 +56,12 @@ public sealed class RenderedVideo : IOwnedByOrganization
     /// of them cleanly. Every other photo in the video is a cut-out.
     /// </summary>
     public Guid[] UncutAssetIds { get; private set; } = [];
+
+    /// <summary>
+    /// The positions of the Scenes that were drawn to make this video. Every other
+    /// Scene was reused from an earlier render in which it was the same.
+    /// </summary>
+    public int[] DrawnScenePositions { get; private set; } = [];
 
     public DateTimeOffset CreatedAt { get; private set; }
 

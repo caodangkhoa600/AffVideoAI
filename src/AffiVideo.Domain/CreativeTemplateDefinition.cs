@@ -11,6 +11,7 @@ namespace AffiVideo.Domain;
 /// <param name="MaxFacts">The most Facts the template shows, one at a time.</param>
 /// <param name="FactPacing">How the Facts layout spends its Scene's time.</param>
 /// <param name="NameLimit">The limit on the Product's name, which the template sets in type.</param>
+/// <param name="CallToActionLimit">The limit on the call to action, which is set on one line.</param>
 public sealed record CreativeTemplateDefinition(
     CreativeTemplate Template,
     int Version,
@@ -19,7 +20,8 @@ public sealed record CreativeTemplateDefinition(
     FactPacing FactPacing,
     TextLimit HookLimit,
     TextLimit FactLimit,
-    TextLimit NameLimit)
+    TextLimit NameLimit,
+    TextLimit CallToActionLimit)
 {
     /// <summary>The duration of each Scene in milliseconds, in order, summing exactly to the target.</summary>
     public IReadOnlyList<int> SceneDurations(int targetDurationSeconds) =>
@@ -30,11 +32,13 @@ public sealed record CreativeTemplateDefinition(
     /// video of this duration: every word has arrived and been held on screen before
     /// the Fact leaves. Zero when the Facts are given too little time for even one word.
     /// </summary>
-    public int MaxFactWords(int targetDurationSeconds, int factCount)
+    public int MaxFactWords(int targetDurationSeconds, int factCount) =>
+        MaxFactWordsIn(FactsSceneMs(targetDurationSeconds), factCount);
+
+    /// <summary>The same, for a Facts Scene that lasts this long, whatever the video's duration.</summary>
+    public int MaxFactWordsIn(int factsSceneMs, int factCount)
     {
-        var durations = SceneDurations(targetDurationSeconds);
-        var scene = Scenes.Select((slot, index) => (slot, index)).First(found => found.slot.Layout == SceneLayout.Facts).index;
-        var forWords = (durations[scene] - FactPacing.LeadInMs) / factCount - FactPacing.AroundEachFactMs;
+        var forWords = (factsSceneMs - FactPacing.LeadInMs) / factCount - FactPacing.AroundEachFactMs;
         return forWords < 0 ? 0 : forWords / FactPacing.WordStepMs + 1;
     }
 
@@ -43,15 +47,23 @@ public sealed record CreativeTemplateDefinition(
     /// duration: as many as it has room for, and fewer when that is what it takes for
     /// each to be read in its time. Zero when the first Fact alone cannot be.
     /// </summary>
-    public int FactsShown(IReadOnlyList<string> oldestFirst, int targetDurationSeconds)
+    public int FactsShown(IReadOnlyList<string> oldestFirst, int targetDurationSeconds) =>
+        FactsShownIn(oldestFirst, FactsSceneMs(targetDurationSeconds));
+
+    /// <summary>The same, for a Facts Scene that lasts this long, whatever the video's duration.</summary>
+    public int FactsShownIn(IReadOnlyList<string> oldestFirst, int factsSceneMs)
     {
         for (var count = Math.Min(MaxFacts, oldestFirst.Count); count > 0; count--)
         {
-            var most = MaxFactWords(targetDurationSeconds, count);
+            var most = MaxFactWordsIn(factsSceneMs, count);
             if (oldestFirst.Take(count).All(fact => TextLimit.Words(fact).Length <= most)) return count;
         }
         return 0;
     }
+
+    // How long the template's own Facts Scene is in a video of this duration.
+    private int FactsSceneMs(int targetDurationSeconds) =>
+        SceneDurations(targetDurationSeconds)[Scenes.Select(slot => slot.Layout).ToList().IndexOf(SceneLayout.Facts)];
 }
 
 /// <summary>How the Facts layout spends its Scene's time, in milliseconds.</summary>
@@ -64,11 +76,13 @@ public sealed record FactPacing(int LeadInMs, int AroundEachFactMs, int WordStep
 /// <param name="Layout">Which layout of the template draws the Scene.</param>
 /// <param name="Share">The Scene's part of the duration, relative to the other Scenes' shares.</param>
 /// <param name="Techniques">The Techniques the Scene can be produced with, the one it would rather have first.</param>
+/// <param name="MinDurationMs">The shortest the Scene can be made for everything in its layout to arrive and be seen, in milliseconds.</param>
 /// <param name="Photo">Which of the Product's photos the Scene shows.</param>
 public sealed record SceneSlot(
     SceneLayout Layout,
     int Share,
     IReadOnlyList<Technique> Techniques,
+    int MinDurationMs,
     ScenePhoto Photo = ScenePhoto.First);
 
 /// <summary>
@@ -144,10 +158,13 @@ public static class CreativeTemplates
         Version: 1,
         Scenes:
         [
-            new SceneSlot(SceneLayout.Hook, Share: 3, [Technique.ImageMotion, Technique.StaticImage]),
-            new SceneSlot(SceneLayout.Reveal, Share: 5, [Technique.ImageToVideo, Technique.ImageMotion, Technique.StaticImage]),
-            new SceneSlot(SceneLayout.Facts, Share: 7, [Technique.TextAnimation], ScenePhoto.Last),
-            new SceneSlot(SceneLayout.Closing, Share: 5, [Technique.ImageMotion, Technique.StaticImage]),
+            // The shortest each can be made: the thirteenth word of a Hook is in place at 1.92 seconds, the
+            // name of the reveal by about 1.5, and the call to action at 1.85, to be read for a moment after.
+            // What a Facts Scene needs beyond its two seconds depends on its Facts, and is the pacing below.
+            new SceneSlot(SceneLayout.Hook, Share: 3, [Technique.ImageMotion, Technique.StaticImage], MinDurationMs: 2000),
+            new SceneSlot(SceneLayout.Reveal, Share: 5, [Technique.ImageToVideo, Technique.ImageMotion, Technique.StaticImage], MinDurationMs: 2000),
+            new SceneSlot(SceneLayout.Facts, Share: 7, [Technique.TextAnimation], MinDurationMs: 2000, ScenePhoto.Last),
+            new SceneSlot(SceneLayout.Closing, Share: 5, [Technique.ImageMotion, Technique.StaticImage], MinDurationMs: 2500),
         ],
         MaxFacts: 3,
         // The Facts panel takes 0.7 seconds to arrive. Within a Fact's time its first word starts 0.1
@@ -159,7 +176,9 @@ public static class CreativeTemplates
         // fourteenth would not be until 2.04.
         HookLimit: new TextLimit(MaxCharacters: 60, MaxWordCharacters: 12, MaxWords: 13),
         FactLimit: new TextLimit(MaxCharacters: 120, MaxWordCharacters: 24),
-        NameLimit: new TextLimit(MaxCharacters: 60, MaxWordCharacters: 24));
+        NameLimit: new TextLimit(MaxCharacters: 60, MaxWordCharacters: 24),
+        // One line in a pill, in type that is not made smaller to fit.
+        CallToActionLimit: new TextLimit(MaxCharacters: 30, MaxWordCharacters: 24));
 
     /// <summary>Null for a creative template that cannot be planned yet.</summary>
     public static CreativeTemplateDefinition? Find(CreativeTemplate template) =>

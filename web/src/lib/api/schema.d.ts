@@ -475,6 +475,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{projectId}/variants/{variantId}/storyboards/{version}/edits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Makes the Variant's next Storyboard version from this one, edited: on-screen and narration text, the photo a Scene shows, the order of the Scenes and their durations. This version stays as it is. A Scene whose text changes is marked Manually Edited, and its text is no longer checked against Facts. Answers 409 with the reason when the edit changes nothing, leaves a Scene out, breaks the target duration, shows an image the Product does not have, moves the Hook from the start, or does not fit a layout. */
+        post: operations["EditStoryboard"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/variants/{variantId}/storyboards/{version}/scenes/{position}/regenerate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Makes the Variant's next Storyboard version from this one with one Scene planned again, by the mock planner, from the Product's Confirmed Facts and photos as they are now. The Scene keeps its place and its duration and is no longer Manually Edited; every other Scene is as it was. Answers 409 with the reason when the Scene cannot be planned. */
+        post: operations["RegenerateScene"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{projectId}/variants/{variantId}/storyboards/{version}/renders": {
         parameters: {
             query?: never;
@@ -845,6 +879,7 @@ export interface components {
             /** Format: int64 */
             sizeInBytes: number;
             uncutAssetIds: string[];
+            drawnScenePositions: number[];
             /** Format: date-time */
             createdAt: string;
             /** Format: uuid */
@@ -897,6 +932,16 @@ export interface components {
         RenderJobState: "Created" | "Queued" | "Validating" | "Planning" | "GeneratingAssets" | "GeneratingVideo" | "Rendering" | "QualityReview" | "Completed" | "Failed" | "Cancelled";
         /** @enum {unknown} */
         RenderMode: "ProductLock" | "Hybrid";
+        SceneEditRequest: {
+            /** Format: int32 */
+            position: number;
+            onScreenText?: null | string[];
+            narrationText?: null | string;
+            /** Format: uuid */
+            assetId?: null | string;
+            /** Format: int32 */
+            durationMs?: null | number;
+        };
         SceneFactResponse: {
             /** Format: uuid */
             factId: string;
@@ -915,6 +960,7 @@ export interface components {
             narrationText: string;
             assetIds: string[];
             facts: components["schemas"]["SceneFactResponse"][];
+            manuallyEdited: boolean;
         };
         SessionResponse: {
             member: components["schemas"]["MemberResponse"];
@@ -927,6 +973,9 @@ export interface components {
         StatusResponse: {
             database: components["schemas"]["DependencyStatusResponse"];
             objectStorage: components["schemas"]["DependencyStatusResponse"];
+        };
+        StoryboardEditRequest: {
+            scenes: components["schemas"]["SceneEditRequest"][];
         };
         /** @enum {unknown} */
         StoryboardPlanner: "Mock";
@@ -2234,6 +2283,100 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    EditStoryboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                variantId: string;
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StoryboardEditRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoryboardResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RegenerateScene: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                variantId: string;
+                version: number;
+                position: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoryboardResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
             };
         };
     };

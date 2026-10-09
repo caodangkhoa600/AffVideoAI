@@ -221,6 +221,39 @@ public sealed class OrganizationIsolationTests(AffiVideoApp app)
     }
 
     [Fact]
+    public async Task A_member_of_one_Organization_is_refused_editing_the_Storyboards_of_another_and_showing_its_photos_in_their_own()
+    {
+        var theirs = await app.CreateOrganizationAsync();
+        var mine = await app.CreateOrganizationAsync();
+        using var me = await app.SignedInAsync(mine.Owner);
+        using var them = await app.SignedInAsync(theirs.Owner);
+        var theirProduct = await StoryboardTests.NewProductAsync(them);
+        var theirPhoto = await StoryboardTests.UploadPhotoAsync(them, theirProduct);
+        await StoryboardTests.ConfirmedFactAsync(them, theirProduct, "Pin dùng liên tục 30 giờ");
+        var theirVariant = await StoryboardTests.NewVariantAsync(them, theirProduct);
+        var theirStoryboard = await StoryboardTests.GeneratedAsync(them, theirVariant);
+        var myVariant = await StoryboardTests.ReadyVariantAsync(me);
+        var myStoryboard = await StoryboardTests.GeneratedAsync(me, myVariant);
+        var edit = StoryboardEditTests.Changing(theirStoryboard, new SceneEditRequest(2, OnScreenText: ["Lumo"]));
+        var theirVariantUnderMyProject = $"{VariantTests.Variants(myVariant.ProjectId)}/{theirVariant.Id}/storyboards/1";
+
+        var edited = await StoryboardEditTests.EditAsync(me, theirVariant, 1, edit);
+        var regenerated = await StoryboardEditTests.RegenerateAsync(me, theirVariant, 1, position: 2);
+        var editedUnderMyProject = await me.PostAsync($"{theirVariantUnderMyProject}/edits", new StoryboardEditRequest(edit));
+        var regeneratedUnderMyProject = await me.PostAsync($"{theirVariantUnderMyProject}/scenes/2/regenerate", new { });
+        // Their photo is no asset of my Product, whatever its identifier.
+        var withTheirPhoto = await StoryboardEditTests.EditAsync(
+            me, myVariant, 1, StoryboardEditTests.Changing(myStoryboard, new SceneEditRequest(2, AssetId: theirPhoto.Id)));
+
+        Assert.All(
+            [edited, regenerated, editedUnderMyProject, regeneratedUnderMyProject],
+            response => Assert.Equal(HttpStatusCode.NotFound, response.StatusCode));
+        Assert.Equal(HttpStatusCode.Conflict, withTheirPhoto.StatusCode);
+        Assert.Equal(1, (await StoryboardTests.ListAsync(me, myVariant)).Total);
+        Assert.Equal([theirStoryboard.Id], (await StoryboardTests.ListAsync(them, theirVariant)).Items.Select(s => s.Id));
+    }
+
+    [Fact]
     public async Task A_member_of_one_Organization_is_refused_the_render_jobs_and_Rendered_Videos_of_another()
     {
         var theirs = await RenderTests.RenderedAsync(app);

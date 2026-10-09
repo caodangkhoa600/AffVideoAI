@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using AffiVideo.Application.Rendering;
 using AffiVideo.Domain;
 using Microsoft.Extensions.Options;
@@ -12,6 +13,7 @@ internal sealed class RenderJobRunner(
     IRenderQueue queue,
     VideoLayers layers,
     Remotion remotion,
+    SceneClips keptClips,
     Ffmpeg ffmpeg,
     IOptions<RenderingOptions> options,
     ILogger<RenderJobRunner> logger)
@@ -84,9 +86,9 @@ internal sealed class RenderJobRunner(
         await queue.MoveAsync(work, RenderJobState.GeneratingAssets, cancellationToken);
         Directory.CreateDirectory(jobDirectory);
         var images = remotion.Prepare(jobDirectory);
-        await File.WriteAllBytesAsync(
-            Path.Combine(images, BackdropFile), Backdrop.Studio(RenderedVideo.Width, RenderedVideo.Height).EncodePng(), cancellationToken);
-        var layerOf = new Dictionary<Guid, (LayerInput Input, VideoLayerDetails Details)>();
+        var backdrop = Backdrop.Studio(RenderedVideo.Width, RenderedVideo.Height).EncodePng();
+        await File.WriteAllBytesAsync(Path.Combine(images, BackdropFile), backdrop, cancellationToken);
+        var layerOf = new Dictionary<Guid, (LayerInput Input, VideoLayerDetails Details, byte[] Png)>();
         foreach (var photo in photos.DistinctBy(photo => photo.Id))
         {
             var layer = await layers.ForAsync(photo, cancellationToken);
@@ -95,7 +97,7 @@ internal sealed class RenderJobRunner(
             var details = layer.Details;
             layerOf[photo.Id] = (
                 new LayerInput($"{Remotion.ImagesFolder}/{file}", details.Width, details.Height, details.ProductWidth, details.ProductHeight),
-                details);
+                details, layer.Png);
         }
 
         await queue.MoveAsync(work, RenderJobState.Rendering, cancellationToken);
@@ -103,7 +105,7 @@ internal sealed class RenderJobRunner(
         var first = layerOf[photos[0].Id].Details;
         var colours = Palette.From(first.Hue, first.Saturation);
         var inputs = scenes
-            .Select((scene, index) => new SceneInput(
+            .Select((scene, index) => Remotion.Describe(new SceneInput(
                 storyboard.CreativeTemplate,
                 scene.Layout,
                 scene.DurationMs * RenderedVideo.FramesPerSecond / 1000,
@@ -111,15 +113,31 @@ internal sealed class RenderJobRunner(
                 layerOf[photos[index].Id].Input,
                 index == 0 ? null : new PreviousSceneInput(scenes[index - 1].Layout, layerOf[photos[index - 1].Id].Input),
                 $"{Remotion.ImagesFolder}/{BackdropFile}",
-                colours))
+                colours)))
+            .ToList();
+        // Everything that decides a Scene's frames: what its template is handed, and the images that names.
+        var keys = scenes
+            .Select((_, index) => SceneClips.KeyOf(
+                remotion.Look, inputs[index],
+                index == 0
+                    ? [backdrop, layerOf[photos[index].Id].Png]
+                    : [backdrop, layerOf[photos[index].Id].Png, layerOf[photos[index - 1].Id].Png]))
             .ToList();
         var clips = scenes.Select(scene => Path.Combine(jobDirectory, $"scene-{scene.Position}.mp4")).ToList();
-        // A Scene needs nothing of its neighbours' frames, so several are drawn at once.
+        var organizationId = work.Job.OrganizationId;
+        var drawn = new ConcurrentBag<int>();
+        // A Scene needs nothing of its neighbours' frames, so several are drawn at once. A Scene
+        // that an earlier render drew just as it is now is not drawn again: its clip was kept.
         await Parallel.ForEachAsync(
             Enumerable.Range(0, scenes.Count),
             new ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, _options.ScenesAtOnce), CancellationToken = cancellationToken },
             async (index, cancellation) =>
-                await remotion.RenderAsync(jobDirectory, scenes[index].Position, inputs[index], clips[index], cancellation));
+            {
+                if (await keptClips.FetchAsync(organizationId, keys[index], clips[index], cancellation)) return;
+
+                await remotion.RenderAsync(jobDirectory, scenes[index].Position, inputs[index], clips[index], cancellation);
+                drawn.Add(index);
+            });
 
         var durationMs = scenes.Sum(scene => scene.DurationMs);
         var video = Path.Combine(jobDirectory, "video.mp4");
@@ -132,9 +150,15 @@ internal sealed class RenderJobRunner(
             throw new InvalidOperationException($"The rendered file is not what a Rendered Video must be: {string.Join("; ", wrong)}.");
         }
 
+        // Only now are the new clips kept: a clip is never reused unless the video it was drawn for passed its checks.
+        foreach (var index in drawn)
+        {
+            await keptClips.KeepAsync(organizationId, keys[index], clips[index], cancellationToken);
+        }
+
         var uncut = photos.Where(photo => !layerOf[photo.Id].Details.CutOut).Select(photo => photo.Id).Distinct().ToList();
         await using var mp4 = File.OpenRead(video);
-        await queue.CompleteAsync(work, mp4, uncut, cancellationToken);
+        await queue.CompleteAsync(work, mp4, uncut, [.. drawn.Select(index => scenes[index].Position).Order()], cancellationToken);
     }
 
     private static string Doing(RenderJobState state) => state switch

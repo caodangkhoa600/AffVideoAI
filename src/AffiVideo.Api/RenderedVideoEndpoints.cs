@@ -140,6 +140,7 @@ internal static class RenderedVideoEndpoints
         record.Video.DurationMs,
         record.Video.SizeInBytes,
         record.Video.UncutAssetIds,
+        record.Video.DrawnScenePositions,
         record.Video.CreatedAt,
         record.ProductId,
         record.ProductName,

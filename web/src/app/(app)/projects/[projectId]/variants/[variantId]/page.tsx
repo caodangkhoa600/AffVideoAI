@@ -7,6 +7,7 @@ import { Suspense, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { api, problemDetail, type Scene, type SceneLayout, type Storyboard, type Technique, type Variant } from "@/lib/api/client";
 import { creativeTemplateName } from "../../../creative-templates";
+import { SceneEditor } from "./scene-editor";
 import { StoryboardRender } from "./storyboard-render";
 
 const LOADING = <p className="text-sm text-muted-foreground">Loading…</p>;
@@ -109,6 +110,15 @@ function VariantStoryboards({ variant }: { variant: Variant }) {
   const [chosen, setChosen] = useState<number>();
   const [generating, setGenerating] = useState(false);
   const [refused, setRefused] = useState<string>();
+  // The version in the Scene editor, when one is.
+  const [editing, setEditing] = useState<number>();
+
+  // A version was added: the list is asked for again, and the newest is the one to read.
+  const added = async () => {
+    await queryClient.invalidateQueries({ queryKey: key });
+    setChosen(undefined);
+    setEditing(undefined);
+  };
 
   const generate = async () => {
     setGenerating(true);
@@ -117,8 +127,7 @@ function VariantStoryboards({ variant }: { variant: Variant }) {
       .POST("/api/v1/projects/{projectId}/variants/{variantId}/storyboards", { params: { path } })
       .catch(() => ({ error: undefined, response: undefined }));
     if (response?.ok) {
-      await queryClient.invalidateQueries({ queryKey: key });
-      setChosen(undefined);
+      await added();
     } else {
       // A 409 says in the API's own words what is missing.
       setRefused(problemDetail(error) ?? "The Storyboard could not be generated.");
@@ -146,7 +155,7 @@ function VariantStoryboards({ variant }: { variant: Variant }) {
       <div className="flex flex-col gap-3">
         <p className="text-sm text-muted-foreground">
           A Storyboard is planned from the Product&apos;s Confirmed Facts and photos by the mock planner, with no AI.
-          Generating again adds a version and keeps the earlier ones.
+          Generating again, editing and regenerating a Scene each add a version and keep the earlier ones.
         </p>
         <div>
           <Button onClick={generate} disabled={generating || !storyboards.data}>
@@ -182,6 +191,7 @@ function VariantStoryboards({ variant }: { variant: Variant }) {
                   size="sm"
                   variant={storyboard.id === shown.id ? "default" : "outline"}
                   aria-pressed={storyboard.id === shown.id}
+                  disabled={editing !== undefined}
                   onClick={() => setChosen(storyboard.version)}
                 >
                   {storyboard.version}
@@ -189,24 +199,76 @@ function VariantStoryboards({ variant }: { variant: Variant }) {
               ))}
             </div>
           )}
-          <StoryboardVersion storyboard={shown} productId={project.data?.productId} />
-          {/* Keyed by the version, so a job being watched is never shown under another version. */}
-          <StoryboardRender key={shown.id} variant={variant} storyboard={shown} />
+          {editing === shown.version ? (
+            <SceneEditor
+              key={shown.id}
+              variant={variant}
+              storyboard={shown}
+              productId={project.data?.productId}
+              onSaved={added}
+              onCancel={() => setEditing(undefined)}
+            />
+          ) : (
+            <>
+              <StoryboardVersion
+                key={shown.id}
+                variant={variant}
+                storyboard={shown}
+                productId={project.data?.productId}
+                onEdit={() => setEditing(shown.version)}
+                onAdded={added}
+              />
+              {/* Keyed by the version, so a job being watched is never shown under another version. */}
+              <StoryboardRender key={`render-${shown.id}`} variant={variant} storyboard={shown} />
+            </>
+          )}
         </>
       )}
     </>
   );
 }
 
-function StoryboardVersion({ storyboard, productId }: { storyboard: Storyboard; productId?: string }) {
+function StoryboardVersion({
+  variant,
+  storyboard,
+  productId,
+  onEdit,
+  onAdded,
+}: {
+  variant: Variant;
+  storyboard: Storyboard;
+  productId?: string;
+  onEdit: () => void;
+  onAdded: () => Promise<void>;
+}) {
   const total = storyboard.scenes.reduce((sum, scene) => sum + scene.durationMs, 0);
+  // The position of the Scene being regenerated, while it is.
+  const [regenerating, setRegenerating] = useState<number>();
+  const [refused, setRefused] = useState<string>();
+
+  const regenerate = async (position: number) => {
+    setRegenerating(position);
+    setRefused(undefined);
+    const { error, response } = await api
+      .POST("/api/v1/projects/{projectId}/variants/{variantId}/storyboards/{version}/scenes/{position}/regenerate", {
+        params: { path: { projectId: variant.projectId, variantId: variant.id, version: storyboard.version, position } },
+      })
+      .catch(() => ({ error: undefined, response: undefined }));
+    if (response?.ok) {
+      await onAdded();
+    } else {
+      setRefused(problemDetail(error) ?? "The Scene could not be regenerated.");
+      setRegenerating(undefined);
+    }
+  };
+
   return (
     <section className="flex flex-col gap-4" data-testid="storyboard">
       <div className="flex flex-col gap-1">
         <h2 className="text-xl font-semibold tracking-tight">Version {storyboard.version}</h2>
         <p className="text-sm text-muted-foreground">
           {storyboard.scenes.length} Scenes · {seconds(total)} ·{" "}
-          {storyboard.renderMode === "ProductLock" ? "Product Lock" : storyboard.renderMode} · generated on{" "}
+          {storyboard.renderMode === "ProductLock" ? "Product Lock" : storyboard.renderMode} · made on{" "}
           {new Date(storyboard.createdAt).toLocaleString()}
         </p>
         <p className="w-fit rounded-md border bg-muted px-2 py-1 text-sm" data-testid="storyboard-planner">
@@ -214,17 +276,46 @@ function StoryboardVersion({ storyboard, productId }: { storyboard: Storyboard; 
             ? "Produced by the mock planner: fixed sentence patterns filled with Confirmed Facts. No AI wrote this."
             : `Produced by the ${storyboard.planner} planner.`}
         </p>
+        <div>
+          <Button variant="outline" onClick={onEdit} disabled={regenerating !== undefined} data-testid="storyboard-edit">
+            Edit the Scenes
+          </Button>
+        </div>
+        {refused && (
+          <p role="alert" className="text-sm text-destructive" data-testid="scene-regenerate-refused">
+            {refused}
+          </p>
+        )}
       </div>
       <ol className="flex flex-col divide-y rounded-lg border">
         {storyboard.scenes.map((scene) => (
-          <SceneRow key={scene.position} scene={scene} productId={productId} />
+          <SceneRow
+            key={scene.position}
+            scene={scene}
+            productId={productId}
+            regenerating={regenerating === scene.position}
+            disabled={regenerating !== undefined}
+            onRegenerate={() => regenerate(scene.position)}
+          />
         ))}
       </ol>
     </section>
   );
 }
 
-function SceneRow({ scene, productId }: { scene: Scene; productId?: string }) {
+function SceneRow({
+  scene,
+  productId,
+  regenerating,
+  disabled,
+  onRegenerate,
+}: {
+  scene: Scene;
+  productId?: string;
+  regenerating: boolean;
+  disabled: boolean;
+  onRegenerate: () => void;
+}) {
   return (
     <li className="flex gap-4 p-4" data-testid="scene">
       {productId &&
@@ -245,6 +336,11 @@ function SceneRow({ scene, productId }: { scene: Scene; productId?: string }) {
           Scene {scene.position} · {LAYOUTS[scene.layout]} · {seconds(scene.durationMs)} ·{" "}
           <span data-testid="scene-technique">{TECHNIQUES[scene.technique]}</span>
         </p>
+        {scene.manuallyEdited && (
+          <p className="w-fit rounded-md border bg-muted px-2 py-1 text-sm" data-testid="scene-manually-edited">
+            Manually Edited: a person wrote this text, and it is not checked against Facts.
+          </p>
+        )}
         <div className="flex flex-col" data-testid="scene-on-screen-text">
           {scene.onScreenText.map((line, index) => (
             <p key={index} className="break-words font-medium">
@@ -257,7 +353,7 @@ function SceneRow({ scene, productId }: { scene: Scene; productId?: string }) {
           {scene.narrationText}
         </p>
         {scene.facts.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Uses no Facts.</p>
+          !scene.manuallyEdited && <p className="text-sm text-muted-foreground">Uses no Facts.</p>
         ) : (
           <div className="flex flex-col gap-1 text-sm" data-testid="scene-facts">
             <p className="text-muted-foreground">Facts used:</p>
@@ -270,6 +366,11 @@ function SceneRow({ scene, productId }: { scene: Scene; productId?: string }) {
             </ul>
           </div>
         )}
+        <div>
+          <Button size="sm" variant="outline" onClick={onRegenerate} disabled={disabled} data-testid="scene-regenerate">
+            {regenerating ? "Regenerating…" : "Regenerate this Scene"}
+          </Button>
+        </div>
       </div>
     </li>
   );

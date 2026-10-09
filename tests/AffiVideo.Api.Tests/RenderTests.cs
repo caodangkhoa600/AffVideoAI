@@ -300,6 +300,63 @@ public sealed partial class RenderTests(AffiVideoApp app)
     }
 
     [Fact]
+    public async Task Rendering_an_edited_version_draws_only_the_Scene_that_changed_and_reuses_the_clips_of_the_others()
+    {
+        await app.WorkerAsync();
+        var organization = await app.CreateOrganizationAsync();
+        using var member = await app.SignedInAsync(organization.Owner);
+        var product = await StoryboardTests.NewProductAsync(member, "Bình giữ nhiệt Lumo 500");
+        // It came already cut out, so no model runs.
+        await ProductAssetTests.UploadedAsync(member, product, ProductAssetKind.Photo, Bottle(onBackdrop: false));
+        await StoryboardTests.ConfirmedFactAsync(member, product, "Giữ lạnh suốt 24 giờ");
+        var variant = await StoryboardTests.NewVariantAsync(member, product, targetDurationSeconds: 15);
+        var first = await StoryboardTests.GeneratedAsync(member, variant);
+        var clips = $"organizations/{organization.Id}/scene-clips/";
+
+        var original = await VideoAsync(member, variant, first.Version);
+        var keptAfterFirst = await app.StoredKeysAsync(clips);
+        // Only the reveal says something else. Its neighbours are drawn from what they are handed, and that has not changed.
+        var second = await StoryboardEditTests.EditedAsync(
+            member, variant, first.Version, StoryboardEditTests.Changing(first, new SceneEditRequest(2, OnScreenText: ["Lumo 500 mới về"])));
+        var edited = await VideoAsync(member, variant, second.Version);
+        var again = await VideoAsync(member, variant, first.Version);
+
+        Assert.Equal([1, 2, 3, 4], original.Video.DrawnScenePositions);
+        Assert.Equal([2], edited.Video.DrawnScenePositions);
+        Assert.Empty(again.Video.DrawnScenePositions);
+        // Each Rendered Video says which Storyboard version it came from.
+        Assert.Equal((1, 2, 1), (original.Video.StoryboardVersion, edited.Video.StoryboardVersion, again.Video.StoryboardVersion));
+        Assert.Equal((first.Id, second.Id, first.Id), (original.Video.StoryboardId, edited.Video.StoryboardId, again.Video.StoryboardId));
+        // One clip for each Scene that was ever drawn, under the Organization.
+        Assert.Equal(4, keptAfterFirst.Length);
+        Assert.Equal(5, (await app.StoredKeysAsync(clips)).Length);
+
+        // What was reused is frame for frame what was drawn the first time, and the Scene that changed is not.
+        var starts = first.Scenes.Select((_, index) => first.Scenes.Take(index).Sum(scene => scene.DurationMs)).ToList();
+        for (var index = 0; index < first.Scenes.Count; index++)
+        {
+            var late = (starts[index] + first.Scenes[index].DurationMs * 0.8) / 1000;
+            using var before = await FrameAsync(original.Mp4, late);
+            using var after = await FrameAsync(edited.Mp4, late);
+            using var rendered = await FrameAsync(again.Mp4, late);
+            Assert.Equal(0, Different(before, rendered));
+            if (index == 1) Assert.True(Different(before, after) > 0.005, "The Scene that was edited looks as it did.");
+            else Assert.Equal(0, Different(before, after));
+        }
+    }
+
+    // Renders the version and waits for its Rendered Video and the MP4 the API serves for it.
+    private async Task<(RenderedVideoResponse Video, byte[] Mp4)> VideoAsync(Browser member, VariantResponse variant, int version)
+    {
+        var job = await EndedAsync(member, await SubmittedAsync(member, variant, version));
+        Assert.True(job.State == RenderJobState.Completed, $"The render ended {job.State}: {job.Failure?.Message}\n{await app.WorkerLogAsync()}");
+        var video = await member.GetAsync<RenderedVideoResponse>($"/api/v1/rendered-videos/{job.RenderedVideoId}");
+        var content = await member.GetAsync($"/api/v1/rendered-videos/{video.Id}/content");
+        content.EnsureSuccessStatusCode();
+        return (video, await content.Content.ReadAsByteArrayAsync(Cancellation));
+    }
+
+    [Fact]
     public async Task Renders_are_only_found_under_the_Storyboard_version_they_belong_to()
     {
         var organization = await app.CreateOrganizationAsync();

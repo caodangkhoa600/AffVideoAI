@@ -1735,6 +1735,161 @@
         }
       }
     },
+    "/api/v1/projects/{projectId}/variants/{variantId}/storyboards/{version}/edits": {
+      "post": {
+        "tags": [
+          "Storyboards"
+        ],
+        "summary": "Makes the Variant's next Storyboard version from this one, edited: on-screen and narration text, the photo a Scene shows, the order of the Scenes and their durations. This version stays as it is. A Scene whose text changes is marked Manually Edited, and its text is no longer checked against Facts. Answers 409 with the reason when the edit changes nothing, leaves a Scene out, breaks the target duration, shows an image the Product does not have, moves the Hook from the start, or does not fit a layout.",
+        "operationId": "EditStoryboard",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "variantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StoryboardEditRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoryboardResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/variants/{variantId}/storyboards/{version}/scenes/{position}/regenerate": {
+      "post": {
+        "tags": [
+          "Storyboards"
+        ],
+        "summary": "Makes the Variant's next Storyboard version from this one with one Scene planned again, by the mock planner, from the Product's Confirmed Facts and photos as they are now. The Scene keeps its place and its duration and is no longer Manually Edited; every other Scene is as it was. Answers 409 with the reason when the Scene cannot be planned.",
+        "operationId": "RegenerateScene",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "variantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "position",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoryboardResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/projects/{projectId}/variants/{variantId}/storyboards/{version}/renders": {
       "post": {
         "tags": [
@@ -3004,6 +3159,7 @@
           "durationMs",
           "sizeInBytes",
           "uncutAssetIds",
+          "drawnScenePositions",
           "createdAt",
           "productId",
           "productName",
@@ -3047,6 +3203,13 @@
             "items": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          "drawnScenePositions": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
             }
           },
           "createdAt": {
@@ -3227,6 +3390,47 @@
           "Hybrid"
         ]
       },
+      "SceneEditRequest": {
+        "required": [
+          "position"
+        ],
+        "type": "object",
+        "properties": {
+          "position": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "onScreenText": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "narrationText": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "assetId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "durationMs": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        }
+      },
       "SceneFactResponse": {
         "required": [
           "factId",
@@ -3260,7 +3464,8 @@
           "onScreenText",
           "narrationText",
           "assetIds",
-          "facts"
+          "facts",
+          "manuallyEdited"
         ],
         "type": "object",
         "properties": {
@@ -3299,6 +3504,9 @@
             "items": {
               "$ref": "#/components/schemas/SceneFactResponse"
             }
+          },
+          "manuallyEdited": {
+            "type": "boolean"
           }
         }
       },
@@ -3344,6 +3552,20 @@
           },
           "objectStorage": {
             "$ref": "#/components/schemas/DependencyStatusResponse"
+          }
+        }
+      },
+      "StoryboardEditRequest": {
+        "required": [
+          "scenes"
+        ],
+        "type": "object",
+        "properties": {
+          "scenes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SceneEditRequest"
+            }
           }
         }
       },

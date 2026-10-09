@@ -58,14 +58,16 @@ public static class PlanningEngine
         int usablePhotos, CreativeTemplateDefinition template, int targetDurationSeconds, RenderMode renderMode)
     {
         var durations = template.SceneDurations(targetDurationSeconds);
-        return template.Scenes
-            .Select((scene, index) => scene.Techniques
-                .Where(technique => renderMode.Allows(technique) && CanBeMade(technique, usablePhotos, durations[index]))
-                // Type needs nothing but the text, so it is what is left when nothing else can be made.
-                .DefaultIfEmpty(Technique.TextAnimation)
-                .First())
-            .ToArray();
+        return template.Scenes.Select((scene, index) => TechniqueFor(scene, usablePhotos, durations[index], renderMode)).ToArray();
     }
+
+    /// <summary>The Technique for one Scene of a template that lasts this long, chosen the same way.</summary>
+    public static Technique TechniqueFor(SceneSlot scene, int usablePhotos, int sceneMilliseconds, RenderMode renderMode) =>
+        scene.Techniques
+            .Where(technique => renderMode.Allows(technique) && CanBeMade(technique, usablePhotos, sceneMilliseconds))
+            // Type needs nothing but the text, so it is what is left when nothing else can be made.
+            .DefaultIfEmpty(Technique.TextAnimation)
+            .First();
 
     private static bool CanBeMade(Technique technique, int usablePhotos, int sceneMilliseconds) => technique switch
     {

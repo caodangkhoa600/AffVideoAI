@@ -52,7 +52,7 @@ public sealed class TechniqueSelectionTests
     public void A_Scene_that_would_rather_be_generated_falls_back_to_what_can_be_made(RenderMode renderMode)
     {
         var template = TemplateOf(
-            new SceneSlot(SceneLayout.Reveal, Share: 1, [Technique.ImageToVideo, Technique.ThreeDRender, Technique.VideoAsset, Technique.ImageMotion]));
+            new SceneSlot(SceneLayout.Reveal, Share: 1, [Technique.ImageToVideo, Technique.ThreeDRender, Technique.VideoAsset, Technique.ImageMotion], MinDurationMs: 1000));
 
         var techniques = PlanningEngine.AssignTechniques(usablePhotos: 1, template, targetDurationSeconds: 20, renderMode);
 
@@ -64,8 +64,8 @@ public sealed class TechniqueSelectionTests
     {
         // One second and nineteen seconds.
         var template = TemplateOf(
-            new SceneSlot(SceneLayout.Hook, Share: 1, [Technique.ImageMotion, Technique.StaticImage]),
-            new SceneSlot(SceneLayout.Reveal, Share: 19, [Technique.ImageMotion, Technique.StaticImage]));
+            new SceneSlot(SceneLayout.Hook, Share: 1, [Technique.ImageMotion, Technique.StaticImage], MinDurationMs: 1000),
+            new SceneSlot(SceneLayout.Reveal, Share: 19, [Technique.ImageMotion, Technique.StaticImage], MinDurationMs: 1000));
 
         var techniques = PlanningEngine.AssignTechniques(usablePhotos: 1, template, targetDurationSeconds: 20, RenderMode.ProductLock);
 
