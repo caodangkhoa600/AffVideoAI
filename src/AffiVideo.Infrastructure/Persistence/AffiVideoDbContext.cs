@@ -1,5 +1,108 @@
+using System.Reflection;
+using AffiVideo.Application;
+using AffiVideo.Domain;
+using AffiVideo.Infrastructure.Identity;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 
 namespace AffiVideo.Infrastructure.Persistence;
 
-public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> options) : DbContext(options);
+/// <summary>
+/// Organizations are kept apart here. Every query for an Organization or for a record
+/// that is <see cref="IOwnedByOrganization"/> is filtered to the caller's Organization,
+/// and saving refuses any such record that belongs to another one. A new
+/// entity an Organization owns only has to implement <see cref="IOwnedByOrganization"/>.
+/// </summary>
+public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> options, Caller caller)
+    : IdentityUserContext<Member, Guid>(options), IDataProtectionKeyContext
+{
+    public DbSet<Organization> Organizations => Set<Organization>();
+
+    public DbSet<Member> Members => Set<Member>();
+
+    public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();
+
+    /// <summary>The keys that protect session cookies and anti-forgery tokens, kept here so sessions outlive a restart of the API.</summary>
+    public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
+
+    // The filters below read this from the context running the query, so one
+    // cached model serves every caller.
+    private Guid? CallerOrganizationId => caller.OrganizationId;
+
+    protected override void OnModelCreating(ModelBuilder builder)
+    {
+        base.OnModelCreating(builder);
+
+        builder.Entity<Organization>(organization =>
+        {
+            organization.Property(o => o.Name).HasMaxLength(Organization.NameMaxLength);
+            organization.HasQueryFilter(o => o.Id == CallerOrganizationId);
+        });
+
+        builder.Entity<Member>(member =>
+        {
+            member.ToTable("Members");
+            member.HasOne<Organization>().WithMany().HasForeignKey(m => m.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            member.Property(m => m.Role).HasConversion<string>().HasMaxLength(20);
+        });
+        builder.Entity<IdentityUserClaim<Guid>>().ToTable("MemberClaims");
+        builder.Entity<IdentityUserLogin<Guid>>().ToTable("MemberLogins");
+        builder.Entity<IdentityUserToken<Guid>>().ToTable("MemberTokens");
+
+        builder.Entity<AuditLogEntry>(entry =>
+        {
+            entry.ToTable("AuditLog");
+            entry.HasOne<Organization>().WithMany().HasForeignKey(e => e.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            entry.HasOne<Member>().WithMany().HasForeignKey(e => e.ActorMemberId).OnDelete(DeleteBehavior.Restrict);
+            entry.Property(e => e.Action).HasMaxLength(100);
+            entry.HasIndex(e => new { e.OrganizationId, e.OccurredAt });
+        });
+
+        var filter = typeof(AffiVideoDbContext).GetMethod(nameof(FilterToCallerOrganization), BindingFlags.NonPublic | BindingFlags.Instance)!;
+        foreach (var entityType in builder.Model.GetEntityTypes().Where(t => typeof(IOwnedByOrganization).IsAssignableFrom(t.ClrType)).ToList())
+        {
+            filter.MakeGenericMethod(entityType.ClrType).Invoke(this, [builder]);
+        }
+    }
+
+    private void FilterToCallerOrganization<T>(ModelBuilder builder) where T : class, IOwnedByOrganization =>
+        builder.Entity<T>().HasQueryFilter(record => record.OrganizationId == CallerOrganizationId);
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        RefuseWritesForAnotherOrganization();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        RefuseWritesForAnotherOrganization();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    // The second check, which the filters cannot make: a record built or loaded
+    // some other way must still belong to the caller's Organization to be written.
+    private void RefuseWritesForAnotherOrganization()
+    {
+        foreach (var entry in ChangeTracker.Entries())
+        {
+            if (entry.State is EntityState.Unchanged or EntityState.Detached) continue;
+            if (OwningOrganization(entry) is { } owner && owner != caller.OrganizationId)
+            {
+                throw new InvalidOperationException(
+                    $"A {entry.Metadata.ClrType.Name} of Organization {owner} cannot be written by a caller acting for " +
+                    (caller.OrganizationId is { } own ? $"Organization {own}." : "no Organization."));
+            }
+        }
+    }
+
+    private static Guid? OwningOrganization(EntityEntry entry) => entry.Entity switch
+    {
+        Organization organization => organization.Id,
+        IOwnedByOrganization owned => owned.OrganizationId,
+        _ => null,
+    };
+}

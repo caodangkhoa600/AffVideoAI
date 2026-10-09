@@ -6,6 +6,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /source
 COPY global.json Directory.Build.props ./
 COPY src/AffiVideo.Application/AffiVideo.Application.csproj src/AffiVideo.Application/
+COPY src/AffiVideo.Domain/AffiVideo.Domain.csproj src/AffiVideo.Domain/
 COPY src/AffiVideo.Infrastructure/AffiVideo.Infrastructure.csproj src/AffiVideo.Infrastructure/
 COPY src/AffiVideo.Worker/AffiVideo.Worker.csproj src/AffiVideo.Worker/
 RUN dotnet restore src/AffiVideo.Worker

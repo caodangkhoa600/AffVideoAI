@@ -1,3 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <ItemGroup>
+    <ProjectReference Include="..\AffiVideo.Domain\AffiVideo.Domain.csproj" />
+  </ItemGroup>
+
 </Project>

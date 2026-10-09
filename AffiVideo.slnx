@@ -3,6 +3,7 @@
     <Project Path="src/AffiVideo.Api/AffiVideo.Api.csproj" />
     <Project Path="src/AffiVideo.Application/AffiVideo.Application.csproj" />
     <Project Path="src/AffiVideo.Contracts/AffiVideo.Contracts.csproj" />
+    <Project Path="src/AffiVideo.Domain/AffiVideo.Domain.csproj" />
     <Project Path="src/AffiVideo.Infrastructure/AffiVideo.Infrastructure.csproj" />
     <Project Path="src/AffiVideo.Worker/AffiVideo.Worker.csproj" />
   </Folder>

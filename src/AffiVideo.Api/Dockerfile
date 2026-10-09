@@ -4,6 +4,7 @@ WORKDIR /source
 COPY global.json Directory.Build.props ./
 COPY src/AffiVideo.Application/AffiVideo.Application.csproj src/AffiVideo.Application/
 COPY src/AffiVideo.Contracts/AffiVideo.Contracts.csproj src/AffiVideo.Contracts/
+COPY src/AffiVideo.Domain/AffiVideo.Domain.csproj src/AffiVideo.Domain/
 COPY src/AffiVideo.Infrastructure/AffiVideo.Infrastructure.csproj src/AffiVideo.Infrastructure/
 COPY src/AffiVideo.Api/AffiVideo.Api.csproj src/AffiVideo.Api/
 RUN dotnet restore src/AffiVideo.Api

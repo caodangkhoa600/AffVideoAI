@@ -107,6 +107,16 @@ services:
     environment: *app-environment
     depends_on: *app-depends-on
 
+  # Not started by `up`. Creates the demonstration Organization and its Owner
+  # (credentials in README.md) unless they are already there:
+  #   docker compose run --rm seed
+  seed:
+    image: affivideo-api
+    profiles: ["tools"]
+    command: ["seed"]
+    environment: *app-environment
+    depends_on: *app-depends-on
+
 volumes:
   postgres-data:
   minio-data:

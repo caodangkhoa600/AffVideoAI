@@ -1,9 +1,15 @@
+using AffiVideo.Application;
+using AffiVideo.Application.Organizations;
 using AffiVideo.Application.SystemStatus;
+using AffiVideo.Infrastructure.Identity;
+using AffiVideo.Infrastructure.Organizations;
 using AffiVideo.Infrastructure.Persistence;
 using AffiVideo.Infrastructure.Storage;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace AffiVideo.Infrastructure;
 
@@ -11,11 +17,31 @@ public static class InfrastructureSetup
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
+        services.AddScoped<Caller>();
         services.AddDbContext<AffiVideoDbContext>(options =>
             options.UseNpgsql(configuration.GetConnectionString("Database")));
         services.Configure<StorageOptions>(configuration.GetSection(StorageOptions.Section));
         services.AddSingleton<S3ObjectStorage>();
+        services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<ISystemStatusReader, SystemStatusReader>();
+
+        services.AddIdentityCore<Member>(options =>
+            {
+                // A member signs in with their email, so it is their user name too
+                // and only has to be a valid, unused email.
+                options.User.RequireUniqueEmail = true;
+                options.User.AllowedUserNameCharacters = "";
+                // Length is what makes a password hard to guess; composition rules are not.
+                options.Password.RequiredLength = 12;
+                options.Password.RequireDigit = false;
+                options.Password.RequireLowercase = false;
+                options.Password.RequireUppercase = false;
+                options.Password.RequireNonAlphanumeric = false;
+            })
+            .AddUserStore<MemberStore>()
+            .AddClaimsPrincipalFactory<MemberClaimsPrincipalFactory>();
+        services.AddScoped<IOrganizations, ScopedOrganizations>();
+        services.AddScoped<IOrganizationProvisioner, OrganizationProvisioner>();
         return services;
     }
 
@@ -29,5 +55,21 @@ public static class InfrastructureSetup
         await using var scope = services.CreateAsyncScope();
         await scope.ServiceProvider.GetRequiredService<AffiVideoDbContext>().Database.MigrateAsync(cancellationToken);
         await scope.ServiceProvider.GetRequiredService<S3ObjectStorage>().EnsureBucketExistsAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Creates the demonstration Organization and its Owner unless they are already
+    /// there. Only the explicit seed command calls this.
+    /// </summary>
+    /// <returns>Whether anything was created.</returns>
+    public static async Task<bool> SeedAsync(this IServiceProvider services, CancellationToken cancellationToken)
+    {
+        await using var scope = services.CreateAsyncScope();
+        var created = await scope.ServiceProvider.GetRequiredService<IOrganizationProvisioner>().CreateAsync(
+            DemonstrationOrganization.Name,
+            DemonstrationOrganization.OwnerEmail,
+            DemonstrationOrganization.OwnerPassword,
+            cancellationToken);
+        return created is not null;
     }
 }

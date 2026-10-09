@@ -1,7 +1,12 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using AffiVideo.Api.Tests;
+using AffiVideo.Application.Organizations;
+using AffiVideo.Contracts;
 using AffiVideo.Infrastructure;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.Minio;
 using Testcontainers.PostgreSql;
 
@@ -11,8 +16,8 @@ namespace AffiVideo.Api.Tests;
 
 /// <summary>
 /// The API running in-process against real PostgreSQL and real object storage in
-/// containers, prepared by the same code the migrate command runs. Shared by every
-/// test in the assembly.
+/// containers, prepared by the same code the migrate and seed commands run. Shared
+/// by every test in the assembly.
 /// </summary>
 public sealed class AffiVideoApp : IAsyncLifetime
 {
@@ -25,14 +30,64 @@ public sealed class AffiVideoApp : IAsyncLifetime
     private readonly MinioContainer _minio = new MinioBuilder(MinioImage).Build();
     private WebApplicationFactory<Program>? _factory;
 
+    /// <summary>How the API writes JSON: camelCase names, enums by name.</summary>
+    public static JsonSerializerOptions Json { get; } = new(JsonSerializerDefaults.Web)
+    {
+        Converters = { new JsonStringEnumConverter() },
+    };
+
     public async ValueTask InitializeAsync()
     {
         await Task.WhenAll(_postgres.StartAsync(), _minio.StartAsync());
         _factory = With([]);
         await _factory.Services.MigrateAsync(CancellationToken.None);
+        await _factory.Services.SeedAsync(CancellationToken.None);
     }
 
     public HttpClient CreateClient() => _factory!.CreateClient();
+
+    /// <summary>A browser with no cookies yet.</summary>
+    public Browser NewBrowser() => NewBrowser(_factory!);
+
+    // https, because a browser only sends a Secure cookie back over a secure connection.
+    public static Browser NewBrowser(WebApplicationFactory<Program> factory) =>
+        new(factory.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost") }));
+
+    /// <summary>
+    /// A new Organization with one Owner, made by the code the seed command uses:
+    /// sign-up is closed, so there is no way to make one over HTTP.
+    /// </summary>
+    public async Task<TestOrganization> CreateOrganizationAsync()
+    {
+        var unique = Guid.NewGuid().ToString("N");
+        var owner = new Credentials($"owner-{unique}@example.test", $"owner-password-{unique}");
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var id = await scope.ServiceProvider.GetRequiredService<IOrganizationProvisioner>()
+            .CreateAsync($"Organization {unique}", owner.Email, owner.Password, CancellationToken.None);
+        return new TestOrganization(id!.Value, owner);
+    }
+
+    /// <summary>Runs what the seed command runs, again. Answers whether it created anything.</summary>
+    public Task<bool> SeedAsync() => _factory!.Services.SeedAsync(CancellationToken.None);
+
+    /// <summary>Has a signed-in Owner add an Editor, and returns what the Editor signs in with.</summary>
+    public async Task<Credentials> AddEditorAsync(Browser owner, TestOrganization organization)
+    {
+        var unique = Guid.NewGuid().ToString("N");
+        var editor = new Credentials($"editor-{unique}@example.test", $"editor-password-{unique}");
+        var response = await owner.PostAsync(
+            $"/api/v1/organizations/{organization.Id}/members", new AddMemberRequest(editor.Email, editor.Password));
+        response.EnsureSuccessStatusCode();
+        return editor;
+    }
+
+    /// <summary>A browser signed in as these credentials.</summary>
+    public async Task<Browser> SignedInAsync(Credentials credentials)
+    {
+        var browser = NewBrowser();
+        (await browser.SignInAsync(credentials.Email, credentials.Password)).EnsureSuccessStatusCode();
+        return browser;
+    }
 
     /// <summary>Another instance of the API with some settings replaced, for tests about a broken environment.</summary>
     public WebApplicationFactory<Program> With(Dictionary<string, string> settings)
@@ -60,3 +115,7 @@ public sealed class AffiVideoApp : IAsyncLifetime
         await _minio.DisposeAsync();
     }
 }
+
+public sealed record Credentials(string Email, string Password);
+
+public sealed record TestOrganization(Guid Id, Credentials Owner);

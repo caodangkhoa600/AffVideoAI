@@ -1,3 +1,4 @@
+using AffiVideo.Application;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
@@ -7,5 +8,5 @@ namespace AffiVideo.Infrastructure.Persistence;
 internal sealed class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<AffiVideoDbContext>
 {
     public AffiVideoDbContext CreateDbContext(string[] args) =>
-        new(new DbContextOptionsBuilder<AffiVideoDbContext>().UseNpgsql().Options);
+        new(new DbContextOptionsBuilder<AffiVideoDbContext>().UseNpgsql().Options, new Caller());
 }

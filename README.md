@@ -25,6 +25,7 @@ only inside the worker image.
 cp .env.example .env
 docker compose up --build --wait
 docker compose run --rm migrate
+docker compose run --rm seed
 ```
 
 `up --wait` returns once all five services pass their health checks. The first
@@ -34,8 +35,12 @@ build downloads Chrome Headless Shell and takes a few minutes.
 the only thing that changes the schema; nothing does so at startup. Run it again
 after pulling changes that add a migration.
 
-Then open http://localhost:3000/status. It shows the API, the database and
-object storage as reachable.
+`seed` creates the demonstration Organization and its Owner. Running it again
+changes nothing.
+
+Then open http://localhost:3000 and sign in (see [Sign in](#sign-in)).
+http://localhost:3000/status needs no sign-in and shows the API, the database
+and object storage as reachable.
 
 If a port is taken, change it in `.env`. `docker compose down` stops everything
 and keeps the data; `docker compose down -v` also deletes it.
@@ -48,9 +53,10 @@ three apps on the host:
 ```sh
 docker compose up -d --wait postgres minio
 dotnet run --project src/AffiVideo.Api -- migrate
+dotnet run --project src/AffiVideo.Api -- seed
 dotnet run --project src/AffiVideo.Api        # http://localhost:5080
 dotnet run --project src/AffiVideo.Worker
-npm --prefix web run dev                      # http://localhost:3000/status
+npm --prefix web run dev                      # http://localhost:3000
 ```
 
 Their settings come from files, so nothing has to be typed:
@@ -74,6 +80,45 @@ For the web app, put overrides in `web/.env.local`.
 
 The Compose services do not read these files: containers run in the
 Production environment and take everything from `.env`.
+
+## Sign in
+
+The seed creates one Organization, "AffiVideo Demo", with one Owner:
+
+| Email                        | Password              |
+| ---------------------------- | --------------------- |
+| `owner@demo.affivideo.local` | `demo-owner-password` |
+
+These are for a system that only listens on this machine. There is no sign-up:
+a member comes from the seed or from an Owner adding an Editor on the
+Members page. Nothing is emailed, so the Owner chooses the Editor's password
+(at least 12 characters) and passes it on.
+
+An Owner can do everything. An Editor can do all creative work but is refused
+when adding members, changing the Organization's settings or reading the audit
+log. Adding a member is recorded in the audit log, which an Owner reads at
+`GET /api/v1/organizations/{id}/audit-log`; it has no page yet.
+
+The session is a cookie that scripts cannot read (HttpOnly, Secure,
+SameSite=Lax); nothing is kept in browser storage. Chrome, Edge and Firefox
+accept a Secure cookie from `http://localhost`. Safari does not, so use one of
+the others until the app is served over HTTPS. Five wrong passwords in a row
+lock the member out for five minutes.
+
+A request that changes anything must send an anti-forgery token: fetch
+`GET /api/v1/antiforgery-token` and send its `requestToken` in the
+`X-CSRF-TOKEN` header. The web app's API client does this for every such
+request.
+
+## Keeping Organizations apart
+
+Everything an Organization owns carries its identifier, and
+`AffiVideoDbContext` is where it is kept apart: a query only returns records
+of the caller's Organization, and saving refuses a record of any other. An
+endpoint asked for another Organization's record answers 404, exactly as for
+one that does not exist. A new entity that an Organization owns implements
+`IOwnedByOrganization` and gets both; add a case for it to
+`tests/AffiVideo.Api.Tests/OrganizationIsolationTests.cs`.
 
 ## Test
 
@@ -132,10 +177,10 @@ it is a deliberate act that includes re-reading the licence (ADR 0002).
 ## Status
 
 Done: the look prototypes (tickets 01, 25, 26, in `prototypes/`), the affiliate
-experiment plan (ticket 24, `docs/business/affiliate-experiment.md`) and the
-walking skeleton (ticket 02).
+experiment plan (ticket 24, `docs/business/affiliate-experiment.md`), the
+walking skeleton (ticket 02) and sign in and Organizations (ticket 03).
 
-Next: sign in and Organizations (ticket 03).
+Next: Products (ticket 04).
 
 Notes from the walking skeleton:
 
@@ -143,7 +188,14 @@ Notes from the walking skeleton:
   Chainguard's build of MinIO, pinned by digest.
 - The first migration is empty: no ticket has needed a table yet. It exists so
   that the migrate command and the migrations history are in place.
-- There is no `AffiVideo.Domain` project yet. Ticket 03 adds it with its first
-  type, the Organization.
-- shadcn/ui, React Hook Form and Zod are not installed yet. The status page
-  needs none of them; the first ticket with a form adds them.
+
+Notes from sign in and Organizations:
+
+- A member belongs to exactly one Organization, and an email can be used once
+  across all of them.
+- The role and the Organization are read from the session cookie, so a change
+  to either would not reach a session that is already open. Nothing changes
+  them yet; the ticket that does must end the member's sessions.
+- The keys that protect cookies are stored in the database, so rebuilding the
+  API does not sign anyone out.
+- The seeded Organization has no sample Product yet; ticket 04 adds it.

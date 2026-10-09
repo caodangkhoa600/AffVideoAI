@@ -14,6 +14,7 @@ internal static class StatusEndpoints
                     new DependencyStatusResponse(status.DatabaseReachable),
                     new DependencyStatusResponse(status.ObjectStorageReachable)));
             })
+            .AllowAnonymous()
             .WithName("GetStatus")
             .WithSummary("Whether the API can reach its database and object storage.")
             .WithTags("Status");

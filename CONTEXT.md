@@ -10,6 +10,20 @@ AffiVideo turns product information and product images into short vertical marke
 The tenant that owns products, projects and videos. Our own affiliate operation is an ordinary Organization.
 _Avoid_: Workspace, account, tenant
 
+**Member**:
+A person who signs in. A member belongs to exactly one Organization, as its Owner or as an Editor.
+_Avoid_: User, account
+
+**Owner**:
+A member who can do everything in their Organization, including adding members and changing its settings.
+_Avoid_: Admin
+
+**Editor**:
+A member who does all creative work but cannot manage members or the Organization's settings.
+
+**Audit log**:
+The record of sensitive actions in an Organization: who did what, and when. Entries are never changed.
+
 **Affiliate Lab**:
 The set of capabilities (Campaigns, Published Posts, Performance Snapshots) available only to Organizations that have it enabled.
 _Avoid_: Admin area, internal module
