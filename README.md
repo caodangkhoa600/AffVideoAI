@@ -110,7 +110,7 @@ are recorded in the audit log, which an
 Owner reads at `GET /api/v1/organizations/{id}/audit-log`; it has no page yet.
 
 The session is a cookie that scripts cannot read (HttpOnly, Secure,
-SameSite=Lax); nothing is kept in browser storage. Chrome, Edge and Firefox
+SameSite=Lax); nothing that signs anyone in is kept in browser storage. Chrome, Edge and Firefox
 accept a Secure cookie from `http://localhost`. Safari does not, so use one of
 the others until the app is served over HTTPS. Five wrong passwords in a row
 lock the member out for five minutes.
@@ -119,6 +119,38 @@ A request that changes anything must send an anti-forgery token: fetch
 `GET /api/v1/antiforgery-token` and send its `requestToken` in the
 `X-CSRF-TOKEN` header. The web app's API client does this for every such
 request.
+
+## Create a video: the demonstration flow
+
+This is the whole way from a Product to an MP4, with no paid AI and no
+credentials but the Owner's above. It needs the five services running, the
+worker among them, since the worker renders.
+
+1. Sign in. The page that opens is the dashboard: jobs in progress, the newest
+   Rendered Videos and the newest Projects. Press **Create video**.
+2. **Product.** Pick the seeded AirBeat X1, or press **Add a new Product** and
+   fill in what it is and who it is for.
+3. **Photos.** Add at least one photo of at least 400 pixels on each side. A
+   photo of the Product alone on a plain background cuts out best.
+4. **Facts.** Add what is true of the Product, one statement at a time, in
+   Vietnamese, and press **Confirm** on each. The AirBeat X1 already has three
+   Confirmed Facts. Only a Confirmed Fact can appear in the video.
+5. **Creative direction.** Choose a creative template, write the Hook (the
+   opening line, in Vietnamese) and the duration, 15 to 30 seconds. These are
+   fixed once you go on.
+6. **Storyboard.** Press **Generate Storyboard** and read the Scenes. **Edit
+   the Scenes** changes text, photo, order and durations; **Regenerate this
+   Scene** plans one again. Each makes a new version.
+7. **Video.** Press **Render video**. The stage is shown while the worker
+   renders, a minute or two, and longer the first time a photo is cut out. Watch
+   the video, press **Approve**, then **Download MP4**.
+
+The wizard can be left at any step: **Create video** leads back to the step it
+was left at, and so does the address of the step. **Start another video**
+begins again from the Product. Everything the wizard makes is an ordinary
+Product, Project, Variant, Storyboard and Rendered Video, and is also on their
+own pages, where narration and music are added and a Variant is duplicated
+with another Hook.
 
 ## Keeping Organizations apart
 
@@ -157,6 +189,24 @@ npm ci
 npm run typecheck
 npm run lint
 ```
+
+One test drives a browser through the demonstration flow above: sign in, create
+a Product, upload a photo, Confirm Facts, generate a Storyboard, render,
+preview, approve and download. It uses the system that is running, signs in as
+the seeded Owner and adds a Product with a name of its own each time, so it
+needs `docker compose up`, `migrate` and `seed` first:
+
+```sh
+cd web
+npx playwright install chromium     # once
+npm run e2e
+```
+
+It looks for the web app at http://localhost:3000; set `AFFIVIDEO_WEB_URL` for
+another address, and `AFFIVIDEO_EMAIL` and `AFFIVIDEO_PASSWORD` for another
+member. To keep it away from your own data, give it a system of its own: a
+second Compose project (`docker compose -p affivideo-e2e --env-file <file> up
+--build --wait`) with other ports in its env file.
 
 To check that the worker image can draw Vietnamese text with no network:
 
@@ -206,10 +256,42 @@ render and preview (ticket 09), job reliability (ticket 10), approve,
 download and the library (ticket 11), Storyboard editing (ticket 12),
 flagging work built on Withdrawn Facts (ticket 13), the Luxury Cinematic
 and Problem–Solution templates (ticket 14), uploaded narration and music
-(ticket 15) and production cost records (ticket 16).
+(ticket 15), production cost records (ticket 16) and the create video
+wizard, dashboard and end-to-end test (ticket 17).
 
-Next: the create video wizard, dashboard and end-to-end test (ticket 17) and
-the Affiliate Lab and Campaigns (ticket 18).
+The work stops here for the founder to run the demonstration flow on their own
+Product and say what they found. Next after that: the Affiliate Lab and
+Campaigns (ticket 18).
+
+Notes from the create video wizard and dashboard:
+
+- The wizard is one page, `/create`, with six steps: Product, Photos, Facts,
+  Creative direction, Storyboard, Video. It keeps nothing of its own in the
+  database: each step is the same component as on the Product's, Project's or
+  Variant's page, working on the same records.
+- Where a member is, is in the address: the step, and the identifiers of the
+  Product, Project and Variant the video has so far. The same is remembered in
+  the browser's local storage, for each member apart, which is how `/create`
+  with nothing after it finds its way back. It is identifiers and a step name;
+  another browser or a cleared one starts from the first step, and the work is
+  still on its own pages.
+- Choosing the creative direction makes a Project (the audience, the duration
+  and the objective) and a Variant (the creative template and the Hook), and
+  from then on the step shows what was chosen: the API changes neither. A
+  Hook is held to 60 characters there, which is what every creative template's
+  layout holds. One that still does not fit (a word too long) is refused when
+  the Storyboard is generated, and the Storyboard step then offers **Use
+  another Hook**, which duplicates the Variant with the new Hook and carries
+  on with that one.
+- Next is held back until the step has what the following one needs: a photo,
+  a Confirmed Fact, a Storyboard. The numbered steps lead back to any earlier
+  step, and ahead only once the creative direction is chosen. Whether a photo is large enough and a Fact
+  is in the video's language is said when the Storyboard is generated.
+- The Video step renders the newest Storyboard version.
+- `GET /api/v1/render-jobs/in-progress` lists the Organization's render jobs
+  that have not ended, newest first, each with the Product, Variant and
+  Storyboard version it renders. The dashboard asks for it every two seconds
+  while there is one, and every ten while there is none.
 
 Notes from the walking skeleton:
 

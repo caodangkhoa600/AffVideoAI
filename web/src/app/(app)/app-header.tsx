@@ -10,6 +10,7 @@ import { useSession } from "@/lib/session";
 
 const LINKS = [
   { href: "/", label: "Home" },
+  { href: "/create", label: "Create video" },
   { href: "/products", label: "Products" },
   { href: "/projects", label: "Projects" },
   { href: "/videos", label: "Videos" },

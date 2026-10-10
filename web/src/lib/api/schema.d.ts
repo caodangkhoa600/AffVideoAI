@@ -57,6 +57,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/render-jobs/in-progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The Organization's render jobs that have not ended, queued or being rendered, newest first, each with the Product, Variant and Storyboard version it renders. */
+        get: operations["ListRenderJobsInProgress"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/render-jobs/{jobId}": {
         parameters: {
             query?: never;
@@ -884,6 +901,15 @@ export interface components {
             /** Format: int32 */
             total: number;
         };
+        PagedResponseOfRenderJobInProgressResponse: {
+            items: components["schemas"]["RenderJobInProgressResponse"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+            /** Format: int32 */
+            total: number;
+        };
         PagedResponseOfRenderJobResponse: {
             items: components["schemas"]["RenderJobResponse"][];
             /** Format: int32 */
@@ -1077,6 +1103,20 @@ export interface components {
             category: components["schemas"]["RenderFailureCategory"];
             message: string;
             detail: null | string;
+        };
+        RenderJobInProgressResponse: {
+            job: components["schemas"]["RenderJobResponse"];
+            /** Format: uuid */
+            productId: string;
+            productName: string;
+            /** Format: uuid */
+            projectId: string;
+            /** Format: uuid */
+            variantId: string;
+            creativeTemplate: components["schemas"]["CreativeTemplate"];
+            hook: string;
+            /** Format: int32 */
+            storyboardVersion: number;
         };
         RenderJobResponse: {
             /** Format: uuid */
@@ -1331,6 +1371,29 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    ListRenderJobsInProgress: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagedResponseOfRenderJobInProgressResponse"];
+                };
             };
         };
     };

@@ -20,6 +20,21 @@ public sealed record RenderJobResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
+/// <summary>A render job that has not ended, with what it is rendering: enough to say which video is on its way.</summary>
+/// <param name="ProductName">As the Product is named now.</param>
+/// <param name="CreativeTemplate">Of the Variant the video is for.</param>
+/// <param name="Hook">Of the Variant the video is for.</param>
+/// <param name="StoryboardVersion">The version of the Variant's Storyboard being rendered.</param>
+public sealed record RenderJobInProgressResponse(
+    RenderJobResponse Job,
+    Guid ProductId,
+    string ProductName,
+    Guid ProjectId,
+    Guid VariantId,
+    CreativeTemplate CreativeTemplate,
+    string Hook,
+    int StoryboardVersion);
+
 /// <summary>Why a render job failed.</summary>
 /// <param name="Stage">The stage the job was in.</param>
 /// <param name="Category">The kind of thing that went wrong. A job that failed on <c>InvalidInput</c> was not tried again.</param>

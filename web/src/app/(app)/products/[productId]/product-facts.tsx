@@ -66,8 +66,9 @@ function refusal(error: unknown, fallback: string): Refusal {
   return Object.keys(fields).length > 0 ? { fields } : { fields, message: problemDetail(error) ?? fallback };
 }
 
-function FactGroup({ productId, state, empty }: { productId: string; state: FactState; empty: string }) {
-  const facts = useQuery({
+/** The Product's Facts in one state, oldest first, and how many there are. */
+export function useFacts(productId: string, state: FactState) {
+  return useQuery({
     queryKey: [...factsKey(productId), state],
     queryFn: async () => {
       const { data, response } = await api.GET("/api/v1/products/{productId}/facts", {
@@ -77,6 +78,10 @@ function FactGroup({ productId, state, empty }: { productId: string; state: Fact
       return data;
     },
   });
+}
+
+function FactGroup({ productId, state, empty }: { productId: string; state: FactState; empty: string }) {
+  const facts = useFacts(productId, state);
 
   return (
     <div className="flex flex-col gap-3" data-testid={`facts-${state.toLowerCase()}`}>

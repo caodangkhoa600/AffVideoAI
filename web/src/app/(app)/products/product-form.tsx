@@ -92,10 +92,14 @@ function toRequest(values: Values): ProductRequest {
 export function ProductForm({
   product,
   cancelHref,
+  onCancel,
   onSaved,
 }: {
   product?: Product;
-  cancelHref: string;
+  /** Where Cancel leads, on a page of its own. */
+  cancelHref?: string;
+  /** What Cancel does, where the form is part of a page that stays. */
+  onCancel?: () => void;
   onSaved: (saved: Product) => void;
 }) {
   const queryClient = useQueryClient();
@@ -200,9 +204,16 @@ export function ProductForm({
         <Button type="submit" disabled={isSubmitting}>
           {isSubmitting ? "Saving…" : product ? "Save changes" : "Create Product"}
         </Button>
-        <Button variant="outline" asChild>
-          <Link href={cancelHref}>Cancel</Link>
-        </Button>
+        {cancelHref && (
+          <Button variant="outline" asChild>
+            <Link href={cancelHref}>Cancel</Link>
+          </Button>
+        )}
+        {onCancel && (
+          <Button type="button" variant="outline" disabled={isSubmitting} onClick={onCancel}>
+            Cancel
+          </Button>
+        )}
       </div>
     </form>
   );

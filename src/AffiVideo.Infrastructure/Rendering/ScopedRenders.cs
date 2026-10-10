@@ -54,6 +54,26 @@ internal sealed class ScopedRenders(AffiVideoDbContext database, Caller caller, 
         return new Page<RenderJob>(items, page.Page, page.PageSize, await all.CountAsync(cancellationToken));
     }
 
+    public async Task<Page<RenderJobInProgress>> ListJobsInProgressAsync(PageRequest page, CancellationToken cancellationToken)
+    {
+        // RenderJobStates.HasEnded, spelt out so that the database can do the choosing.
+        var all = database.RenderJobs.AsNoTracking().Where(j =>
+            j.State != RenderJobState.Completed && j.State != RenderJobState.Failed && j.State != RenderJobState.Cancelled);
+        // A job is kept with its Storyboard, and so with the Variant, Project and Product
+        // it renders: every one of them is there to be joined.
+        var inContext =
+            from job in all
+            join storyboard in database.Storyboards on job.StoryboardId equals storyboard.Id
+            join variant in database.Variants on storyboard.VariantId equals variant.Id
+            join project in database.Projects on variant.ProjectId equals project.Id
+            join product in database.Products on project.ProductId equals product.Id
+            orderby job.CreatedAt descending, job.Id descending
+            select new RenderJobInProgress(
+                job, product.Id, product.Name, project.Id, variant.Id, variant.CreativeTemplate, variant.Hook, storyboard.Version);
+        var items = await inContext.Skip(page.Skip).Take(page.PageSize).ToListAsync(cancellationToken);
+        return new Page<RenderJobInProgress>(items, page.Page, page.PageSize, await all.CountAsync(cancellationToken));
+    }
+
     public Task<RenderJob?> FindJobAsync(Guid jobId, CancellationToken cancellationToken) =>
         database.RenderJobs.AsNoTracking().SingleOrDefaultAsync(j => j.Id == jobId, cancellationToken);
 

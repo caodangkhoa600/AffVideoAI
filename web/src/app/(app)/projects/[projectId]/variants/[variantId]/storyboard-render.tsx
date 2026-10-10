@@ -16,7 +16,7 @@ import { RenderedVideoCost } from "../../../../videos/production-cost";
 import { RenderedVideoActions, RenderedVideoFlag, RenderedVideoStatus } from "../../../../videos/rendered-video-actions";
 
 /** Where a render job is (RenderJobState in the domain), as a member reads it. There is no percentage to show. */
-const STAGES: Record<RenderJobState, string> = {
+export const STAGES: Record<RenderJobState, string> = {
   Created: "Queued",
   Queued: "Queued",
   Validating: "Validating",

@@ -1,11 +1,12 @@
 "use client";
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Suspense, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { api, problemDetail, type Project } from "@/lib/api/client";
+import { useProject } from "../use-project";
 import { ProjectVariants } from "./project-variants";
 
 const LOADING = <p className="text-sm text-muted-foreground">Loading…</p>;
@@ -22,19 +23,7 @@ export default function ProjectPage() {
 
 function RequestedProject() {
   const { projectId } = useParams<{ projectId: string }>();
-  // `data` is null when there is no such Project in the member's Organization.
-  const project = useQuery({
-    queryKey: ["projects", "one", projectId],
-    queryFn: async () => {
-      const { data, response } = await api.GET("/api/v1/projects/{projectId}", {
-        params: { path: { projectId } },
-      });
-      // 400 is an identifier that is not one: as absent as one that matches nothing.
-      if (response.status === 404 || response.status === 400) return null;
-      if (!data) throw new Error(`The API answered ${response.status}`);
-      return data;
-    },
-  });
+  const project = useProject(projectId);
 
   if (project.isError || project.data === null) {
     return (

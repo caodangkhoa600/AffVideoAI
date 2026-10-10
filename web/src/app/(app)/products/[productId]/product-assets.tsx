@@ -12,12 +12,12 @@ const LIMITS = "JPEG, PNG or WebP, up to 20 MB and 6000 pixels on each side.";
 
 type Refusal = { file: string; reason: string };
 
-/** The Product's photos and logo: what is there, adding to it, and removing from it. */
-export function ProductAssets({ productId }: { productId: string }) {
-  const queryClient = useQueryClient();
-  const queryKey = ["products", "one", productId, "assets"];
-  const assets = useQuery({
-    queryKey,
+const assetsKey = (productId: string) => ["products", "one", productId, "assets"];
+
+/** The Product's photos and logo. */
+export function useProductAssets(productId: string) {
+  return useQuery({
+    queryKey: assetsKey(productId),
     queryFn: async () => {
       const { data, response } = await api.GET("/api/v1/products/{productId}/assets", {
         params: { path: { productId } },
@@ -26,6 +26,13 @@ export function ProductAssets({ productId }: { productId: string }) {
       return data;
     },
   });
+}
+
+/** The Product's photos and logo: what is there, adding to it, and removing from it. */
+export function ProductAssets({ productId }: { productId: string }) {
+  const queryClient = useQueryClient();
+  const queryKey = assetsKey(productId);
+  const assets = useProductAssets(productId);
   const [uploading, setUploading] = useState<ProductAssetKind | null>(null);
   const [refusals, setRefusals] = useState<Refusal[]>([]);
 

@@ -56,6 +56,18 @@ internal static class RenderEndpoints
             .WithName("ListRenderJobs")
             .WithSummary("The jobs that render this Storyboard version, newest first.");
 
+        routes.MapGet("/render-jobs/in-progress", async (
+                int? page, int? pageSize, IRenders renders, CancellationToken cancellationToken) =>
+                TypedResults.Ok((await renders.ListJobsInProgressAsync(new PageRequest(page, pageSize), cancellationToken))
+                    .ToResponse(found => new RenderJobInProgressResponse(
+                        ToResponse(found.Job), found.ProductId, found.ProductName, found.ProjectId, found.VariantId,
+                        found.CreativeTemplate, found.Hook, found.StoryboardVersion))))
+            .WithTags("Rendering")
+            .WithName("ListRenderJobsInProgress")
+            .WithSummary(
+                "The Organization's render jobs that have not ended, queued or being rendered, newest first, " +
+                "each with the Product, Variant and Storyboard version it renders.");
+
         routes.MapGet("/render-jobs/{jobId:guid}", async Task<Results<Ok<RenderJobResponse>, NotFound>> (
                 Guid jobId, IRenders renders, CancellationToken cancellationToken) =>
                 await renders.FindJobAsync(jobId, cancellationToken) is { } job

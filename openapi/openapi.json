@@ -109,6 +109,45 @@
         }
       }
     },
+    "/api/v1/render-jobs/in-progress": {
+      "get": {
+        "tags": [
+          "Rendering"
+        ],
+        "summary": "The Organization's render jobs that have not ended, queued or being rendered, newest first, each with the Product, Variant and Storyboard version it renders.",
+        "operationId": "ListRenderJobsInProgress",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResponseOfRenderJobInProgressResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/render-jobs/{jobId}": {
       "get": {
         "tags": [
@@ -3276,6 +3315,35 @@
           }
         }
       },
+      "PagedResponseOfRenderJobInProgressResponse": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RenderJobInProgressResponse"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "PagedResponseOfRenderJobResponse": {
         "required": [
           "items",
@@ -3963,6 +4031,49 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "RenderJobInProgressResponse": {
+        "required": [
+          "job",
+          "productId",
+          "productName",
+          "projectId",
+          "variantId",
+          "creativeTemplate",
+          "hook",
+          "storyboardVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "job": {
+            "$ref": "#/components/schemas/RenderJobResponse"
+          },
+          "productId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "variantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "creativeTemplate": {
+            "$ref": "#/components/schemas/CreativeTemplate"
+          },
+          "hook": {
+            "type": "string"
+          },
+          "storyboardVersion": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
