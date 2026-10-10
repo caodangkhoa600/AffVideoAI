@@ -25,7 +25,7 @@ A member who does all creative work but cannot manage members or the Organizatio
 The record of sensitive actions in an Organization: who did what, and when. Entries are never changed.
 
 **Affiliate Lab**:
-The set of capabilities (Campaigns, Published Posts, Performance Snapshots, Commission records) available only to Organizations that have it enabled.
+The set of capabilities (Campaigns, Published Posts, Performance Snapshots, Commission records and the dashboard that compares them) available only to Organizations that have it enabled.
 _Avoid_: Admin area, internal module
 
 ### Products

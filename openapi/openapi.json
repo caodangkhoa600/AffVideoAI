@@ -3940,7 +3940,7 @@
         "tags": [
           "Affiliate Lab"
         ],
-        "summary": "Latest Published Post performance grouped by Product, creative template, Hook and Campaign. Unknown figures stay unknown; Commission is attributed only where its record permits.",
+        "summary": "The Organization's Published Posts grouped by Product, creative template, Hook and Campaign: what their latest Performance Snapshots add up to, the rates that can be worked out, and the Commission recorded at a level that matches the group. A figure that is not known is null, never zero, and a group below the minimums is marked as too small to compare.",
         "operationId": "GetLabDashboard",
         "responses": {
           "200": {
@@ -4706,7 +4706,7 @@
         "required": [
           "key",
           "name",
-          "posts",
+          "publishedPosts",
           "tooSmallToCompare",
           "views",
           "likes",
@@ -4715,10 +4715,9 @@
           "clicks",
           "clickThroughRate",
           "conversionRate",
-          "commission",
-          "postSources",
-          "clickThroughRateSources",
-          "conversionRateSources"
+          "recordedForLinks",
+          "recordedForProduct",
+          "recordsBeforePublication"
         ],
         "type": "object",
         "properties": {
@@ -4728,7 +4727,7 @@
           "name": {
             "type": "string"
           },
-          "posts": {
+          "publishedPosts": {
             "type": "integer",
             "format": "int32"
           },
@@ -4764,36 +4763,31 @@
             ],
             "format": "double"
           },
-          "commission": {
+          "recordedForLinks": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/CommissionTotalResponse"
             }
           },
-          "postSources": {
+          "recordedForProduct": {
             "type": "array",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/CommissionTotalResponse"
             }
           },
-          "clickThroughRateSources": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "conversionRateSources": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+          "recordsBeforePublication": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
       "LabDashboardMetricResponse": {
         "required": [
           "value",
-          "sources"
+          "unknown",
+          "sources",
+          "earliestTakenAt",
+          "latestTakenAt"
         ],
         "type": "object",
         "properties": {
@@ -4804,17 +4798,35 @@
             ],
             "format": "int64"
           },
+          "unknown": {
+            "type": "integer",
+            "format": "int32"
+          },
           "sources": {
             "type": "array",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/PerformanceSource"
             }
+          },
+          "earliestTakenAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "latestTakenAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           }
         }
       },
       "LabDashboardResponse": {
         "required": [
-          "minimumPosts",
+          "minimumPublishedPosts",
           "minimumViews",
           "products",
           "creativeTemplates",
@@ -4823,7 +4835,7 @@
         ],
         "type": "object",
         "properties": {
-          "minimumPosts": {
+          "minimumPublishedPosts": {
             "type": "integer",
             "format": "int32"
           },

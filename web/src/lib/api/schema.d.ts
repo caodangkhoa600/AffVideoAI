@@ -1038,7 +1038,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Latest Published Post performance grouped by Product, creative template, Hook and Campaign. Unknown figures stay unknown; Commission is attributed only where its record permits. */
+        /** The Organization's Published Posts grouped by Product, creative template, Hook and Campaign: what their latest Performance Snapshots add up to, the rates that can be worked out, and the Commission recorded at a level that matches the group. A figure that is not known is null, never zero, and a group below the minimums is marked as too small to compare. */
         get: operations["GetLabDashboard"];
         put?: never;
         post?: never;
@@ -1284,7 +1284,7 @@ export interface components {
             key: string;
             name: string;
             /** Format: int32 */
-            posts: number;
+            publishedPosts: number;
             tooSmallToCompare: boolean;
             views: components["schemas"]["LabDashboardMetricResponse"];
             likes: components["schemas"]["LabDashboardMetricResponse"];
@@ -1295,19 +1295,25 @@ export interface components {
             clickThroughRate: null | number;
             /** Format: double */
             conversionRate: null | number;
-            commission: components["schemas"]["CommissionTotalResponse"][];
-            postSources: string[];
-            clickThroughRateSources: string[];
-            conversionRateSources: string[];
+            recordedForLinks: components["schemas"]["CommissionTotalResponse"][];
+            recordedForProduct: components["schemas"]["CommissionTotalResponse"][];
+            /** Format: int32 */
+            recordsBeforePublication: number;
         };
         LabDashboardMetricResponse: {
             /** Format: int64 */
             value: null | number;
-            sources: string[];
+            /** Format: int32 */
+            unknown: number;
+            sources: components["schemas"]["PerformanceSource"][];
+            /** Format: date-time */
+            earliestTakenAt: null | string;
+            /** Format: date-time */
+            latestTakenAt: null | string;
         };
         LabDashboardResponse: {
             /** Format: int32 */
-            minimumPosts: number;
+            minimumPublishedPosts: number;
             /** Format: int64 */
             minimumViews: number;
             products: components["schemas"]["LabDashboardGroupResponse"][];

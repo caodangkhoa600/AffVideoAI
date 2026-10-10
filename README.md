@@ -266,9 +266,45 @@ and Problem–Solution templates (ticket 14), uploaded narration and music
 wizard, dashboard and end-to-end test (ticket 17), which the founder ran and
 accepted, the Affiliate Lab flag and Campaigns (ticket 18), Published
 Posts (ticket 19), Performance Snapshots (ticket 20), Commission records
-(ticket 22), and the corrections to them (ticket 27).
+(ticket 22), the corrections to them (ticket 27), and the Affiliate Lab
+dashboard (ticket 23). Every ticket of month one is done or set aside.
 
-Next: the Affiliate Lab dashboard (ticket 23).
+Notes from the Affiliate Lab dashboard:
+
+- `GET /api/v1/lab/dashboard` answers four lists of groups: `products`,
+  `creativeTemplates`, `hooks` and `campaigns`. A group is the Published Posts
+  of one Product, creative template, Hook or Campaign. The page is
+  `/lab/dashboard`: plain tables, no charts.
+- `views`, `likes`, `comments`, `shares` and `clicks` are added up from the
+  latest Performance Snapshot of each Published Post. A figure's `value` is
+  null unless every Published Post in the group knows it, and `unknown` says
+  how many do not. Each figure names its `sources` and the moments its
+  snapshots apply to.
+- `clickThroughRate` is clicks for each view, and null unless both are known
+  for the group.
+- `recordedForLinks` is the Commission of the affiliate links whose every
+  Published Post is in the group. A link that reaches outside the group is
+  left out, never divided. `recordedForProduct` is what is recorded for the
+  Product itself: only a Product group has it, and it is never added to the
+  links' figure. `recordsBeforePublication` counts the links' records that
+  cover days before the link's first Published Post.
+- `conversionRate` is orders for each click, from the links alone. It is null
+  unless every Published Post in the group knows its clicks and carries a link
+  wholly inside the group, every such link has records that all say their
+  orders, and none of those records is from before publication. Orders
+  recorded for a Product make no rate. It is orders, not confirmed orders:
+  those arrive weeks later and would read low for anything recent.
+- A group is `tooSmallToCompare` below `LabDashboard:MinimumPublishedPosts`
+  (2) Published Posts or `LabDashboard:MinimumViews` (100) views, or when its
+  views are not all known. The mark is on the whole row, Commission included.
+  The minimums are configuration (`LabDashboard__MinimumViews` in the
+  environment).
+- A Product is listed when it has a Published Post or a Commission record.
+  Every Campaign is listed. A Variant in two Campaigns counts in both, so the
+  figures of two Campaigns are not to be added together.
+- Nothing is ranked, and no group is called a winner. The dashboard reads
+  everything the Organization has published on each request, which suits the
+  tens of Published Posts of an experiment.
 
 Notes from Commission records (tickets 22 and 27):
 

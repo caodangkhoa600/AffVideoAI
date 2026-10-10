@@ -6,134 +6,143 @@ using Microsoft.Extensions.Options;
 
 namespace AffiVideo.Infrastructure.Lab;
 
+/// <summary>Below either, a group is too small to compare with another.</summary>
 public sealed class LabDashboardOptions
 {
     public const string Section = "LabDashboard";
-    public int MinimumPosts { get; set; } = 2;
+
+    public int MinimumPublishedPosts { get; set; } = 2;
+
     public long MinimumViews { get; set; } = 100;
 }
 
+// No method names an Organization: the context's filter leaves only the caller's records.
+// Everything the Organization has published is read at once and grouped here, which suits
+// the tens of Published Posts of an experiment, not thousands.
 internal sealed class ScopedLabDashboard(AffiVideoDbContext database, IOptions<LabDashboardOptions> configured) : ILabDashboard
 {
     public async Task<LabDashboard> ReadAsync(CancellationToken cancellationToken)
     {
         var options = configured.Value;
-        var posts = await (from post in database.PublishedPosts.AsNoTracking()
+        // A Published Post holds its Rendered Video, which is kept with its Storyboard, and so with the Variant and Product it was made from.
+        var posts = await (
+            from post in database.PublishedPosts.AsNoTracking()
             join video in database.RenderedVideos on post.RenderedVideoId equals video.Id
             join storyboard in database.Storyboards on video.StoryboardId equals storyboard.Id
             join variant in database.Variants on storyboard.VariantId equals variant.Id
             join project in database.Projects on variant.ProjectId equals project.Id
-            join product in database.Products on project.ProductId equals product.Id
-            select new PostRow(post.Id, post.AffiliateLinkId, product.Id, variant.Id,
-                variant.CreativeTemplate, variant.Hook)).ToListAsync(cancellationToken);
-
-        var postIds = posts.Select(p => p.Id).ToArray();
-        var snapshots = await database.PerformanceSnapshots.AsNoTracking()
-            .Where(s => postIds.Contains(s.PublishedPostId)).ToListAsync(cancellationToken);
-        var latest = snapshots.GroupBy(s => s.PublishedPostId).ToDictionary(g => g.Key,
-            g => g.OrderByDescending(s => s.TakenAt).ThenByDescending(s => s.RecordedAt)
-                .ThenByDescending(s => s.Id).First());
+            select new Post(
+                post.Id, post.AffiliateLinkId, post.PublishedOn, project.ProductId, variant.Id, variant.CreativeTemplate, variant.Hook,
+                // The order of PerformanceSnapshotQueries.LatestFirst, written out: a method of ours cannot be translated in here.
+                database.PerformanceSnapshots
+                    .Where(s => s.PublishedPostId == post.Id)
+                    .OrderByDescending(s => s.TakenAt).ThenByDescending(s => s.RecordedAt).ThenByDescending(s => s.Id)
+                    .FirstOrDefault())).ToListAsync(cancellationToken);
         var records = await database.CommissionRecords.AsNoTracking().ToListAsync(cancellationToken);
-        var allProducts = await database.Products.AsNoTracking().Select(p => new { p.Id, p.Name })
-            .ToListAsync(cancellationToken);
-        var campaignVariants = await database.CampaignVariants.AsNoTracking().ToListAsync(cancellationToken);
-        var campaigns = await database.Campaigns.AsNoTracking().ToListAsync(cancellationToken);
+        var products = await database.Products.AsNoTracking().Select(p => new { p.Id, p.Name }).ToListAsync(cancellationToken);
+        var campaigns = await database.Campaigns.AsNoTracking().Select(c => new { c.Id, c.Name }).ToListAsync(cancellationToken);
+        var grouped = (await database.CampaignVariants.AsNoTracking().ToListAsync(cancellationToken)).ToLookup(g => g.CampaignId, g => g.VariantId);
 
-        List<LabDashboardGroup> Group(IEnumerable<GroupSelection> groups) => groups
-            .OrderBy(g => g.Name, StringComparer.Ordinal).ThenBy(g => g.Identity.Key, StringComparer.Ordinal)
-            .Select(g => Build(g.Identity, g.Name, posts.Where(g.Identity.Contains).ToList(), posts,
-                latest, records, options)).ToList();
+        var everything = new Recorded(posts, records, options);
+        List<LabDashboardGroup> Rows(IEnumerable<Group> groups) =>
+            [.. groups.OrderBy(g => g.Name, StringComparer.Ordinal).ThenBy(g => g.Key, StringComparer.Ordinal).Select(everything.Row)];
 
-        var products = Group(allProducts.Select(product =>
-            new GroupSelection(new ProductGroup(product.Id), product.Name)));
-        var templates = Group(posts.Select(p => p.Template).Distinct().Select(template =>
-            new GroupSelection(new TemplateGroup(template), template.ToString())));
-        var hooks = Group(posts.Select(p => p.Hook).Distinct().Select(hook =>
-            new GroupSelection(new HookGroup(hook), hook)));
-        var campaignGroups = Group(campaigns.Select(c => new GroupSelection(
-            new CampaignGroup(c.Id, campaignVariants.Where(v => v.CampaignId == c.Id)
-                .Select(v => v.VariantId).ToHashSet()), c.Name)));
-        return new LabDashboard(options.MinimumPosts, options.MinimumViews, products, templates, hooks, campaignGroups);
+        return new LabDashboard(
+            options.MinimumPublishedPosts,
+            options.MinimumViews,
+            Rows(products
+                .Where(product => posts.Any(p => p.ProductId == product.Id) || records.Any(r => r.ProductId == product.Id))
+                .Select(product => new Group(product.Id.ToString(), product.Name, p => p.ProductId == product.Id, product.Id))),
+            Rows(posts.Select(p => p.CreativeTemplate).Distinct()
+                .Select(template => new Group(template.ToString(), template.ToString(), p => p.CreativeTemplate == template))),
+            Rows(posts.Select(p => p.Hook).Distinct().Select(hook => new Group(hook, hook, p => p.Hook == hook))),
+            Rows(campaigns.Select(campaign =>
+            {
+                var variants = grouped[campaign.Id].ToHashSet();
+                return new Group(campaign.Id.ToString(), campaign.Name, p => variants.Contains(p.VariantId));
+            })));
     }
 
-    private static LabDashboardGroup Build(GroupIdentity identity, string name, IReadOnlyList<PostRow> members,
-        IReadOnlyList<PostRow> allPosts, IReadOnlyDictionary<Guid, PerformanceSnapshot> latest,
-        IReadOnlyList<CommissionRecord> records, LabDashboardOptions options)
+    private sealed record Post(
+        Guid Id, Guid? LinkId, DateOnly PublishedOn, Guid ProductId, Guid VariantId, CreativeTemplate CreativeTemplate, string Hook,
+        PerformanceSnapshot? Latest);
+
+    /// <param name="Holds">Whether a Published Post is in the group.</param>
+    /// <param name="ProductId">The Product the group is, when it is one: only a Product has records of its own.</param>
+    private sealed record Group(string Key, string Name, Func<Post, bool> Holds, Guid? ProductId = null);
+
+    private sealed class Recorded(IReadOnlyList<Post> posts, IReadOnlyList<CommissionRecord> records, LabDashboardOptions options)
     {
-        LabMetric Metric(Func<PerformanceSnapshot, long?> read)
+        private readonly ILookup<Guid, Post> _carrying = posts.Where(p => p.LinkId is not null).ToLookup(p => p.LinkId!.Value);
+        private readonly ILookup<Guid, CommissionRecord> _ofLink =
+            records.Where(r => r.AffiliateLinkId is not null).ToLookup(r => r.AffiliateLinkId!.Value);
+
+        public LabDashboardGroup Row(Group group)
         {
-            var values = members.Select(p => latest.GetValueOrDefault(p.Id)).ToList();
-            var sources = members.Select(p => latest.GetValueOrDefault(p.Id) is { } snapshot
-                    ? $"Performance Snapshot {snapshot.Id} ({snapshot.Source})"
-                    : $"Published Post {p.Id} (no Performance Snapshot)")
-                .Distinct().Order(StringComparer.Ordinal).ToList();
-            return new LabMetric(values.Count > 0 && values.All(s => s is not null && read(s) is not null)
-                ? values.Sum(s => read(s!)) : null, sources);
+            var members = posts.Where(group.Holds).ToList();
+            var views = Metric(members, PerformanceMetric.Views);
+            var clicks = Metric(members, PerformanceMetric.Clicks);
+
+            // A link's Commission belongs to every Published Post that carries it together, so it is
+            // the group's only when all of them are in the group. Otherwise it is left out, never divided.
+            var links = members
+                .Where(p => p.LinkId is not null)
+                .Select(p => p.LinkId!.Value)
+                .Distinct()
+                .Where(link => _carrying[link].All(group.Holds))
+                .ToList();
+            var ofLinks = links.SelectMany(link => _ofLink[link]).ToList();
+            // The link may have been in use before any Published Post here carried it.
+            var beforePublication = links.Sum(link =>
+            {
+                var first = _carrying[link].Min(p => p.PublishedOn);
+                return _ofLink[link].Count(r => r.PeriodStart < first);
+            });
+
+            return new LabDashboardGroup(
+                group.Key,
+                group.Name,
+                members.Count,
+                members.Count < options.MinimumPublishedPosts || views.Value is null || views.Value < options.MinimumViews,
+                views,
+                Metric(members, PerformanceMetric.Likes),
+                Metric(members, PerformanceMetric.Comments),
+                Metric(members, PerformanceMetric.Shares),
+                clicks,
+                views.Value is > 0 && clicks.Value is { } clicked ? decimal.Divide(clicked, views.Value.Value) : null,
+                ConversionRate(members, clicks, links, beforePublication),
+                Commissions.Totals(ofLinks),
+                // Kept apart from the links': a report for the Product may already hold what a report for one of its links holds.
+                Commissions.Totals(records.Where(r => group.ProductId is { } product && r.ProductId == product)),
+                beforePublication);
         }
 
-        var views = Metric(s => s.Views);
-        var likes = Metric(s => s.Likes);
-        var comments = Metric(s => s.Comments);
-        var shares = Metric(s => s.Shares);
-        var clicks = Metric(s => s.Clicks);
-        // A link can contribute only when every post carrying it is in this group.
-        var links = members.Where(p => p.LinkId is not null).Select(p => p.LinkId!.Value).Distinct()
-            .Where(link => allPosts.Where(p => p.LinkId == link).All(identity.Contains)).ToHashSet();
-        var matched = records.Where(r => r.AffiliateLinkId is { } link && links.Contains(link)
-            || identity is ProductGroup product && r.ProductId == product.ProductId).ToList();
-        var commission = Commissions.Totals(matched);
-        var clickRate = views.Value is > 0 && clicks.Value is not null
-            ? decimal.Divide(clicks.Value.Value, views.Value.Value) : (decimal?)null;
-        // Orders at Product level cannot be projected onto a creative group containing other Products.
-        // Link records can be counted only if their posts belong wholly to this group.
-        var productOrders = matched.Where(r => r.ProductId is not null).ToList();
-        var linkOrders = matched.Where(r => r.AffiliateLinkId is not null).ToList();
-        var ordersKnown = productOrders.Count > 0 && linkOrders.Count == 0 && productOrders.All(r => r.Orders is not null)
-            || linkOrders.Count > 0 && productOrders.Count == 0 && linkOrders.All(r => r.Orders is not null)
-                && members.All(p => p.LinkId is { } link && linkOrders.Any(r => r.AffiliateLinkId == link));
-        var conversion = clicks.Value is > 0 && ordersKnown && matched.Select(r => r.Currency).Distinct().Count() <= 1
-            ? decimal.Divide(matched.Sum(r => r.Orders!.Value), clicks.Value.Value) : (decimal?)null;
-        return new LabDashboardGroup(identity.Key, name, members.Count,
-            members.Count < Math.Max(1, options.MinimumPosts) || views.Value is null || views.Value < Math.Max(0, options.MinimumViews),
-            views, likes, comments, shares, clicks, clickRate, conversion, commission,
-            members.Select(p => $"Published Post {p.Id}").Order(StringComparer.Ordinal).ToList(),
-            views.Sources.Concat(clicks.Sources).Distinct().Order(StringComparer.Ordinal).ToList(),
-            clicks.Sources.Concat(matched.Select(r => $"Commission record {r.Id} ({r.Source})"))
-                .Distinct().Order(StringComparer.Ordinal).ToList());
-    }
+        // Orders for each click, from the links alone: an order recorded for a Product may have come from
+        // anywhere. It is a rate only when every click in it could have led to an order in it, and the reverse.
+        private decimal? ConversionRate(IReadOnlyList<Post> members, LabMetric clicks, IReadOnlyList<Guid> links, int beforePublication)
+        {
+            if (clicks.Value is not > 0 || beforePublication > 0) return null;
+            if (!members.All(p => p.LinkId is { } link && links.Contains(link))) return null;
 
-    private sealed record PostRow(Guid Id, Guid? LinkId, Guid ProductId,
-        Guid VariantId, CreativeTemplate Template, string Hook);
+            long orders = 0;
+            foreach (var link in links)
+            {
+                var ofLink = _ofLink[link].ToList();
+                if (ofLink.Count == 0 || ofLink.Any(r => r.Orders is null)) return null;
+                orders += ofLink.Sum(r => (long)r.Orders!.Value);
+            }
+            return decimal.Divide(orders, clicks.Value.Value);
+        }
 
-    private sealed record GroupSelection(GroupIdentity Identity, string Name);
-
-    private abstract record GroupIdentity
-    {
-        public abstract string Key { get; }
-        public abstract bool Contains(PostRow post);
-    }
-
-    private sealed record ProductGroup(Guid ProductId) : GroupIdentity
-    {
-        public override string Key => ProductId.ToString();
-        public override bool Contains(PostRow post) => post.ProductId == ProductId;
-    }
-
-    private sealed record TemplateGroup(CreativeTemplate Template) : GroupIdentity
-    {
-        public override string Key => Template.ToString();
-        public override bool Contains(PostRow post) => post.Template == Template;
-    }
-
-    private sealed record HookGroup(string Hook) : GroupIdentity
-    {
-        public override string Key => Hook;
-        public override bool Contains(PostRow post) => post.Hook == Hook;
-    }
-
-    private sealed record CampaignGroup(Guid CampaignId, IReadOnlySet<Guid> VariantIds) : GroupIdentity
-    {
-        public override string Key => CampaignId.ToString();
-        public override bool Contains(PostRow post) => VariantIds.Contains(post.VariantId);
+        private static LabMetric Metric(IReadOnlyList<Post> members, PerformanceMetric metric)
+        {
+            var known = members.Where(p => p.Latest?.Total(metric) is not null).Select(p => p.Latest!).ToList();
+            return new LabMetric(
+                members.Count > 0 && known.Count == members.Count ? known.Sum(s => s.Total(metric)!.Value) : null,
+                members.Count - known.Count,
+                [.. known.Select(s => s.Source).Distinct().Order()],
+                known.Count == 0 ? null : known.Min(s => s.TakenAt),
+                known.Count == 0 ? null : known.Max(s => s.TakenAt));
+        }
     }
 }

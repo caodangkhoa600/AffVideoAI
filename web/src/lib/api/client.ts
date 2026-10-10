@@ -45,6 +45,7 @@ export type CommissionRecord = components["schemas"]["CommissionRecordResponse"]
 export type CommissionTotal = components["schemas"]["CommissionTotalResponse"];
 export type CommissionSource = components["schemas"]["CommissionSource"];
 export type LabDashboardGroup = components["schemas"]["LabDashboardGroupResponse"];
+export type LabDashboardMetric = components["schemas"]["LabDashboardMetricResponse"];
 // Only ever an optional query parameter, so the description has it as nullable.
 export type RenderedVideoOrder = NonNullable<components["schemas"]["RenderedVideoOrder"]>;
 

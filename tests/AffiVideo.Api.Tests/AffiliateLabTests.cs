@@ -63,6 +63,7 @@ public sealed class AffiliateLabTests(AffiVideoApp app)
             await member.DeleteAsync($"{Lab}/commission-records/{nothing}"),
             await member.GetAsync($"{Lab}/affiliate-links/{nothing}/commission"),
             await member.GetAsync($"{Lab}/products/{product.Id}/commission"),
+            await member.GetAsync($"{Lab}/dashboard"),
         ];
 
         Assert.All(responses, response => Assert.Equal(HttpStatusCode.NotFound, response.StatusCode));
