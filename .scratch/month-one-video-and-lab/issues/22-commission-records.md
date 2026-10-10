@@ -24,3 +24,4 @@
   - Product level is the records attached to the Product plus those of every affiliate link that only Published Posts of that Product carry. A link carried by posts of two Products counts for neither, and one no post carries counts for none. An amount recorded for both a link and its Product is counted twice.
   - A Published Post with a link of its own and nothing recorded shows "no Commission recorded yet"; one with a shared link or no link shows no figure at all.
   - The pages were typechecked and linted but not clicked through in a browser.
+- 2026-10-10: Reviewed and grilled. The founder changed several of the decisions above; ticket 27 holds them: adjustments are signed, the source is renamed the report, overlapping periods are flagged, and a Product's two levels are no longer added together.

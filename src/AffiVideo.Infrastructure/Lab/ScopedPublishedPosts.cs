@@ -180,19 +180,24 @@ internal sealed class ScopedPublishedPosts(AffiVideoDbContext database, Caller c
         };
 
     // Commission is recorded for a link, so it is a Published Post's only while no other carries its link.
-    // For the others it is left unknown: nothing here divides a link's Commission between its posts.
+    // For the others it is left unknown: nothing here divides a link's Commission between Published Posts.
     private async Task<List<PublishedPostRecord>> ToRecordsAsync(List<PostInContext> found, CancellationToken cancellationToken)
     {
         var ownLinks = found
             .Where(x => x.AffiliateLink is not null && !x.AffiliateLinkShared)
             .Select(x => x.AffiliateLink!.Id)
             .ToList();
-        var commission = await database.CommissionByLinkAsync(ownLinks, cancellationToken);
+        var recorded = await database.CommissionRecordsByLinkAsync(ownLinks, cancellationToken);
         return found
             .Select(x => new PublishedPostRecord(
                 x.Post, x.Account, x.AffiliateLink, x.AffiliateLinkShared,
                 x.ProductId, x.ProductName, x.ProjectId, x.VariantId, x.CreativeTemplate, x.Hook, x.Current,
-                x.AffiliateLink is null || x.AffiliateLinkShared ? null : commission.GetValueOrDefault(x.AffiliateLink.Id, [])))
+                x.AffiliateLink is null || x.AffiliateLinkShared
+                    ? null
+                    : new PublishedPostCommission(
+                        Commissions.Totals(recorded[x.AffiliateLink.Id]),
+                        // The link may have been in use before it was put on this Published Post.
+                        recorded[x.AffiliateLink.Id].Count(record => record.PeriodStart < x.Post.PublishedOn))))
             .ToList();
     }
 

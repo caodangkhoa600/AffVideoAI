@@ -969,10 +969,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The Organization's Commission records, the latest period first. An affiliate link or a Product narrows the list to the records attached to it. */
+        /** The Organization's Commission records, the latest period first. An affiliate link or a Product narrows the list to the records attached to it. Each says whether it overlaps another. */
         get: operations["ListCommissionRecords"];
         put?: never;
-        /** Records what an affiliate report says for a period, attached to one affiliate link or one Product: orders, confirmed orders, Commission, and the refunds and adjustments that reduce it. Answers 409 for a record that is already there for the same source, currency and period. */
+        /** Records what an affiliate report says for a period, as manual entry, attached to one affiliate link or one Product: orders, confirmed orders, Commission, the refunds that reduce it and the adjustments that reduce or add to it. Answers 409 for a record that is already there for the same report, currency and period. A period that overlaps another's is accepted, and the answer says so. */
         post: operations["RecordCommission"];
         delete?: never;
         options?: never;
@@ -1004,7 +1004,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** What is recorded for an affiliate link, one total for each currency, with how many Published Posts carry the link. When more than one does, the totals cannot be split by post. */
+        /** What is recorded for an affiliate link, one total for each currency, with how many Published Posts carry the link and which Products they are of. When more than one carries it, the totals cannot be split between them. */
         get: operations["GetAffiliateLinkCommission"];
         put?: never;
         post?: never;
@@ -1021,7 +1021,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** What is recorded for a Product, one total for each currency: the records attached to the Product, and those attached to an affiliate link that only Published Posts of this Product carry. */
+        /** What is recorded for a Product, and apart from it what is recorded for the affiliate links that only Published Posts of this Product carry. The two are never added to each other. */
         get: operations["GetProductCommission"];
         put?: never;
         post?: never;
@@ -1112,7 +1112,7 @@ export interface components {
             periodStart: string;
             /** Format: date */
             periodEnd: string;
-            source: string;
+            report: string;
             currency: string;
             /** Format: double */
             commission: number;
@@ -1146,7 +1146,7 @@ export interface components {
             periodStart: string;
             /** Format: date */
             periodEnd: string;
-            source: string;
+            report: string;
             currency: string;
             /** Format: int32 */
             orders: null | number;
@@ -1160,9 +1160,13 @@ export interface components {
             adjustments: number;
             /** Format: double */
             net: number;
+            source: components["schemas"]["CommissionSource"];
             /** Format: date-time */
             recordedAt: string;
+            overlapsAnother: boolean;
         };
+        /** @enum {unknown} */
+        CommissionSource: "Manual";
         CommissionTotalResponse: {
             currency: string;
             /** Format: int32 */
@@ -1179,7 +1183,10 @@ export interface components {
             net: number;
             /** Format: int32 */
             records: number;
-            sources: string[];
+            /** Format: int32 */
+            overlappingRecords: number;
+            reports: string[];
+            sources: components["schemas"]["CommissionSource"][];
             /** Format: date */
             periodStart: string;
             /** Format: date */
@@ -1287,6 +1294,7 @@ export interface components {
             label: string;
             /** Format: int32 */
             publishedPostCount: number;
+            productIds: string[];
             totals: components["schemas"]["CommissionTotalResponse"][];
         };
         MemberResponse: {
@@ -1534,7 +1542,8 @@ export interface components {
             /** Format: uuid */
             productId: string;
             productName: string;
-            totals: components["schemas"]["CommissionTotalResponse"][];
+            recordedForProduct: components["schemas"]["CommissionTotalResponse"][];
+            recordedForLinks: components["schemas"]["CommissionTotalResponse"][];
         };
         ProductionCostResponse: {
             estimatedTotals: components["schemas"]["EstimatedAmountResponse"][];
@@ -1607,6 +1616,11 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
         };
+        PublishedPostCommissionResponse: {
+            totals: components["schemas"]["CommissionTotalResponse"][];
+            /** Format: int32 */
+            recordsBeforePublication: number;
+        };
         PublishedPostLinkResponse: {
             /** Format: uuid */
             id: string;
@@ -1645,7 +1659,7 @@ export interface components {
             affiliateLink: null | components["schemas"]["PublishedPostLinkResponse"];
             affiliateLinkShared: boolean;
             currentPerformance: null | components["schemas"]["CurrentPerformanceResponse"];
-            commission: null | components["schemas"]["CommissionTotalResponse"][];
+            commission: null | components["schemas"]["PublishedPostCommissionResponse"];
             /** Format: date-time */
             createdAt: string;
         };

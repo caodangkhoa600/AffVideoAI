@@ -120,9 +120,9 @@ public sealed record PublishedPostRequest(
 /// </param>
 /// <param name="CurrentPerformance">Its latest Performance Snapshot, which is its current figure. Null when it has none.</param>
 /// <param name="Commission">
-/// What is recorded for its affiliate link, one total for each currency: empty when nothing is recorded yet.
-/// Null when it carries no affiliate link, or one that another Published Post carries too. Commission is then
-/// not known for this Published Post, and is never worked out from views or clicks.
+/// What is recorded for its affiliate link. Null when it carries no affiliate link, or one that another
+/// Published Post carries too. Commission is then not known for this Published Post, and is never
+/// worked out from views or clicks.
 /// </param>
 public sealed record PublishedPostResponse(
     Guid Id,
@@ -139,7 +139,7 @@ public sealed record PublishedPostResponse(
     PublishedPostLinkResponse? AffiliateLink,
     bool AffiliateLinkShared,
     CurrentPerformanceResponse? CurrentPerformance,
-    IReadOnlyList<CommissionTotalResponse>? Commission,
+    PublishedPostCommissionResponse? Commission,
     DateTimeOffset CreatedAt);
 
 /// <summary>The affiliate link a Published Post carries.</summary>
@@ -210,25 +210,27 @@ public sealed record CurrentPerformanceResponse(
 /// </summary>
 /// <param name="PeriodStart">The first day the figures cover.</param>
 /// <param name="PeriodEnd">The last day the figures cover. Not before the first.</param>
-/// <param name="Source">The report the figures were read from, such as the name of the affiliate programme.</param>
+/// <param name="Report">The report the figures were read from, such as the name of the affiliate programme.</param>
 /// <param name="Currency">The currency every amount is in.</param>
-/// <param name="Commission">What was earned, before anything was taken back.</param>
+/// <param name="Commission">What was earned, before anything was taken back or added.</param>
 /// <param name="Orders">Left out when the report does not say, which is unknown and not zero.</param>
 /// <param name="ConfirmedOrders">Left out when the report does not say, which is unknown and not zero.</param>
-/// <param name="Refunds">Commission taken back because orders were refunded. It reduces the net figure.</param>
-/// <param name="Adjustments">Commission taken back for any other reason. It reduces the net figure.</param>
+/// <param name="Refunds">Commission taken back because orders were refunded. Zero or more; it reduces the net figure.</param>
+/// <param name="Adjustments">
+/// What the programme changed for any other reason: below zero when it took Commission away, above zero when it added some.
+/// </param>
 public sealed record CommissionRecordRequest(
     DateOnly PeriodStart,
     DateOnly PeriodEnd,
-    [Required, StringLength(CommissionRecord.SourceMaxLength)] string Source,
+    [Required, StringLength(CommissionRecord.ReportMaxLength)] string Report,
     [Required, CurrencyCode] string Currency,
-    [Price] decimal Commission,
+    [Amount] decimal Commission,
     Guid? AffiliateLinkId = null,
     Guid? ProductId = null,
     [Range(0, int.MaxValue)] int? Orders = null,
     [Range(0, int.MaxValue)] int? ConfirmedOrders = null,
-    [Price] decimal Refunds = 0,
-    [Price] decimal Adjustments = 0) : IValidatableObject
+    [Amount] decimal Refunds = 0,
+    [Amount(Signed = true)] decimal Adjustments = 0) : IValidatableObject
 {
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
@@ -245,17 +247,24 @@ public sealed record CommissionRecordRequest(
 }
 
 /// <summary>A Commission record. It is attached to an affiliate link or to a Product, never both.</summary>
+/// <param name="Report">The report the figures were read from.</param>
 /// <param name="Orders">Null when the report did not say, which is unknown and not zero.</param>
 /// <param name="ConfirmedOrders">Null when the report did not say, which is unknown and not zero.</param>
-/// <param name="Net">The Commission less the refunds and the adjustments.</param>
+/// <param name="Adjustments">Below zero when Commission was taken away, above zero when some was added.</param>
+/// <param name="Net">The Commission less the refunds, with the adjustments.</param>
+/// <param name="Source">How the figures got in.</param>
 /// <param name="RecordedAt">When the record was entered.</param>
+/// <param name="OverlapsAnother">
+/// Whether another record for the same affiliate link or Product, in the same currency, covers some of
+/// the same days. Their Commission may then be counted twice: it is worth checking.
+/// </param>
 public sealed record CommissionRecordResponse(
     Guid Id,
     Guid? AffiliateLinkId,
     Guid? ProductId,
     DateOnly PeriodStart,
     DateOnly PeriodEnd,
-    string Source,
+    string Report,
     string Currency,
     int? Orders,
     int? ConfirmedOrders,
@@ -263,14 +272,21 @@ public sealed record CommissionRecordResponse(
     decimal Refunds,
     decimal Adjustments,
     decimal Net,
-    DateTimeOffset RecordedAt);
+    CommissionSource Source,
+    DateTimeOffset RecordedAt,
+    bool OverlapsAnother);
 
 /// <summary>Commission records in one currency, added up. Amounts in different currencies are never added to each other.</summary>
 /// <param name="Orders">Null unless every record says how many, which is unknown and not zero.</param>
 /// <param name="ConfirmedOrders">Null unless every record says how many.</param>
-/// <param name="Net">The Commission less the refunds and the adjustments.</param>
+/// <param name="Net">The Commission less the refunds, with the adjustments.</param>
 /// <param name="Records">How many records were added up.</param>
-/// <param name="Sources">The reports the figures were read from.</param>
+/// <param name="OverlappingRecords">
+/// How many of them cover some of the same days as another of them for the same affiliate link or Product.
+/// Above zero, part of the total may be counted twice.
+/// </param>
+/// <param name="Reports">The reports the figures were read from.</param>
+/// <param name="Sources">How the figures got in.</param>
 /// <param name="PeriodStart">The first day any of the records covers.</param>
 /// <param name="PeriodEnd">The last day any of the records covers.</param>
 public sealed record CommissionTotalResponse(
@@ -282,24 +298,72 @@ public sealed record CommissionTotalResponse(
     decimal Adjustments,
     decimal Net,
     int Records,
-    IReadOnlyList<string> Sources,
+    int OverlappingRecords,
+    IReadOnlyList<string> Reports,
+    IReadOnlyList<CommissionSource> Sources,
     DateOnly PeriodStart,
     DateOnly PeriodEnd);
+
+/// <summary>What is recorded for the affiliate link of a Published Post that no other Published Post carries.</summary>
+/// <param name="Totals">One for each currency. Empty when nothing is recorded yet.</param>
+/// <param name="RecordsBeforePublication">
+/// How many of the records cover days before the Published Post was published. What those days earned
+/// was not earned by it, and a record cannot be split by day.
+/// </param>
+public sealed record PublishedPostCommissionResponse(IReadOnlyList<CommissionTotalResponse> Totals, int RecordsBeforePublication);
 
 /// <summary>What is recorded for an affiliate link.</summary>
 /// <param name="Label">Empty when the link has no name of its own.</param>
 /// <param name="PublishedPostCount">
 /// How many Published Posts carry the link. Above one, the totals belong to all of them together
-/// and cannot be split by post.
+/// and cannot be split between them.
+/// </param>
+/// <param name="ProductIds">
+/// The Products those Published Posts are of. The link counts among a Product's links only when this
+/// is that Product alone.
 /// </param>
 public sealed record LinkCommissionResponse(
-    Guid AffiliateLinkId, string Url, string Label, int PublishedPostCount, IReadOnlyList<CommissionTotalResponse> Totals);
+    Guid AffiliateLinkId,
+    string Url,
+    string Label,
+    int PublishedPostCount,
+    IReadOnlyList<Guid> ProductIds,
+    IReadOnlyList<CommissionTotalResponse> Totals);
 
 /// <summary>
-/// What is recorded for a Product, and for every affiliate link that only Published Posts of
-/// that Product carry.
+/// What is recorded for a Product, and apart from it what is recorded for the affiliate links that only
+/// Published Posts of that Product carry. The two are never added to each other: a report for the
+/// Product may already hold what a report for one of its links holds.
 /// </summary>
-public sealed record ProductCommissionResponse(Guid ProductId, string ProductName, IReadOnlyList<CommissionTotalResponse> Totals);
+public sealed record ProductCommissionResponse(
+    Guid ProductId,
+    string ProductName,
+    IReadOnlyList<CommissionTotalResponse> RecordedForProduct,
+    IReadOnlyList<CommissionTotalResponse> RecordedForLinks);
+
+/// <summary>
+/// An amount of money with no more decimal places or digits than are stored: zero or more,
+/// or of either sign when <see cref="Signed"/>.
+/// </summary>
+[AttributeUsage(AttributeTargets.Parameter | AttributeTargets.Property)]
+public sealed class AmountAttribute : ValidationAttribute
+{
+    private static readonly decimal Limit = (decimal)Math.Pow(10, Commissions.AmountPrecision - Commissions.AmountDecimals);
+
+    /// <summary>Whether the amount may be below zero.</summary>
+    public bool Signed { get; init; }
+
+    public override bool IsValid(object? value) =>
+        value is null
+        || (value is decimal amount
+            && (Signed || amount >= 0)
+            && Math.Abs(amount) < Limit
+            && decimal.Round(amount, Commissions.AmountDecimals) == amount);
+
+    public override string FormatErrorMessage(string name) => Signed
+        ? "Enter an amount with at most two decimal places. Below zero takes Commission away."
+        : "Enter an amount of zero or more, with at most two decimal places.";
+}
 
 /// <summary>A count so far: a whole number of zero or more.</summary>
 [AttributeUsage(AttributeTargets.Parameter | AttributeTargets.Property)]

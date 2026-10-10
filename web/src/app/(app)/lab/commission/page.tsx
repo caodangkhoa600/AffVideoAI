@@ -8,7 +8,7 @@ import { Field } from "@/components/field";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { api, fieldErrors, problemDetail, type CommissionRecord } from "@/lib/api/client";
-import { formatAmount, formatOrders, formatPeriod } from "./commission";
+import { commissionSourceName, formatAdjustment, formatAmount, formatOrders, formatPeriod } from "./commission";
 
 const LOADING = <p className="text-sm text-muted-foreground">Loading…</p>;
 
@@ -16,12 +16,14 @@ const LOADING = <p className="text-sm text-muted-foreground">Loading…</p>;
 const PAGE_SIZE = 200;
 
 // The API's limit (CommissionRecord in the domain).
-const SOURCE_MAX_LENGTH = 100;
+const REPORT_MAX_LENGTH = 100;
 
 const SELECT =
   "h-8 w-full rounded-lg border border-input bg-transparent px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
 
 const AMOUNT = /^\d{1,13}(\.\d{1,2})?$/;
+// An adjustment takes Commission away when it is below zero.
+const SIGNED_AMOUNT = /^-?\d{1,13}(\.\d{1,2})?$/;
 const COUNT = /^\d{1,9}$/;
 
 /** What a record is attached to, as the select names it: a link or a Product, with its identifier. */
@@ -36,7 +38,7 @@ export default function CommissionPage() {
         <h1 className="text-3xl font-semibold tracking-tight">Commission</h1>
         <p className="text-sm text-muted-foreground">
           What your affiliate reports say, recorded at the level they give it: for an affiliate link or for a Product.
-          It is never divided between the Published Posts that share a link.{" "}
+          It is never divided between the Published Posts that share an affiliate link.{" "}
           <Link href="/lab" className="font-medium underline underline-offset-4">
             Affiliate Lab
           </Link>
@@ -115,14 +117,14 @@ function Commission() {
                 <tr className="border-b">
                   <th className="p-3 font-medium">Period</th>
                   <th className="p-3 font-medium">Attached to</th>
-                  <th className="p-3 font-medium">Source</th>
+                  <th className="p-3 font-medium">Report</th>
                   <th className="p-3 text-right font-medium">Orders</th>
                   <th className="p-3 text-right font-medium">Confirmed</th>
                   <th className="p-3 text-right font-medium">Commission</th>
                   <th className="p-3 text-right font-medium">Refunds</th>
                   <th className="p-3 text-right font-medium">Adjustments</th>
                   <th className="p-3 text-right font-medium">Net</th>
-                  <th className="p-3 font-medium">Entered</th>
+                  <th className="p-3 font-medium">Source</th>
                   <th className="p-3" />
                 </tr>
               </thead>
@@ -141,6 +143,13 @@ function Commission() {
               </tbody>
             </table>
           </div>
+        )}
+        {records.data.items.some((record) => record.overlapsAnother) && (
+          <p className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-3 text-sm" data-testid="overlap-warning">
+            The records marked &quot;overlaps&quot; cover some of the same days as another record for the same affiliate
+            link or Product, in the same currency. If two reports hold the same orders, that Commission is counted twice.
+            Delete the one that should not be there; leave them if the reports really are of different orders.
+          </p>
         )}
         {records.data.total > records.data.items.length && (
           <p className="text-sm text-muted-foreground">
@@ -162,11 +171,11 @@ function today() {
 }
 
 const FIGURES = [
-  { key: "commission", label: "Commission", amount: true, placeholder: "" },
-  { key: "refunds", label: "Refunds", amount: true, placeholder: "0" },
-  { key: "adjustments", label: "Adjustments", amount: true, placeholder: "0" },
-  { key: "orders", label: "Orders", amount: false, placeholder: "Unknown" },
-  { key: "confirmedOrders", label: "Confirmed orders", amount: false, placeholder: "Unknown" },
+  { key: "commission", label: "Commission", kind: "amount", placeholder: "" },
+  { key: "refunds", label: "Refunds", kind: "amount", placeholder: "0" },
+  { key: "adjustments", label: "Adjustments (+ or -)", kind: "signed", placeholder: "0" },
+  { key: "orders", label: "Orders", kind: "count", placeholder: "Unknown" },
+  { key: "confirmedOrders", label: "Confirmed orders", kind: "count", placeholder: "Unknown" },
 ] as const;
 
 function RecordCommission({
@@ -181,7 +190,7 @@ function RecordCommission({
   const [target, setTarget] = useState<Target>(startsAt);
   const [periodStart, setPeriodStart] = useState(today);
   const [periodEnd, setPeriodEnd] = useState(today);
-  const [source, setSource] = useState("");
+  const [report, setReport] = useState("");
   const [currency, setCurrency] = useState("VND");
   const [figures, setFigures] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -198,13 +207,16 @@ function RecordCommission({
     if (!periodStart) wrong.periodStart = "Enter the first day the figures cover.";
     if (!periodEnd) wrong.periodEnd = "Enter the last day the figures cover.";
     else if (periodStart && periodEnd < periodStart) wrong.periodEnd = "The period cannot end before it starts.";
-    if (source.trim() === "") wrong.source = "Enter the report the figures are from.";
+    if (report.trim() === "") wrong.report = "Enter the report the figures are from.";
     if (!/^[A-Z]{3}$/.test(currency)) wrong.currency = "Use a three-letter currency code in capitals, such as VND.";
     const typed = Object.fromEntries(FIGURES.map(({ key }) => [key, (figures[key] ?? "").trim()]));
-    for (const { key, amount } of FIGURES) {
+    for (const { key, kind } of FIGURES) {
       if (typed[key] === "") continue;
-      if (amount && !AMOUNT.test(typed[key])) wrong[key] = "Enter an amount of zero or more, with at most two decimal places.";
-      if (!amount && !COUNT.test(typed[key])) wrong[key] = "Enter a whole number of zero or more, or leave it empty.";
+      if (kind === "amount" && !AMOUNT.test(typed[key])) wrong[key] = "Enter an amount of zero or more, with at most two decimal places.";
+      if (kind === "signed" && !SIGNED_AMOUNT.test(typed[key])) {
+        wrong[key] = "Enter an amount with at most two decimal places. Start it with - when Commission was taken away.";
+      }
+      if (kind === "count" && !COUNT.test(typed[key])) wrong[key] = "Enter a whole number of zero or more, or leave it empty.";
     }
     if (typed.commission === "") wrong.commission = "Enter the Commission the report gives. Zero is a figure.";
     setErrors(wrong);
@@ -219,10 +231,10 @@ function RecordCommission({
           productId: kind === "product" ? id : null,
           periodStart,
           periodEnd,
-          source,
+          report,
           currency,
           commission: Number(typed.commission),
-          // Taken back is nothing unless the report says so. Orders left empty are unknown, which is not zero.
+          // Nothing was taken back or added unless the report says so. Orders left empty are unknown, which is not zero.
           refunds: Number(typed.refunds || "0"),
           adjustments: Number(typed.adjustments || "0"),
           orders: typed.orders === "" ? null : Number(typed.orders),
@@ -231,7 +243,7 @@ function RecordCommission({
       })
       .catch(() => ({ error: undefined, response: undefined }));
     if (response?.ok) {
-      // What it is attached to, the source and the currency stay: the next record is often the next period of the same report.
+      // What it is attached to, the report and the currency stay: the next record is often the next period of the same report.
       setFigures({});
       setRecorded(true);
       await onRecorded();
@@ -251,9 +263,11 @@ function RecordCommission({
     <section className="flex flex-col gap-4" data-testid="record-commission">
       <h2 className="text-xl font-semibold tracking-tight">Record Commission</h2>
       <p className="text-sm text-muted-foreground">
-        Type what the report says for one period. Refunds and adjustments are Commission that was taken back: they
-        reduce the net figure. Leave the orders empty when the report does not give them: empty is kept as unknown, not
-        as zero. A record is not changed afterwards; delete a wrong one and record it again.
+        Type what the report says for one period. Refunds are Commission that was taken back because orders were
+        refunded: they reduce the net figure. An adjustment is anything else the programme changed: start it with -
+        when Commission was taken away, and leave it plain when some was added, such as a bonus. Leave the orders empty
+        when the report does not give them: empty is kept as unknown, not as zero. A record is not changed afterwards;
+        delete a wrong one and record it again.
       </p>
       <form onSubmit={record} noValidate className="flex flex-col gap-4">
         <div className="flex max-w-xl flex-col gap-2">
@@ -299,13 +313,13 @@ function RecordCommission({
             error={errors.periodEnd}
           />
           <Field
-            id="commission-source"
-            label="Source"
+            id="commission-report"
+            label="Report"
             placeholder="Shopee Affiliate"
-            value={source}
-            maxLength={SOURCE_MAX_LENGTH}
-            onChange={(event) => setSource(event.target.value)}
-            error={errors.source}
+            value={report}
+            maxLength={REPORT_MAX_LENGTH}
+            onChange={(event) => setReport(event.target.value)}
+            error={errors.report}
           />
           <Field
             id="commission-currency"
@@ -317,13 +331,13 @@ function RecordCommission({
           />
         </div>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
-          {FIGURES.map(({ key, label, amount, placeholder }) => (
+          {FIGURES.map(({ key, label, kind, placeholder }) => (
             <Field
               key={key}
               id={`commission-${key}`}
               label={label}
               // Text, not a number input: that one hands over nothing for what it cannot read, and nothing means unknown.
-              inputMode={amount ? "decimal" : "numeric"}
+              inputMode={kind === "count" ? "numeric" : kind === "signed" ? "text" : "decimal"}
               maxLength={16}
               placeholder={placeholder}
               value={figures[key] ?? ""}
@@ -379,11 +393,19 @@ function RecordRow({
 
   return (
     <tr data-testid="commission-record">
-      <td className="p-3">{formatPeriod(record.periodStart, record.periodEnd)}</td>
+      <td className="p-3">
+        {formatPeriod(record.periodStart, record.periodEnd)}
+        {record.overlapsAnother && (
+          <span className="text-amber-600 dark:text-amber-400" data-testid="overlap-flag" title="Covers some of the same days as another record for the same affiliate link or Product">
+            {" "}
+            · overlaps
+          </span>
+        )}
+      </td>
       <td className="max-w-xs truncate p-3" title={attachedTo}>
         {attachedTo}
       </td>
-      <td className="p-3">{record.source}</td>
+      <td className="p-3">{record.report}</td>
       <td className="p-3 text-right tabular-nums">
         <span className={record.orders == null ? "text-muted-foreground" : undefined}>{formatOrders(record.orders)}</span>
       </td>
@@ -394,9 +416,11 @@ function RecordRow({
       </td>
       <td className="p-3 text-right tabular-nums">{formatAmount(record.commission, record.currency)}</td>
       <td className="p-3 text-right tabular-nums">{formatAmount(record.refunds, record.currency)}</td>
-      <td className="p-3 text-right tabular-nums">{formatAmount(record.adjustments, record.currency)}</td>
+      <td className="p-3 text-right tabular-nums">{formatAdjustment(record.adjustments, record.currency)}</td>
       <td className="p-3 text-right font-semibold tabular-nums">{formatAmount(record.net, record.currency)}</td>
-      <td className="p-3">{new Date(record.recordedAt).toLocaleString()}</td>
+      <td className="p-3">
+        {commissionSourceName(record.source)}, {new Date(record.recordedAt).toLocaleString()}
+      </td>
       <td className="p-3 text-right">
         {confirming ? (
           <span className="flex items-center justify-end gap-2">

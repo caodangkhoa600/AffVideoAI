@@ -66,7 +66,7 @@ public sealed record PublishedPostRecord(
     CreativeTemplate CreativeTemplate,
     string Hook,
     PerformanceSnapshot? Current,
-    IReadOnlyList<CommissionTotal>? Commission);
+    PublishedPostCommission? Commission);
 
 /// <summary>
 /// The Published Post as recorded; or what in the request names nothing of the

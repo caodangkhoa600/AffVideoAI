@@ -25,7 +25,7 @@ A member who does all creative work but cannot manage members or the Organizatio
 The record of sensitive actions in an Organization: who did what, and when. Entries are never changed.
 
 **Affiliate Lab**:
-The set of capabilities (Campaigns, Published Posts, Performance Snapshots) available only to Organizations that have it enabled.
+The set of capabilities (Campaigns, Published Posts, Performance Snapshots, Commission records) available only to Organizations that have it enabled.
 _Avoid_: Admin area, internal module
 
 ### Products
@@ -184,3 +184,27 @@ _Avoid_: Metrics entry, stats, daily delta
 **Commission**:
 Affiliate earnings recorded at the level the source report gives them (a link or a Product). It is never split across Published Posts that share a link.
 _Avoid_: Revenue, attributed sales
+
+**Commission record**:
+What one Report says for one period: orders, confirmed orders, Commission, refunds and adjustments, in one currency, for exactly one affiliate link or one Product.
+_Avoid_: Commission entry, payout, earnings row
+
+**Report**:
+The statement an affiliate programme gives of what was earned, as the member names it. It is where a Commission record's figures were read.
+_Avoid_: Source, statement, dashboard
+
+**Source**:
+How a figure got into the system, such as manual entry. It is not where the figure was read: for Commission that is the Report.
+_Avoid_: Origin, provider, channel
+
+**Refund**:
+Commission an affiliate programme took back because orders were refunded. It is an amount of Commission, not the money returned to the buyer.
+_Avoid_: Return, chargeback, clawback
+
+**Adjustment**:
+A change an affiliate programme made to Commission for any reason other than a refund. It takes Commission away or adds some.
+_Avoid_: Correction, deduction, penalty, bonus
+
+**Net Commission**:
+Commission less refunds, with adjustments applied. It can be below zero.
+_Avoid_: Profit, payout, earnings

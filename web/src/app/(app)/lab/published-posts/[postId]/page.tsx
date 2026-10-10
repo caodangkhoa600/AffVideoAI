@@ -106,7 +106,7 @@ function PostDetails({ post }: { post: PublishedPost }) {
         </Link>
       </div>
       <CurrentFigures post={post} />
-      <Commission post={post} />
+      <PostCommission post={post} />
       <EnterSnapshot postId={post.id} onRecorded={reload} />
       {snapshots.isError ? (
         <p role="alert" className="text-sm text-destructive">
@@ -156,7 +156,7 @@ function CurrentFigures({ post }: { post: PublishedPost }) {
  * What the affiliate reports say this Published Post earned. That is only known while no other
  * Published Post carries its affiliate link; otherwise it is shown for the link and for the Product.
  */
-function Commission({ post }: { post: PublishedPost }) {
+function PostCommission({ post }: { post: PublishedPost }) {
   const link = post.affiliateLink;
   return (
     <section className="flex flex-col gap-4" data-testid="post-commission">
@@ -169,12 +169,21 @@ function Commission({ post }: { post: PublishedPost }) {
         <>
           <p className="text-sm text-muted-foreground">
             No other Published Post carries its affiliate link (<span className="break-all">{link.label || link.url}</span>
-            ), so what is recorded for the link is what this Published Post earned.
+            ), so what is recorded for the link is shown for this Published Post.
           </p>
-          {post.commission.length === 0 ? (
+          {post.commission.totals.length === 0 ? (
             <p className="text-sm text-muted-foreground">No Commission is recorded for the link yet.</p>
           ) : (
-            <CommissionTotals totals={post.commission} testId="commission-of-post" />
+            <CommissionTotals totals={post.commission.totals} testId="commission-of-post" />
+          )}
+          {post.commission.recordsBeforePublication > 0 && (
+            <p className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-3 text-sm" data-testid="commission-before-publication">
+              {post.commission.recordsBeforePublication === 1
+                ? "1 of the records covers"
+                : `${post.commission.recordsBeforePublication} of the records cover`}{" "}
+              days before this Published Post was published on {post.publishedOn}. What the link earned on those days
+              was not earned by this Published Post, and a record cannot be split by day, so it is all shown.
+            </p>
           )}
         </>
       ) : (
@@ -219,13 +228,17 @@ function SharedCommission({ post, linkId }: { post: PublishedPost; linkId: strin
     );
   }
   if (!ofLink.data || !ofProduct.data) return LOADING;
+  // The link counts among a Product's links only when every Published Post carrying it is of that Product.
+  const ofOneProduct = ofLink.data.productIds.length === 1;
   return (
     <>
       <p className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-3 text-sm" data-testid="commission-shared-note">
         Its affiliate link (<span className="break-all">{ofLink.data.label || ofLink.data.url}</span>) is carried by{" "}
         {ofLink.data.publishedPostCount} Published Posts. The report gives one figure for the link, and nothing says
-        which Published Post earned how much of it, so Commission cannot be split by post. It is shown for the link and
-        for the Product.
+        which Published Post earned how much of it, so Commission cannot be split between Published Posts.{" "}
+        {ofOneProduct
+          ? "It is shown for the link, and among the links of the Product."
+          : `Those Published Posts are of ${ofLink.data.productIds.length} Products, so it is shown for the link only: it counts for no single Product.`}
       </p>
       <h3 className="font-medium">For the affiliate link, all {ofLink.data.publishedPostCount} Published Posts together</h3>
       {ofLink.data.totals.length === 0 ? (
@@ -234,12 +247,23 @@ function SharedCommission({ post, linkId }: { post: PublishedPost; linkId: strin
         <CommissionTotals totals={ofLink.data.totals} testId="commission-of-link" />
       )}
       <h3 className="font-medium">For the Product, {ofProduct.data.productName}</h3>
-      {ofProduct.data.totals.length === 0 ? (
+      <p className="text-sm text-muted-foreground">
+        Two figures that are never added to each other: a report for the Product may already hold what a report for
+        one of its links holds.
+      </p>
+      <h4 className="text-sm font-medium">Recorded for the Product</h4>
+      {ofProduct.data.recordedForProduct.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No Commission is recorded for the Product itself.</p>
+      ) : (
+        <CommissionTotals totals={ofProduct.data.recordedForProduct} testId="commission-of-product" />
+      )}
+      <h4 className="text-sm font-medium">Recorded for its affiliate links</h4>
+      {ofProduct.data.recordedForLinks.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No Commission is recorded for the Product, or for an affiliate link that only its Published Posts carry.
+          No Commission is recorded for an affiliate link that only Published Posts of this Product carry.
         </p>
       ) : (
-        <CommissionTotals totals={ofProduct.data.totals} testId="commission-of-product" />
+        <CommissionTotals totals={ofProduct.data.recordedForLinks} testId="commission-of-product-links" />
       )}
     </>
   );

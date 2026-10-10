@@ -3738,7 +3738,7 @@
         "tags": [
           "Affiliate Lab"
         ],
-        "summary": "The Organization's Commission records, the latest period first. An affiliate link or a Product narrows the list to the records attached to it.",
+        "summary": "The Organization's Commission records, the latest period first. An affiliate link or a Product narrows the list to the records attached to it. Each says whether it overlaps another.",
         "operationId": "ListCommissionRecords",
         "parameters": [
           {
@@ -3791,7 +3791,7 @@
         "tags": [
           "Affiliate Lab"
         ],
-        "summary": "Records what an affiliate report says for a period, attached to one affiliate link or one Product: orders, confirmed orders, Commission, and the refunds and adjustments that reduce it. Answers 409 for a record that is already there for the same source, currency and period.",
+        "summary": "Records what an affiliate report says for a period, as manual entry, attached to one affiliate link or one Product: orders, confirmed orders, Commission, the refunds that reduce it and the adjustments that reduce or add to it. Answers 409 for a record that is already there for the same report, currency and period. A period that overlaps another's is accepted, and the answer says so.",
         "operationId": "RecordCommission",
         "requestBody": {
           "content": {
@@ -3870,7 +3870,7 @@
         "tags": [
           "Affiliate Lab"
         ],
-        "summary": "What is recorded for an affiliate link, one total for each currency, with how many Published Posts carry the link. When more than one does, the totals cannot be split by post.",
+        "summary": "What is recorded for an affiliate link, one total for each currency, with how many Published Posts carry the link and which Products they are of. When more than one carries it, the totals cannot be split between them.",
         "operationId": "GetAffiliateLinkCommission",
         "parameters": [
           {
@@ -3905,7 +3905,7 @@
         "tags": [
           "Affiliate Lab"
         ],
-        "summary": "What is recorded for a Product, one total for each currency: the records attached to the Product, and those attached to an affiliate link that only Published Posts of this Product carry.",
+        "summary": "What is recorded for a Product, and apart from it what is recorded for the affiliate links that only Published Posts of this Product carry. The two are never added to each other.",
         "operationId": "GetProductCommission",
         "parameters": [
           {
@@ -4176,7 +4176,7 @@
         "required": [
           "periodStart",
           "periodEnd",
-          "source",
+          "report",
           "currency",
           "commission"
         ],
@@ -4190,7 +4190,7 @@
             "type": "string",
             "format": "date"
           },
-          "source": {
+          "report": {
             "type": "string"
           },
           "currency": {
@@ -4247,7 +4247,7 @@
           "productId",
           "periodStart",
           "periodEnd",
-          "source",
+          "report",
           "currency",
           "orders",
           "confirmedOrders",
@@ -4255,7 +4255,9 @@
           "refunds",
           "adjustments",
           "net",
-          "recordedAt"
+          "source",
+          "recordedAt",
+          "overlapsAnother"
         ],
         "type": "object",
         "properties": {
@@ -4285,7 +4287,7 @@
             "type": "string",
             "format": "date"
           },
-          "source": {
+          "report": {
             "type": "string"
           },
           "currency": {
@@ -4321,11 +4323,22 @@
             "type": "number",
             "format": "double"
           },
+          "source": {
+            "$ref": "#/components/schemas/CommissionSource"
+          },
           "recordedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "overlapsAnother": {
+            "type": "boolean"
           }
         }
+      },
+      "CommissionSource": {
+        "enum": [
+          "Manual"
+        ]
       },
       "CommissionTotalResponse": {
         "required": [
@@ -4337,6 +4350,8 @@
           "adjustments",
           "net",
           "records",
+          "overlappingRecords",
+          "reports",
           "sources",
           "periodStart",
           "periodEnd"
@@ -4380,10 +4395,20 @@
             "type": "integer",
             "format": "int32"
           },
-          "sources": {
+          "overlappingRecords": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reports": {
             "type": "array",
             "items": {
               "type": "string"
+            }
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommissionSource"
             }
           },
           "periodStart": {
@@ -4758,6 +4783,7 @@
           "url",
           "label",
           "publishedPostCount",
+          "productIds",
           "totals"
         ],
         "type": "object",
@@ -4775,6 +4801,13 @@
           "publishedPostCount": {
             "type": "integer",
             "format": "int32"
+          },
+          "productIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
           },
           "totals": {
             "type": "array",
@@ -5578,7 +5611,8 @@
         "required": [
           "productId",
           "productName",
-          "totals"
+          "recordedForProduct",
+          "recordedForLinks"
         ],
         "type": "object",
         "properties": {
@@ -5589,7 +5623,13 @@
           "productName": {
             "type": "string"
           },
-          "totals": {
+          "recordedForProduct": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommissionTotalResponse"
+            }
+          },
+          "recordedForLinks": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/CommissionTotalResponse"
@@ -5863,6 +5903,25 @@
           }
         }
       },
+      "PublishedPostCommissionResponse": {
+        "required": [
+          "totals",
+          "recordsBeforePublication"
+        ],
+        "type": "object",
+        "properties": {
+          "totals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommissionTotalResponse"
+            }
+          },
+          "recordsBeforePublication": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "PublishedPostLinkResponse": {
         "required": [
           "id",
@@ -6000,13 +6059,14 @@
             ]
           },
           "commission": {
-            "type": [
-              "null",
-              "array"
-            ],
-            "items": {
-              "$ref": "#/components/schemas/CommissionTotalResponse"
-            }
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PublishedPostCommissionResponse"
+              }
+            ]
           },
           "createdAt": {
             "type": "string",

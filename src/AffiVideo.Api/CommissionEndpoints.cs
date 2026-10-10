@@ -21,35 +21,36 @@ internal static class CommissionEndpoints
                 CancellationToken cancellationToken) =>
             {
                 var found = await commission.ListAsync(
-                    new CommissionTarget(affiliateLinkId, productId), new PageRequest(page, pageSize), cancellationToken);
+                    new CommissionRecordFilter(affiliateLinkId, productId), new PageRequest(page, pageSize), cancellationToken);
                 return TypedResults.Ok(found.ToResponse(ToResponse));
             })
             .WithName("ListCommissionRecords")
             .WithSummary(
                 "The Organization's Commission records, the latest period first. An affiliate link or a Product " +
-                "narrows the list to the records attached to it.");
+                "narrows the list to the records attached to it. Each says whether it overlaps another.");
 
         group.MapPost("", async Task<Results<Created<CommissionRecordResponse>, ValidationProblem, ProblemHttpResult>> (
                 CommissionRecordRequest request, ICommissionRecords commission, CancellationToken cancellationToken) =>
-                await commission.RecordAsync(
+                await commission.RecordManualAsync(
                         new NewCommissionRecord(
                             new CommissionTarget(request.AffiliateLinkId, request.ProductId),
-                            request.PeriodStart, request.PeriodEnd, request.Source, request.Currency,
+                            request.PeriodStart, request.PeriodEnd, request.Report, request.Currency,
                             new CommissionFigures(
                                 request.Orders, request.ConfirmedOrders, request.Commission, request.Refunds, request.Adjustments)),
                         cancellationToken) switch
                     {
                         { Record: { } recorded } => TypedResults.Created((string?)null, ToResponse(recorded)),
-                        { Unknown: { } unknown } =>
-                            TypedResults.ValidationProblem(unknown.ToDictionary(field => field.Key, field => new[] { field.Value })),
+                        { NoSuch: { } missing } =>
+                            TypedResults.ValidationProblem(missing.ToDictionary(field => field.Key, field => new[] { field.Value })),
                         var refused => TypedResults.Problem(refused.Refused, statusCode: StatusCodes.Status409Conflict),
                     })
             .ProducesProblem(StatusCodes.Status409Conflict)
             .WithName("RecordCommission")
             .WithSummary(
-                "Records what an affiliate report says for a period, attached to one affiliate link or one Product: " +
-                "orders, confirmed orders, Commission, and the refunds and adjustments that reduce it. Answers 409 " +
-                "for a record that is already there for the same source, currency and period.");
+                "Records what an affiliate report says for a period, as manual entry, attached to one affiliate link or " +
+                "one Product: orders, confirmed orders, Commission, the refunds that reduce it and the adjustments that " +
+                "reduce or add to it. Answers 409 for a record that is already there for the same report, currency and " +
+                "period. A period that overlaps another's is accepted, and the answer says so.");
 
         group.MapDelete("/{recordId:guid}", async Task<Results<NoContent, NotFound>> (
                 Guid recordId, ICommissionRecords commission, CancellationToken cancellationToken) =>
@@ -65,45 +66,51 @@ internal static class CommissionEndpoints
                 Guid linkId, ICommissionRecords commission, CancellationToken cancellationToken) =>
                 await commission.ForLinkAsync(linkId, cancellationToken) is { } found
                     ? TypedResults.Ok(new LinkCommissionResponse(
-                        found.Link.Id, found.Link.Url, found.Link.Label, found.PublishedPostCount, ToResponse(found.Totals)))
+                        found.Link.Id, found.Link.Url, found.Link.Label, found.PublishedPostCount, found.ProductIds,
+                        ToResponse(found.Totals)))
                     : TypedResults.NotFound())
             .WithTags("Affiliate Lab")
             .WithName("GetAffiliateLinkCommission")
             .WithSummary(
                 "What is recorded for an affiliate link, one total for each currency, with how many Published Posts " +
-                "carry the link. When more than one does, the totals cannot be split by post.");
+                "carry the link and which Products they are of. When more than one carries it, the totals cannot be " +
+                "split between them.");
 
         lab.MapGet("/products/{productId:guid}/commission", async Task<Results<Ok<ProductCommissionResponse>, NotFound>> (
                 Guid productId, ICommissionRecords commission, CancellationToken cancellationToken) =>
                 await commission.ForProductAsync(productId, cancellationToken) is { } found
-                    ? TypedResults.Ok(new ProductCommissionResponse(found.ProductId, found.ProductName, ToResponse(found.Totals)))
+                    ? TypedResults.Ok(new ProductCommissionResponse(
+                        found.ProductId, found.ProductName, ToResponse(found.RecordedForProduct), ToResponse(found.RecordedForLinks)))
                     : TypedResults.NotFound())
             .WithTags("Affiliate Lab")
             .WithName("GetProductCommission")
             .WithSummary(
-                "What is recorded for a Product, one total for each currency: the records attached to the Product, " +
-                "and those attached to an affiliate link that only Published Posts of this Product carry.");
+                "What is recorded for a Product, and apart from it what is recorded for the affiliate links that " +
+                "only Published Posts of this Product carry. The two are never added to each other.");
     }
 
-    public static CommissionTotalResponse ToResponse(CommissionTotal total) => new(
-        total.Currency, total.Orders, total.ConfirmedOrders, total.Commission, total.Refunds, total.Adjustments, total.Net,
-        total.Records, total.Sources, total.PeriodStart, total.PeriodEnd);
+    public static List<CommissionTotalResponse> ToResponse(IReadOnlyList<CommissionTotal> totals) =>
+        totals
+            .Select(total => new CommissionTotalResponse(
+                total.Currency, total.Orders, total.ConfirmedOrders, total.Commission, total.Refunds, total.Adjustments, total.Net,
+                total.Records, total.OverlappingRecords, total.Reports, total.Sources, total.PeriodStart, total.PeriodEnd))
+            .ToList();
 
-    private static List<CommissionTotalResponse> ToResponse(IReadOnlyList<CommissionTotal> totals) => totals.Select(ToResponse).ToList();
-
-    private static CommissionRecordResponse ToResponse(CommissionRecord record) => new(
-        record.Id,
-        record.AffiliateLinkId,
-        record.ProductId,
-        record.PeriodStart,
-        record.PeriodEnd,
-        record.Source,
-        record.Currency,
-        record.Orders,
-        record.ConfirmedOrders,
-        record.Commission,
-        record.Refunds,
-        record.Adjustments,
-        record.Net,
-        record.RecordedAt);
+    private static CommissionRecordResponse ToResponse(CommissionRecordEntry entry) => new(
+        entry.Record.Id,
+        entry.Record.AffiliateLinkId,
+        entry.Record.ProductId,
+        entry.Record.PeriodStart,
+        entry.Record.PeriodEnd,
+        entry.Record.Report,
+        entry.Record.Currency,
+        entry.Record.Orders,
+        entry.Record.ConfirmedOrders,
+        entry.Record.Commission,
+        entry.Record.Refunds,
+        entry.Record.Adjustments,
+        entry.Record.Net,
+        entry.Record.Source,
+        entry.Record.RecordedAt,
+        entry.OverlapsAnother);
 }

@@ -366,15 +366,16 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
             // Neither links nor Products are deleted, and neither could be from under what it earned.
             commission.HasOne<AffiliateLink>().WithMany().HasForeignKey(c => c.AffiliateLinkId).OnDelete(DeleteBehavior.Restrict);
             commission.HasOne<Product>().WithMany().HasForeignKey(c => c.ProductId).OnDelete(DeleteBehavior.Restrict);
-            commission.Property(c => c.Source).HasMaxLength(CommissionRecord.SourceMaxLength);
+            commission.Property(c => c.Report).HasMaxLength(CommissionRecord.ReportMaxLength);
+            commission.Property(c => c.Source).HasConversion<string>().HasMaxLength(20);
             commission.Property(c => c.Currency).HasMaxLength(Product.CurrencyLength);
             commission.Property(c => c.Commission).HasPrecision(Commissions.AmountPrecision, Commissions.AmountDecimals);
             commission.Property(c => c.Refunds).HasPrecision(Commissions.AmountPrecision, Commissions.AmountDecimals);
             commission.Property(c => c.Adjustments).HasPrecision(Commissions.AmountPrecision, Commissions.AmountDecimals);
             commission.Ignore(c => c.Net);
             // A report's figures for a period are recorded once, even when they are recorded twice at the same moment.
-            commission.HasIndex(c => new { c.AffiliateLinkId, c.Source, c.Currency, c.PeriodStart, c.PeriodEnd }).IsUnique();
-            commission.HasIndex(c => new { c.ProductId, c.Source, c.Currency, c.PeriodStart, c.PeriodEnd }).IsUnique();
+            commission.HasIndex(c => new { c.AffiliateLinkId, c.Report, c.Currency, c.PeriodStart, c.PeriodEnd }).IsUnique();
+            commission.HasIndex(c => new { c.ProductId, c.Report, c.Currency, c.PeriodStart, c.PeriodEnd }).IsUnique();
             commission.ToTable(table => table.HasCheckConstraint(
                 "CK_CommissionRecords_OneTarget",
                 $"(\"{nameof(CommissionRecord.AffiliateLinkId)}\" IS NULL) <> (\"{nameof(CommissionRecord.ProductId)}\" IS NULL)"));

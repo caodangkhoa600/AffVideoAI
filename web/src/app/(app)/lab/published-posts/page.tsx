@@ -17,7 +17,7 @@ import {
   type SocialPlatform,
 } from "@/lib/api/client";
 import { creativeTemplateName } from "../../projects/creative-templates";
-import { formatAmount } from "../commission/commission";
+import { formatAmount, reportsAndSources } from "../commission/commission";
 import { METRICS, formatMoment, formatTotal, sourceName } from "./performance";
 
 const LOADING = <p className="text-sm text-muted-foreground">Loading…</p>;
@@ -588,9 +588,13 @@ function RecordedPost({ post }: { post: PublishedPost }) {
             {post.commission && (
               <span data-testid="post-commission">
                 {" · "}
-                {post.commission.length === 0
+                {post.commission.totals.length === 0
                   ? "no Commission recorded yet"
-                  : `Commission ${post.commission.map((total) => formatAmount(total.net, total.currency)).join(" + ")} net, from ${post.commission.flatMap((total) => total.sources).join(", ")}`}
+                  : // One figure for each currency: amounts in different currencies are never added.
+                    post.commission.totals
+                      .map((total) => `Commission ${formatAmount(total.net, total.currency)} net (${reportsAndSources(total)})`)
+                      .join("; ")}
+                {post.commission.recordsBeforePublication > 0 && ", some from before it was published"}
               </span>
             )}
           </>
