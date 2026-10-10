@@ -15,8 +15,9 @@ public sealed class LabDashboardTests(AffiVideoApp app)
         var video = await RenderedVideoTests.RenderedAsync(app, member);
         (await RenderedVideoTests.ApproveAsync(member, video.Id)).EnsureSuccessStatusCode();
         var account = await PublishedPostTests.AccountAsync(member, SocialPlatform.TikTok, PublishedPostTests.NewHandle());
-        var first = await PublishedPostTests.RecordedAsync(member, video.Id, account.Id, new DateOnly(2026, 10, 1));
-        var second = await PublishedPostTests.RecordedAsync(member, video.Id, account.Id, new DateOnly(2026, 10, 2));
+        var link = await PublishedPostTests.LinkAsync(member, PublishedPostTests.NewUrl());
+        var first = await PublishedPostTests.RecordedAsync(member, video.Id, account.Id, new DateOnly(2026, 10, 1), affiliateLinkId: link.Id);
+        var second = await PublishedPostTests.RecordedAsync(member, video.Id, account.Id, new DateOnly(2026, 10, 2), affiliateLinkId: link.Id);
         var at = new DateTimeOffset(2026, 10, 5, 9, 0, 0, TimeSpan.Zero);
         await PerformanceSnapshotTests.RecordedAsync(member, first.Id, new PerformanceSnapshotRequest(at, 100, 10, 2, 3, 5));
         await PerformanceSnapshotTests.RecordedAsync(member, first.Id, new PerformanceSnapshotRequest(at.AddDays(1), 200, 20, 4, 6, 10));
@@ -58,7 +59,14 @@ public sealed class LabDashboardTests(AffiVideoApp app)
         Assert.Equal(15, hookGroup.Clicks.Value);
         var campaignGroup = Assert.Single(dashboard.Campaigns, g => g.Key == campaign.Id.ToString());
         Assert.Equal(250, campaignGroup.Views.Value);
-        Assert.Equal(90m, Assert.Single(campaignGroup.Commission, c => c.Currency == "QDZ").Net);
+        Assert.Empty(campaignGroup.Commission);
+        Assert.Null(campaignGroup.ConversionRate);
+        await CommissionRecordTests.RecordedAsync(member,
+            CommissionRecordTests.Valid(affiliateLinkId: link.Id, currency: "QDZ", orders: 2, commission: 40));
+        dashboard = await member.GetAsync<LabDashboardResponse>("/api/v1/lab/dashboard");
+        campaignGroup = Assert.Single(dashboard.Campaigns, g => g.Key == campaign.Id.ToString());
+        Assert.Equal(40m, Assert.Single(campaignGroup.Commission, c => c.Currency == "QDZ").Net);
+        Assert.Equal(2m / 15m, campaignGroup.ConversionRate);
         var anotherLab = await app.CreateOrganizationAsync(affiliateLab: true);
         using var anotherMember = await app.SignedInAsync(anotherLab.Owner);
         var anotherDashboard = await anotherMember.GetAsync<LabDashboardResponse>("/api/v1/lab/dashboard");

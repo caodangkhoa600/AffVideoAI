@@ -16,6 +16,7 @@ import {
   type SocialAccount,
   type SocialPlatform,
 } from "@/lib/api/client";
+import { usePaged } from "@/lib/api/use-paged";
 import { creativeTemplateName } from "../../projects/creative-templates";
 import { formatAmount, reportsAndSources } from "../commission/commission";
 import { METRICS, formatMoment, formatTotal, sourceName } from "./performance";
@@ -65,17 +66,6 @@ export default function PublishedPostsPage() {
       </Suspense>
     </>
   );
-}
-
-function usePaged<T>(queryKey: unknown[], load: () => Promise<{ data?: T; response: Response }>) {
-  return useQuery({
-    queryKey,
-    queryFn: async () => {
-      const { data, response } = await load();
-      if (!data) throw new Error(`The API answered ${response.status}`);
-      return data;
-    },
-  });
 }
 
 function PublishedPosts() {

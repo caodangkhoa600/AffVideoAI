@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
@@ -8,6 +8,7 @@ import { Field } from "@/components/field";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { api, fieldErrors, problemDetail, type CommissionRecord } from "@/lib/api/client";
+import { usePaged } from "@/lib/api/use-paged";
 import { commissionSourceName, formatAdjustment, formatAmount, formatOrders, formatPeriod } from "./commission";
 
 const LOADING = <p className="text-sm text-muted-foreground">Loading…</p>;
@@ -49,17 +50,6 @@ export default function CommissionPage() {
       </Suspense>
     </>
   );
-}
-
-function usePaged<T>(queryKey: unknown[], load: () => Promise<{ data?: T; response: Response }>) {
-  return useQuery({
-    queryKey,
-    queryFn: async () => {
-      const { data, response } = await load();
-      if (!data) throw new Error(`The API answered ${response.status}`);
-      return data;
-    },
-  });
 }
 
 function Commission() {
