@@ -14,6 +14,7 @@ import {
   type PublishedPost,
 } from "@/lib/api/client";
 import { creativeTemplateName } from "../../../projects/creative-templates";
+import { CommissionTotals } from "../../commission/commission";
 import { METRICS, formatMoment, formatTotal, sourceName } from "../performance";
 
 const LOADING = <p className="text-sm text-muted-foreground">Loading…</p>;
@@ -105,6 +106,7 @@ function PostDetails({ post }: { post: PublishedPost }) {
         </Link>
       </div>
       <CurrentFigures post={post} />
+      <Commission post={post} />
       <EnterSnapshot postId={post.id} onRecorded={reload} />
       {snapshots.isError ? (
         <p role="alert" className="text-sm text-destructive">
@@ -147,6 +149,99 @@ function CurrentFigures({ post }: { post: PublishedPost }) {
         </>
       )}
     </section>
+  );
+}
+
+/**
+ * What the affiliate reports say this Published Post earned. That is only known while no other
+ * Published Post carries its affiliate link; otherwise it is shown for the link and for the Product.
+ */
+function Commission({ post }: { post: PublishedPost }) {
+  const link = post.affiliateLink;
+  return (
+    <section className="flex flex-col gap-4" data-testid="post-commission">
+      <h2 className="text-xl font-semibold tracking-tight">Commission</h2>
+      {!link ? (
+        <p className="text-sm text-muted-foreground" data-testid="commission-no-link">
+          This Published Post carries no affiliate link, so no Commission can be shown for it.
+        </p>
+      ) : post.commission ? (
+        <>
+          <p className="text-sm text-muted-foreground">
+            No other Published Post carries its affiliate link (<span className="break-all">{link.label || link.url}</span>
+            ), so what is recorded for the link is what this Published Post earned.
+          </p>
+          {post.commission.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No Commission is recorded for the link yet.</p>
+          ) : (
+            <CommissionTotals totals={post.commission} testId="commission-of-post" />
+          )}
+        </>
+      ) : (
+        <SharedCommission post={post} linkId={link.id} />
+      )}
+      {link && (
+        <Link href={`/lab/commission?affiliateLinkId=${link.id}`} className="self-start font-medium underline underline-offset-4">
+          Record Commission for this link
+        </Link>
+      )}
+    </section>
+  );
+}
+
+function SharedCommission({ post, linkId }: { post: PublishedPost; linkId: string }) {
+  const ofLink = useQuery({
+    queryKey: ["lab", "commission", "link", linkId],
+    queryFn: async () => {
+      const { data, response } = await api.GET("/api/v1/lab/affiliate-links/{linkId}/commission", {
+        params: { path: { linkId } },
+      });
+      if (!data) throw new Error(`The API answered ${response.status}`);
+      return data;
+    },
+  });
+  const ofProduct = useQuery({
+    queryKey: ["lab", "commission", "product", post.productId],
+    queryFn: async () => {
+      const { data, response } = await api.GET("/api/v1/lab/products/{productId}/commission", {
+        params: { path: { productId: post.productId } },
+      });
+      if (!data) throw new Error(`The API answered ${response.status}`);
+      return data;
+    },
+  });
+
+  if (ofLink.isError || ofProduct.isError) {
+    return (
+      <p role="alert" className="text-sm text-destructive">
+        The Commission could not be loaded.
+      </p>
+    );
+  }
+  if (!ofLink.data || !ofProduct.data) return LOADING;
+  return (
+    <>
+      <p className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-3 text-sm" data-testid="commission-shared-note">
+        Its affiliate link (<span className="break-all">{ofLink.data.label || ofLink.data.url}</span>) is carried by{" "}
+        {ofLink.data.publishedPostCount} Published Posts. The report gives one figure for the link, and nothing says
+        which Published Post earned how much of it, so Commission cannot be split by post. It is shown for the link and
+        for the Product.
+      </p>
+      <h3 className="font-medium">For the affiliate link, all {ofLink.data.publishedPostCount} Published Posts together</h3>
+      {ofLink.data.totals.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No Commission is recorded for the link yet.</p>
+      ) : (
+        <CommissionTotals totals={ofLink.data.totals} testId="commission-of-link" />
+      )}
+      <h3 className="font-medium">For the Product, {ofProduct.data.productName}</h3>
+      {ofProduct.data.totals.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          No Commission is recorded for the Product, or for an affiliate link that only its Published Posts carry.
+        </p>
+      ) : (
+        <CommissionTotals totals={ofProduct.data.totals} testId="commission-of-product" />
+      )}
+    </>
   );
 }
 

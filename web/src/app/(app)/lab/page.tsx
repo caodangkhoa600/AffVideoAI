@@ -24,6 +24,9 @@ export default function LabPage() {
         <Link href="/lab/published-posts" className="self-start font-medium underline underline-offset-4">
           Published Posts
         </Link>
+        <Link href="/lab/commission" className="self-start font-medium underline underline-offset-4">
+          Commission
+        </Link>
       </div>
       <Shortlist />
       <Campaigns />

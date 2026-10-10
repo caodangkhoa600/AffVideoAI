@@ -962,6 +962,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/lab/commission-records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The Organization's Commission records, the latest period first. An affiliate link or a Product narrows the list to the records attached to it. */
+        get: operations["ListCommissionRecords"];
+        put?: never;
+        /** Records what an affiliate report says for a period, attached to one affiliate link or one Product: orders, confirmed orders, Commission, and the refunds and adjustments that reduce it. Answers 409 for a record that is already there for the same source, currency and period. */
+        post: operations["RecordCommission"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/commission-records/{recordId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Deletes a Commission record, which is how a wrong one is corrected: it is deleted and recorded again. The deletion is written to the audit log. */
+        delete: operations["DeleteCommissionRecord"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/affiliate-links/{linkId}/commission": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What is recorded for an affiliate link, one total for each currency, with how many Published Posts carry the link. When more than one does, the totals cannot be split by post. */
+        get: operations["GetAffiliateLinkCommission"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/products/{productId}/commission": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What is recorded for a Product, one total for each currency: the records attached to the Product, and those attached to an affiliate link that only Published Posts of this Product carry. */
+        get: operations["GetProductCommission"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1037,6 +1106,84 @@ export interface components {
         };
         ClearFlagRequest: {
             factIds: string[];
+        };
+        CommissionRecordRequest: {
+            /** Format: date */
+            periodStart: string;
+            /** Format: date */
+            periodEnd: string;
+            source: string;
+            currency: string;
+            /** Format: double */
+            commission: number;
+            /** Format: uuid */
+            affiliateLinkId?: null | string;
+            /** Format: uuid */
+            productId?: null | string;
+            /** Format: int32 */
+            orders?: null | number;
+            /** Format: int32 */
+            confirmedOrders?: null | number;
+            /**
+             * Format: double
+             * @default 0
+             */
+            refunds: number;
+            /**
+             * Format: double
+             * @default 0
+             */
+            adjustments: number;
+        };
+        CommissionRecordResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            affiliateLinkId: null | string;
+            /** Format: uuid */
+            productId: null | string;
+            /** Format: date */
+            periodStart: string;
+            /** Format: date */
+            periodEnd: string;
+            source: string;
+            currency: string;
+            /** Format: int32 */
+            orders: null | number;
+            /** Format: int32 */
+            confirmedOrders: null | number;
+            /** Format: double */
+            commission: number;
+            /** Format: double */
+            refunds: number;
+            /** Format: double */
+            adjustments: number;
+            /** Format: double */
+            net: number;
+            /** Format: date-time */
+            recordedAt: string;
+        };
+        CommissionTotalResponse: {
+            currency: string;
+            /** Format: int32 */
+            orders: null | number;
+            /** Format: int32 */
+            confirmedOrders: null | number;
+            /** Format: double */
+            commission: number;
+            /** Format: double */
+            refunds: number;
+            /** Format: double */
+            adjustments: number;
+            /** Format: double */
+            net: number;
+            /** Format: int32 */
+            records: number;
+            sources: string[];
+            /** Format: date */
+            periodStart: string;
+            /** Format: date */
+            periodEnd: string;
         };
         /** @enum {unknown} */
         CreativeTemplate: "LuxuryCinematic" | "ProductShowcase" | "ProblemSolution";
@@ -1133,6 +1280,15 @@ export interface components {
             commissionAmount: null | number;
             commissionCurrency: null | string;
         };
+        LinkCommissionResponse: {
+            /** Format: uuid */
+            affiliateLinkId: string;
+            url: string;
+            label: string;
+            /** Format: int32 */
+            publishedPostCount: number;
+            totals: components["schemas"]["CommissionTotalResponse"][];
+        };
         MemberResponse: {
             /** Format: uuid */
             id: string;
@@ -1176,6 +1332,15 @@ export interface components {
         };
         PagedResponseOfCampaignVariantResponse: {
             items: components["schemas"]["CampaignVariantResponse"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+            /** Format: int32 */
+            total: number;
+        };
+        PagedResponseOfCommissionRecordResponse: {
+            items: components["schemas"]["CommissionRecordResponse"][];
             /** Format: int32 */
             page: number;
             /** Format: int32 */
@@ -1365,6 +1530,12 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
         };
+        ProductCommissionResponse: {
+            /** Format: uuid */
+            productId: string;
+            productName: string;
+            totals: components["schemas"]["CommissionTotalResponse"][];
+        };
         ProductionCostResponse: {
             estimatedTotals: components["schemas"]["EstimatedAmountResponse"][];
             attempts: components["schemas"]["RenderAttemptCostResponse"][];
@@ -1474,6 +1645,7 @@ export interface components {
             affiliateLink: null | components["schemas"]["PublishedPostLinkResponse"];
             affiliateLinkShared: boolean;
             currentPerformance: null | components["schemas"]["CurrentPerformanceResponse"];
+            commission: null | components["schemas"]["CommissionTotalResponse"][];
             /** Format: date-time */
             createdAt: string;
         };
@@ -4337,6 +4509,158 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ListCommissionRecords: {
+        parameters: {
+            query?: {
+                affiliateLinkId?: string;
+                productId?: string;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagedResponseOfCommissionRecordResponse"];
+                };
+            };
+        };
+    };
+    RecordCommission: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommissionRecordRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommissionRecordResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    DeleteCommissionRecord: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                recordId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GetAffiliateLinkCommission: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                linkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkCommissionResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GetProductCommission: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                productId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductCommissionResponse"];
                 };
             };
             /** @description Not Found */

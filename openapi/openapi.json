@@ -3732,6 +3732,208 @@
           }
         }
       }
+    },
+    "/api/v1/lab/commission-records": {
+      "get": {
+        "tags": [
+          "Affiliate Lab"
+        ],
+        "summary": "The Organization's Commission records, the latest period first. An affiliate link or a Product narrows the list to the records attached to it.",
+        "operationId": "ListCommissionRecords",
+        "parameters": [
+          {
+            "name": "affiliateLinkId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "productId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResponseOfCommissionRecordResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Affiliate Lab"
+        ],
+        "summary": "Records what an affiliate report says for a period, attached to one affiliate link or one Product: orders, confirmed orders, Commission, and the refunds and adjustments that reduce it. Answers 409 for a record that is already there for the same source, currency and period.",
+        "operationId": "RecordCommission",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommissionRecordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommissionRecordResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lab/commission-records/{recordId}": {
+      "delete": {
+        "tags": [
+          "Affiliate Lab"
+        ],
+        "summary": "Deletes a Commission record, which is how a wrong one is corrected: it is deleted and recorded again. The deletion is written to the audit log.",
+        "operationId": "DeleteCommissionRecord",
+        "parameters": [
+          {
+            "name": "recordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/lab/affiliate-links/{linkId}/commission": {
+      "get": {
+        "tags": [
+          "Affiliate Lab"
+        ],
+        "summary": "What is recorded for an affiliate link, one total for each currency, with how many Published Posts carry the link. When more than one does, the totals cannot be split by post.",
+        "operationId": "GetAffiliateLinkCommission",
+        "parameters": [
+          {
+            "name": "linkId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkCommissionResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/lab/products/{productId}/commission": {
+      "get": {
+        "tags": [
+          "Affiliate Lab"
+        ],
+        "summary": "What is recorded for a Product, one total for each currency: the records attached to the Product, and those attached to an affiliate link that only Published Posts of this Product carry.",
+        "operationId": "GetProductCommission",
+        "parameters": [
+          {
+            "name": "productId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductCommissionResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3967,6 +4169,230 @@
               "type": "string",
               "format": "uuid"
             }
+          }
+        }
+      },
+      "CommissionRecordRequest": {
+        "required": [
+          "periodStart",
+          "periodEnd",
+          "source",
+          "currency",
+          "commission"
+        ],
+        "type": "object",
+        "properties": {
+          "periodStart": {
+            "type": "string",
+            "format": "date"
+          },
+          "periodEnd": {
+            "type": "string",
+            "format": "date"
+          },
+          "source": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "commission": {
+            "type": "number",
+            "format": "double"
+          },
+          "affiliateLinkId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "productId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "orders": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "confirmedOrders": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "refunds": {
+            "type": "number",
+            "format": "double",
+            "default": 0
+          },
+          "adjustments": {
+            "type": "number",
+            "format": "double",
+            "default": 0
+          }
+        }
+      },
+      "CommissionRecordResponse": {
+        "required": [
+          "id",
+          "affiliateLinkId",
+          "productId",
+          "periodStart",
+          "periodEnd",
+          "source",
+          "currency",
+          "orders",
+          "confirmedOrders",
+          "commission",
+          "refunds",
+          "adjustments",
+          "net",
+          "recordedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "affiliateLinkId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "productId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "periodStart": {
+            "type": "string",
+            "format": "date"
+          },
+          "periodEnd": {
+            "type": "string",
+            "format": "date"
+          },
+          "source": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "orders": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "confirmedOrders": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "commission": {
+            "type": "number",
+            "format": "double"
+          },
+          "refunds": {
+            "type": "number",
+            "format": "double"
+          },
+          "adjustments": {
+            "type": "number",
+            "format": "double"
+          },
+          "net": {
+            "type": "number",
+            "format": "double"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CommissionTotalResponse": {
+        "required": [
+          "currency",
+          "orders",
+          "confirmedOrders",
+          "commission",
+          "refunds",
+          "adjustments",
+          "net",
+          "records",
+          "sources",
+          "periodStart",
+          "periodEnd"
+        ],
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "orders": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "confirmedOrders": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "commission": {
+            "type": "number",
+            "format": "double"
+          },
+          "refunds": {
+            "type": "number",
+            "format": "double"
+          },
+          "adjustments": {
+            "type": "number",
+            "format": "double"
+          },
+          "net": {
+            "type": "number",
+            "format": "double"
+          },
+          "records": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "periodStart": {
+            "type": "string",
+            "format": "date"
+          },
+          "periodEnd": {
+            "type": "string",
+            "format": "date"
           }
         }
       },
@@ -4326,6 +4752,38 @@
           }
         }
       },
+      "LinkCommissionResponse": {
+        "required": [
+          "affiliateLinkId",
+          "url",
+          "label",
+          "publishedPostCount",
+          "totals"
+        ],
+        "type": "object",
+        "properties": {
+          "affiliateLinkId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "url": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "publishedPostCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommissionTotalResponse"
+            }
+          }
+        }
+      },
       "MemberResponse": {
         "required": [
           "id",
@@ -4472,6 +4930,35 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/CampaignVariantResponse"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PagedResponseOfCommissionRecordResponse": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommissionRecordResponse"
             }
           },
           "page": {
@@ -5087,6 +5574,29 @@
           }
         }
       },
+      "ProductCommissionResponse": {
+        "required": [
+          "productId",
+          "productName",
+          "totals"
+        ],
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "totals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommissionTotalResponse"
+            }
+          }
+        }
+      },
       "ProductionCostResponse": {
         "required": [
           "estimatedTotals",
@@ -5422,6 +5932,7 @@
           "affiliateLink",
           "affiliateLinkShared",
           "currentPerformance",
+          "commission",
           "createdAt"
         ],
         "type": "object",
@@ -5487,6 +5998,15 @@
                 "$ref": "#/components/schemas/CurrentPerformanceResponse"
               }
             ]
+          },
+          "commission": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/CommissionTotalResponse"
+            }
           },
           "createdAt": {
             "type": "string",

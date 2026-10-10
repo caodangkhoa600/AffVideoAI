@@ -265,9 +265,49 @@ and Problem–Solution templates (ticket 14), uploaded narration and music
 (ticket 15), production cost records (ticket 16), the create video
 wizard, dashboard and end-to-end test (ticket 17), which the founder ran and
 accepted, the Affiliate Lab flag and Campaigns (ticket 18), Published
-Posts (ticket 19), and Performance Snapshots (ticket 20).
+Posts (ticket 19), Performance Snapshots (ticket 20), and Commission records
+(ticket 22).
 
-Next: Commission records (ticket 22).
+Next: the Affiliate Lab dashboard (ticket 23).
+
+Notes from Commission records:
+
+- A Commission record is what an affiliate report says for a period:
+  `POST /api/v1/lab/commission-records` with `periodStart`, `periodEnd`,
+  `source` (the report, as the member names it), `currency`, `commission`, and
+  optionally `orders`, `confirmedOrders`, `refunds` and `adjustments`. It is
+  attached to exactly one of `affiliateLinkId` and `productId`: the level the
+  report gives the figures at. Neither or both is refused with 400.
+- Amounts are decimals with two places, always with the record's currency.
+  `refunds` and `adjustments` are Commission that was taken back, each zero or
+  more, and `net` is `commission - refunds - adjustments`. It can be below
+  zero. `orders` and `confirmedOrders` left out are null, which is unknown and
+  not zero.
+- A record is not changed. The same source, currency and period for the same
+  link or Product is refused with 409, so a report typed in twice is not
+  counted twice. A wrong record is deleted
+  (`DELETE /api/v1/lab/commission-records/{recordId}`, written to the audit log
+  as `commission-record.deleted`) and recorded again. Periods that overlap
+  without being the same are not checked.
+- Totals are one for each currency, never added across currencies
+  (`Commissions.Totals` in the domain). A total's `orders` is null unless every
+  record in it says how many. Each total names its `sources`, its `records`
+  count and the days it covers.
+- A Published Post carries `commission`: the totals of its affiliate link when
+  no other Published Post carries that link (an empty list when nothing is
+  recorded yet), and null when it has no link or shares one. Nothing divides a
+  link's Commission between its posts, by views, clicks or anything else.
+- For a shared link, Commission is read at
+  `GET /api/v1/lab/affiliate-links/{linkId}/commission` (with
+  `publishedPostCount`) and `GET /api/v1/lab/products/{productId}/commission`.
+  A Product's totals are the records attached to the Product, and those
+  attached to an affiliate link that only Published Posts of that Product
+  carry. A link carried by posts of two Products, or by none, counts for no
+  Product. A figure recorded both for a link and for its Product is counted
+  twice: record each amount once, at the level the report gives it.
+- The pages: `/lab/commission` records, lists and deletes; the Published Post
+  page has a Commission section, which for a shared link shows the link's and
+  the Product's totals with a note that they cannot be split by post.
 
 Notes from Performance Snapshots:
 

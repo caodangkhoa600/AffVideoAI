@@ -38,4 +38,5 @@ public static class AuditActions
 
     /// <summary>A member uploaded narration or music, and confirmed they hold the rights to it.</summary>
     public const string AudioRightsConfirmed = "audio.rights-confirmed";
+    public const string CommissionRecordDeleted = "commission-record.deleted";
 }

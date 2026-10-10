@@ -112,7 +112,7 @@ internal sealed class ScopedPublishedPosts(AffiVideoDbContext database, Caller c
     public async Task<PublishedPostRecord?> FindAsync(Guid postId, CancellationToken cancellationToken) =>
         await InContext(database.PublishedPosts.AsNoTracking().Where(p => p.Id == postId))
             .SingleOrDefaultAsync(cancellationToken) is { } found
-            ? ToRecord(found)
+            ? (await ToRecordsAsync([found], cancellationToken))[0]
             : null;
 
     public async Task<Page<PublishedPostRecord>> ListAsync(PublishedPostFilter filter, PageRequest page, CancellationToken cancellationToken)
@@ -144,7 +144,7 @@ internal sealed class ScopedPublishedPosts(AffiVideoDbContext database, Caller c
             .Skip(page.Skip).Take(page.PageSize)
             .ToListAsync(cancellationToken);
         return new Page<PublishedPostRecord>(
-            items.Select(ToRecord).ToList(), page.Page, page.PageSize, await all.CountAsync(cancellationToken));
+            await ToRecordsAsync(items, cancellationToken), page.Page, page.PageSize, await all.CountAsync(cancellationToken));
     }
 
     // A Published Post holds its Rendered Video, which is kept with its Storyboard, and so
@@ -179,9 +179,22 @@ internal sealed class ScopedPublishedPosts(AffiVideoDbContext database, Caller c
                 .FirstOrDefault(),
         };
 
-    private static PublishedPostRecord ToRecord(PostInContext found) => new(
-        found.Post, found.Account, found.AffiliateLink, found.AffiliateLinkShared,
-        found.ProductId, found.ProductName, found.ProjectId, found.VariantId, found.CreativeTemplate, found.Hook, found.Current);
+    // Commission is recorded for a link, so it is a Published Post's only while no other carries its link.
+    // For the others it is left unknown: nothing here divides a link's Commission between its posts.
+    private async Task<List<PublishedPostRecord>> ToRecordsAsync(List<PostInContext> found, CancellationToken cancellationToken)
+    {
+        var ownLinks = found
+            .Where(x => x.AffiliateLink is not null && !x.AffiliateLinkShared)
+            .Select(x => x.AffiliateLink!.Id)
+            .ToList();
+        var commission = await database.CommissionByLinkAsync(ownLinks, cancellationToken);
+        return found
+            .Select(x => new PublishedPostRecord(
+                x.Post, x.Account, x.AffiliateLink, x.AffiliateLinkShared,
+                x.ProductId, x.ProductName, x.ProjectId, x.VariantId, x.CreativeTemplate, x.Hook, x.Current,
+                x.AffiliateLink is null || x.AffiliateLinkShared ? null : commission.GetValueOrDefault(x.AffiliateLink.Id, [])))
+            .ToList();
+    }
 
     private sealed class PostInContext
     {

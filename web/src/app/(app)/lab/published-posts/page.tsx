@@ -17,6 +17,7 @@ import {
   type SocialPlatform,
 } from "@/lib/api/client";
 import { creativeTemplateName } from "../../projects/creative-templates";
+import { formatAmount } from "../commission/commission";
 import { METRICS, formatMoment, formatTotal, sourceName } from "./performance";
 
 const LOADING = <p className="text-sm text-muted-foreground">Loading…</p>;
@@ -583,6 +584,14 @@ function RecordedPost({ post }: { post: PublishedPost }) {
             Affiliate link: <span className="break-all">{linkName(post.affiliateLink)}</span>
             {post.affiliateLinkShared && (
               <span data-testid="shared-link"> · shared with another Published Post, so Commission is not shown for this one</span>
+            )}
+            {post.commission && (
+              <span data-testid="post-commission">
+                {" · "}
+                {post.commission.length === 0
+                  ? "no Commission recorded yet"
+                  : `Commission ${post.commission.map((total) => formatAmount(total.net, total.currency)).join(" + ")} net, from ${post.commission.flatMap((total) => total.sources).join(", ")}`}
+              </span>
             )}
           </>
         ) : (

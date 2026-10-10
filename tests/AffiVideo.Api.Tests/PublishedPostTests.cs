@@ -133,7 +133,7 @@ public sealed class PublishedPostTests(AffiVideoApp app)
         Assert.Equal(new PublishedPostLinkResponse(link.Id, link.Url, "Tai nghe, video 1"), post.AffiliateLink);
         Assert.False(post.AffiliateLinkShared);
         Assert.InRange(post.CreatedAt, before.AddSeconds(-1), DateTimeOffset.UtcNow.AddSeconds(1));
-        Assert.Equal(post, await member.GetAsync<PublishedPostResponse>($"{Posts}/{post.Id}"));
+        Assert.Equivalent(post, await member.GetAsync<PublishedPostResponse>($"{Posts}/{post.Id}"), strict: true);
         // An affiliate link is optional.
         Assert.Equal(HttpStatusCode.Created, withoutLink.StatusCode);
         var plain = await ReadAsync<PublishedPostResponse>(withoutLink);

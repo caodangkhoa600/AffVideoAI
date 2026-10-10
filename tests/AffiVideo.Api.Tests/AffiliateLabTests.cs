@@ -58,6 +58,11 @@ public sealed class AffiliateLabTests(AffiVideoApp app)
                 nothing, nothing, new DateOnly(2026, 10, 12), "https://www.tiktok.com/@lumo/video/1")),
             await member.GetAsync($"{Lab}/published-posts/{nothing}/performance-snapshots"),
             await member.PostAsync($"{Lab}/published-posts/{nothing}/performance-snapshots", new { }),
+            await member.GetAsync($"{Lab}/commission-records"),
+            await member.PostAsync($"{Lab}/commission-records", new { }),
+            await member.DeleteAsync($"{Lab}/commission-records/{nothing}"),
+            await member.GetAsync($"{Lab}/affiliate-links/{nothing}/commission"),
+            await member.GetAsync($"{Lab}/products/{product.Id}/commission"),
         ];
 
         Assert.All(responses, response => Assert.Equal(HttpStatusCode.NotFound, response.StatusCode));

@@ -456,7 +456,7 @@ public sealed class OrganizationIsolationTests(AffiVideoApp app)
         Assert.Equal(
             [(myLink.Id, 0)],
             (await me.GetAsync<PagedResponse<AffiliateLinkResponse>>(PublishedPostTests.Links)).Items.Select(l => (l.Id, l.PublishedPostCount)));
-        Assert.Equal(theirPost, await them.GetAsync<PublishedPostResponse>($"{PublishedPostTests.Posts}/{theirPost.Id}"));
+        Assert.Equivalent(theirPost, await them.GetAsync<PublishedPostResponse>($"{PublishedPostTests.Posts}/{theirPost.Id}"), strict: true);
         Assert.Equal([theirPost.Id], (await PublishedPostTests.ListAsync(them, $"?socialAccountId={theirAccount.Id}")).Items.Select(p => p.Id));
     }
 
@@ -477,6 +477,34 @@ public sealed class OrganizationIsolationTests(AffiVideoApp app)
         Assert.Equal(HttpStatusCode.NotFound, read.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, recorded.StatusCode);
         Assert.Equal([theirSnapshot.Id], (await PerformanceSnapshotTests.ListAsync(them, theirPost.Id)).Items.Select(s => s.Id));
+    }
+
+    [Fact]
+    public async Task A_member_of_one_Lab_Organization_is_refused_the_Commission_records_of_another()
+    {
+        var theirs = await PublishedPostTests.LabAsync(app);
+        var mine = await app.CreateOrganizationAsync(affiliateLab: true);
+        using var me = await app.SignedInAsync(mine.Owner);
+        using var them = await app.SignedInAsync(theirs.Owner);
+        var theirLink = await PublishedPostTests.LinkAsync(them, PublishedPostTests.NewUrl());
+        var theirRecord = await CommissionRecordTests.RecordedAsync(them, CommissionRecordTests.Valid(affiliateLinkId: theirLink.Id));
+
+        var forTheirLink = await me.PostAsync(CommissionRecordTests.Records, CommissionRecordTests.Valid(affiliateLinkId: theirLink.Id));
+        var forTheirProduct = await me.PostAsync(
+            CommissionRecordTests.Records, CommissionRecordTests.Valid(productId: theirs.Earbuds.ProductId));
+        var deleted = await me.DeleteAsync($"{CommissionRecordTests.Records}/{theirRecord.Id}");
+        var ofTheirLink = await me.GetAsync(CommissionRecordTests.LinkCommission(theirLink.Id));
+        var ofTheirProduct = await me.GetAsync(CommissionRecordTests.ProductCommission(theirs.Earbuds.ProductId));
+
+        // Theirs are named in the refusal exactly as ones that do not exist would be.
+        Assert.Equal(["affiliateLinkId"], await PublishedPostTests.RefusedFieldsAsync(forTheirLink));
+        Assert.Equal(["productId"], await PublishedPostTests.RefusedFieldsAsync(forTheirProduct));
+        Assert.All([deleted, ofTheirLink, ofTheirProduct], response => Assert.Equal(HttpStatusCode.NotFound, response.StatusCode));
+        Assert.Equal(0, (await CommissionRecordTests.ListAsync(me)).Total);
+        Assert.Equal(0, (await CommissionRecordTests.ListAsync(me, $"?affiliateLinkId={theirLink.Id}")).Total);
+        Assert.Equal(
+            [theirRecord.Id],
+            (await CommissionRecordTests.ListAsync(them, $"?affiliateLinkId={theirLink.Id}")).Items.Select(r => r.Id));
     }
 
     [Fact]
