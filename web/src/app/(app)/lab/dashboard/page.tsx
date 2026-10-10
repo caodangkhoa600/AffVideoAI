@@ -108,7 +108,8 @@ function GroupTable({
   note?: string;
   withProductCommission?: boolean;
 }) {
-  const columns = 9 + (withProductCommission ? 1 : 0);
+  // The heading, the five figures and the two rates. Commission has a line of its own under them: it is too wide for a column.
+  const columns = 8;
   return (
     <section className="flex flex-col gap-3" data-testid={`dashboard-${heading.toLowerCase().replace(" ", "-")}`}>
       <h2 className="text-xl font-semibold tracking-tight">
@@ -125,20 +126,18 @@ function GroupTable({
               <tr className="border-b">
                 <th scope="col" className="p-3 font-medium">{heading}</th>
                 {METRICS.map(({ metric }) => (
-                  <th key={metric} scope="col" className="p-3 text-right font-medium">
+                  <th key={metric} scope="col" className="px-2 py-3 text-right font-medium">
                     {metric}
                   </th>
                 ))}
-                <th scope="col" className="p-3 text-right font-medium">Click-through</th>
-                <th scope="col" className="p-3 text-right font-medium">Conversion</th>
-                <th scope="col" className="p-3 font-medium">{withProductCommission ? "Commission for its links" : "Commission"}</th>
-                {withProductCommission && <th scope="col" className="p-3 font-medium">Commission for the Product</th>}
+                <th scope="col" className="px-2 py-3 text-right font-medium">Click-through</th>
+                <th scope="col" className="px-2 py-3 text-right font-medium">Conversion</th>
               </tr>
             </thead>
             {groups.map((group) => (
               <tbody key={group.key} className="border-b last:border-b-0" data-testid="dashboard-group">
                 <tr>
-                  <th scope="row" className="max-w-xs p-3 align-top font-medium break-words">
+                  <th scope="row" className="max-w-[12rem] p-3 align-top font-medium break-words">
                     {name(group)}
                     <span className="block text-xs font-normal text-muted-foreground">{postCount(group.publishedPosts)}</span>
                     {group.tooSmallToCompare && (
@@ -148,28 +147,32 @@ function GroupTable({
                     )}
                   </th>
                   {METRICS.map(({ metric, key }) => (
-                    <td key={metric} className="p-3 text-right align-top whitespace-nowrap tabular-nums">
+                    <td key={metric} className="px-2 py-3 text-right align-top whitespace-nowrap tabular-nums">
                       <Figure metric={group[key]} publishedPosts={group.publishedPosts} />
                     </td>
                   ))}
-                  <td className="p-3 text-right align-top whitespace-nowrap tabular-nums">
+                  <td className="px-2 py-3 text-right align-top whitespace-nowrap tabular-nums">
                     {group.clickThroughRate == null ? NOT_AVAILABLE : formatRate(group.clickThroughRate)}
                   </td>
-                  <td className="p-3 text-right align-top whitespace-nowrap tabular-nums">
+                  <td className="px-2 py-3 text-right align-top whitespace-nowrap tabular-nums">
                     {group.conversionRate == null ? NOT_AVAILABLE : formatRate(group.conversionRate)}
                   </td>
-                  <td className="p-3 align-top">
-                    <Commission totals={group.recordedForLinks} beforePublication={group.recordsBeforePublication} />
-                  </td>
-                  {withProductCommission && (
-                    <td className="p-3 align-top">
-                      <Commission totals={group.recordedForProduct} beforePublication={0} />
-                    </td>
-                  )}
                 </tr>
                 <tr>
-                  <td colSpan={columns} className="px-3 pb-3 text-xs text-muted-foreground" data-testid="performance-source">
-                    Performance: {performanceSource(group)}
+                  <td colSpan={columns} className="px-3 pb-3">
+                    <dl className="flex flex-col gap-1">
+                      <Commission
+                        label={withProductCommission ? "Commission for its links" : "Commission"}
+                        totals={group.recordedForLinks}
+                        beforePublication={group.recordsBeforePublication}
+                      />
+                      {withProductCommission && (
+                        <Commission label="Commission for the Product" totals={group.recordedForProduct} beforePublication={0} />
+                      )}
+                    </dl>
+                    <p className="pt-1 text-xs text-muted-foreground" data-testid="performance-source">
+                      Performance: {performanceSource(group)}
+                    </p>
                   </td>
                 </tr>
               </tbody>
@@ -179,8 +182,8 @@ function GroupTable({
       )}
       {withProductCommission && groups.length > 0 && (
         <p className="text-sm text-muted-foreground">
-          The two Commission columns are never added to each other: a report for a Product may already hold what a
-          report for one of its affiliate links holds.
+          The two Commission figures of a Product are never added to each other: a report for a Product may already
+          hold what a report for one of its affiliate links holds.
         </p>
       )}
     </section>
@@ -195,7 +198,7 @@ function Figure({ metric, publishedPosts }: { metric: LabDashboardMetric; publis
       Unknown
       {metric.unknown > 0 && (
         <span className="block text-xs">
-          {metric.unknown} of {publishedPosts} not known
+          {metric.unknown} of {publishedPosts} missing
         </span>
       )}
     </span>
@@ -203,29 +206,36 @@ function Figure({ metric, publishedPosts }: { metric: LabDashboardMetric; publis
 }
 
 /** What is recorded, one line for each currency, each with its report, its source and the days it covers. */
-function Commission({ totals, beforePublication }: { totals: CommissionTotal[]; beforePublication: number }) {
-  if (totals.length === 0) return <span className="text-muted-foreground">Not recorded</span>;
+function Commission({ label, totals, beforePublication }: { label: string; totals: CommissionTotal[]; beforePublication: number }) {
   return (
-    <>
-      {totals.map((total) => (
-        <span key={total.currency} className="block" data-testid="dashboard-commission">
-          <span className="font-medium whitespace-nowrap tabular-nums">{formatAmount(total.net, total.currency)} net</span>
-          <span className="block text-xs text-muted-foreground">
-            {reportsAndSources(total)} · {formatPeriod(total.periodStart, total.periodEnd)}
-          </span>
-          {total.overlappingRecords > 0 && (
-            <span className="block text-xs text-amber-600 dark:text-amber-400" data-testid="overlap-flag">
-              {total.overlappingRecords} records overlap: part of this may be counted twice
+    <div className="flex flex-wrap gap-x-2">
+      <dt className="text-muted-foreground">{label}:</dt>
+      <dd className="min-w-0">
+        {totals.length === 0 ? (
+          <span className="text-muted-foreground">Not recorded</span>
+        ) : (
+          totals.map((total) => (
+            <span key={total.currency} className="block" data-testid="dashboard-commission">
+              <span className="font-medium tabular-nums">{formatAmount(total.net, total.currency)} net</span>
+              <span className="text-xs text-muted-foreground">
+                {" "}
+                · {reportsAndSources(total)} · {formatPeriod(total.periodStart, total.periodEnd)}
+              </span>
+              {total.overlappingRecords > 0 && (
+                <span className="block text-xs text-amber-600 dark:text-amber-400" data-testid="overlap-flag">
+                  {total.overlappingRecords} records overlap: part of this may be counted twice
+                </span>
+              )}
             </span>
-          )}
-        </span>
-      ))}
-      {beforePublication > 0 && (
-        <span className="block text-xs text-amber-600 dark:text-amber-400" data-testid="before-publication">
-          {beforePublication === 1 ? "1 record covers" : `${beforePublication} records cover`} days before the link was
-          first published
-        </span>
-      )}
-    </>
+          ))
+        )}
+        {beforePublication > 0 && (
+          <span className="block text-xs text-amber-600 dark:text-amber-400" data-testid="before-publication">
+            {beforePublication === 1 ? "1 record covers" : `${beforePublication} records cover`} days before the link was
+            first published
+          </span>
+        )}
+      </dd>
+    </div>
   );
 }
