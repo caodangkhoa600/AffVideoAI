@@ -51,6 +51,12 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
 
     public DbSet<CampaignVariant> CampaignVariants => Set<CampaignVariant>();
 
+    public DbSet<SocialAccount> SocialAccounts => Set<SocialAccount>();
+
+    public DbSet<AffiliateLink> AffiliateLinks => Set<AffiliateLink>();
+
+    public DbSet<PublishedPost> PublishedPosts => Set<PublishedPost>();
+
     /// <summary>The keys that protect session cookies and anti-forgery tokens, kept here so sessions outlive a restart of the API.</summary>
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
@@ -306,6 +312,38 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
             // The Campaign does not own the Variant: when a Variant goes with its Project, only its place in the Campaign goes with it.
             grouped.HasOne<Variant>().WithMany().HasForeignKey(g => g.VariantId).OnDelete(DeleteBehavior.Cascade);
             grouped.HasIndex(g => g.VariantId);
+        });
+
+        builder.Entity<SocialAccount>(account =>
+        {
+            account.HasOne<Organization>().WithMany().HasForeignKey(a => a.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            account.Property(a => a.Platform).HasConversion<string>().HasMaxLength(20);
+            account.Property(a => a.Handle).HasMaxLength(SocialAccount.HandleMaxLength);
+            // An account is recorded once, even when it is added twice at the same moment.
+            account.HasIndex(a => new { a.OrganizationId, a.Platform, a.Handle }).IsUnique();
+        });
+
+        builder.Entity<AffiliateLink>(link =>
+        {
+            link.HasOne<Organization>().WithMany().HasForeignKey(l => l.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            link.Property(l => l.Url).HasMaxLength(Product.UrlMaxLength);
+            link.Property(l => l.Label).HasMaxLength(AffiliateLink.LabelMaxLength);
+            // A link is recorded once, even when it is added twice at the same moment.
+            link.HasIndex(l => new { l.OrganizationId, l.Url }).IsUnique();
+        });
+
+        builder.Entity<PublishedPost>(post =>
+        {
+            post.HasOne<Organization>().WithMany().HasForeignKey(p => p.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            // A Published Post is a record of something that is live: the Rendered Video, the
+            // account and the link it names cannot be deleted from under it.
+            post.HasOne<RenderedVideo>().WithMany().HasForeignKey(p => p.RenderedVideoId).OnDelete(DeleteBehavior.Restrict);
+            post.HasOne<SocialAccount>().WithMany().HasForeignKey(p => p.SocialAccountId).OnDelete(DeleteBehavior.Restrict);
+            post.HasOne<AffiliateLink>().WithMany().HasForeignKey(p => p.AffiliateLinkId).OnDelete(DeleteBehavior.Restrict);
+            post.Property(p => p.Url).HasMaxLength(Product.UrlMaxLength);
+            // A URL is recorded once, even when it is recorded twice at the same moment.
+            post.HasIndex(p => new { p.OrganizationId, p.Url }).IsUnique();
+            post.HasIndex(p => new { p.OrganizationId, p.PublishedOn });
         });
 
         var filter = typeof(AffiVideoDbContext).GetMethod(nameof(FilterToCallerOrganization), BindingFlags.NonPublic | BindingFlags.Instance)!;

@@ -264,9 +264,52 @@ flagging work built on Withdrawn Facts (ticket 13), the Luxury Cinematic
 and Problem–Solution templates (ticket 14), uploaded narration and music
 (ticket 15), production cost records (ticket 16), the create video
 wizard, dashboard and end-to-end test (ticket 17), which the founder ran and
-accepted, and the Affiliate Lab flag and Campaigns (ticket 18).
+accepted, the Affiliate Lab flag and Campaigns (ticket 18), and Published
+Posts (ticket 19).
 
-Next: Published Posts (ticket 19).
+Next: Performance Snapshots (ticket 20).
+
+Notes from Published Posts:
+
+- A Published Post is the record that an approved Rendered Video was posted,
+  by hand, on one social account at one URL: `POST /api/v1/lab/published-posts`
+  with `renderedVideoId`, `socialAccountId`, `publishedOn` (a date), `url` and,
+  optionally, `affiliateLinkId`. Nothing is posted by the system. The same
+  Rendered Video on three accounts is three Published Posts.
+- It is refused with 409 for a Rendered Video that is not approved, and for a
+  URL the Organization has already recorded. A Rendered Video, account or link
+  that is not the Organization's is a 400 naming the field, the same as one
+  that does not exist.
+- Social accounts (`/api/v1/lab/social-accounts`: a platform and a handle) and
+  affiliate links (`/api/v1/lab/affiliate-links`: an address and an optional
+  name) are records of their own, made once and chosen again. A second social account
+  with the same platform and handle, or a second link with the same address,
+  is answered 409. The platforms are TikTok, Facebook, Instagram, YouTube and
+  Shopee (`SocialPlatform` in the domain); the list is a first guess and is
+  changed there. A handle is kept as typed, so `@lumo` and `lumo` are two
+  social accounts. An address is compared as typed too, apart from spaces
+  around it: the same one with and without a trailing `/` or a query is two.
+- `GET /api/v1/lab/published-posts` lists them, the latest publication date
+  first; `campaignId`, `productId`, `variantId`, `platform` and
+  `socialAccountId` each narrow it. A Campaign narrows it to the Published Posts of the
+  Variants it groups now. Each says the Product, Project and Variant its
+  Rendered Video was made from.
+- An affiliate link says how many Published Posts carry it
+  (`publishedPostCount`), and a Published Post says whether another carries
+  the same link (`affiliateLinkShared`). The form warns before a link is used a
+  second time: Commission can then be shown for the link or the Product, never
+  for each Published Post. Sharing is allowed, since some programmes give one link.
+- A Rendered Video that has a Published Post cannot be deleted (409): that
+  is the record of where it is live.
+- Nothing changes or removes a Published Post, a social account or an
+  affiliate link yet. One recorded with a mistake stays until a ticket adds
+  that.
+- `IPublishingProvider` in `AffiVideo.Application/Providers` is what posting
+  automatically would implement. It has no implementation and nothing calls
+  it.
+- The page is `/lab/published-posts`, linked from the Lab page and, already
+  narrowed, from each Campaign, each Product's Affiliate Lab section and each
+  Variant's page. Any day is accepted as the day of publishing.
 
 Notes from the Affiliate Lab flag and Campaigns:
 

@@ -169,6 +169,14 @@ A grouping of Variants across Products for one experiment. It references Variant
 One approved Rendered Video posted on one social account at one URL. The same video on three accounts is three Published Posts.
 _Avoid_: Publication, upload, post
 
+**Social account**:
+An account on a platform that videos are posted on, known by its platform and handle. It is kept so it can be chosen again.
+_Avoid_: Channel, profile, page
+
+**Affiliate link**:
+A link an affiliate programme gave, kept so it can be chosen again. Commission is shown for a Published Post only when no other Published Post carries its link.
+_Avoid_: Tracking link, referral URL
+
 **Performance Snapshot**:
 The running totals for a Published Post as of one moment, from one named source. The latest snapshot is the current figure.
 _Avoid_: Metrics entry, stats, daily delta

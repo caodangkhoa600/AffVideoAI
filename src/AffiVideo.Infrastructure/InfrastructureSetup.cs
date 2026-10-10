@@ -70,6 +70,9 @@ public static class InfrastructureSetup
         services.AddScoped<IRenderedVideos, ScopedRenderedVideos>();
         services.AddScoped<ILabProducts, ScopedLabProducts>();
         services.AddScoped<ICampaigns, ScopedCampaigns>();
+        services.AddScoped<ISocialAccounts, ScopedSocialAccounts>();
+        services.AddScoped<IAffiliateLinks, ScopedAffiliateLinks>();
+        services.AddScoped<IPublishedPosts, ScopedPublishedPosts>();
         services.AddScoped<DemonstrationSeed>();
         return services;
     }

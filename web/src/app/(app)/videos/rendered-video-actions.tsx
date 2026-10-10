@@ -43,15 +43,16 @@ export function RenderedVideoActions({ video }: { video: RenderedVideo }) {
   const remove = async () => {
     setDeleting(true);
     setFailed(undefined);
-    const { response } = await api
+    const { error, response } = await api
       .DELETE("/api/v1/rendered-videos/{videoId}", { params: { path } })
-      .catch(() => ({ response: undefined }));
+      .catch(() => ({ error: undefined, response: undefined }));
     // 404 is a Rendered Video someone has already deleted: gone, which is what was asked for.
     if (response?.ok || response?.status === 404) {
       await changed();
       return;
     }
-    setFailed("The Rendered Video could not be deleted.");
+    // A 409 is a Rendered Video that has a Published Post, and says so.
+    setFailed(problemDetail(error) ?? "The Rendered Video could not be deleted.");
     setDeleting(false);
     setAsking(false);
   };

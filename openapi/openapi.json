@@ -2617,7 +2617,7 @@
         "tags": [
           "Rendered Videos"
         ],
-        "summary": "Deletes a Rendered Video and its file, approved or not. Nothing brings it back. The Storyboard version it was rendered from is kept and can be rendered again.",
+        "summary": "Deletes a Rendered Video and its file, approved or not. Nothing brings it back. The Storyboard version it was rendered from is kept and can be rendered again. Answers 409 for one that has a Published Post.",
         "operationId": "DeleteRenderedVideo",
         "parameters": [
           {
@@ -2636,6 +2636,16 @@
           },
           "404": {
             "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -3270,6 +3280,354 @@
           }
         }
       }
+    },
+    "/api/v1/lab/social-accounts": {
+      "get": {
+        "tags": [
+          "Affiliate Lab"
+        ],
+        "summary": "The Organization's social accounts, by platform and then by handle.",
+        "operationId": "ListSocialAccounts",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResponseOfSocialAccountResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Affiliate Lab"
+        ],
+        "summary": "Records a social account: a platform and a handle on it. Answers 409 for one that is already recorded.",
+        "operationId": "CreateSocialAccount",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SocialAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SocialAccountResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lab/affiliate-links": {
+      "get": {
+        "tags": [
+          "Affiliate Lab"
+        ],
+        "summary": "The Organization's affiliate links, newest first, each with how many Published Posts carry it.",
+        "operationId": "ListAffiliateLinks",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResponseOfAffiliateLinkResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Affiliate Lab"
+        ],
+        "summary": "Records an affiliate link. The address is only kept, never requested. Answers 409 for one that is already recorded.",
+        "operationId": "CreateAffiliateLink",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AffiliateLinkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AffiliateLinkResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lab/published-posts": {
+      "get": {
+        "tags": [
+          "Affiliate Lab"
+        ],
+        "summary": "The Organization's Published Posts, the latest publication date first. A Campaign, a Product, a Variant, a platform and a social account each narrow the list.",
+        "operationId": "ListPublishedPosts",
+        "parameters": [
+          {
+            "name": "campaignId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "productId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "variantId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "platform",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/SocialPlatform"
+            }
+          },
+          {
+            "name": "socialAccountId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResponseOfPublishedPostResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Affiliate Lab"
+        ],
+        "summary": "Records that an approved Rendered Video was posted, by hand, on a social account at a URL, with the affiliate link it carries if any. Nothing is posted. Answers 409 for a Rendered Video that is not approved, and for a URL that is already recorded.",
+        "operationId": "RecordPublishedPost",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishedPostRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublishedPostResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lab/published-posts/{postId}": {
+      "get": {
+        "tags": [
+          "Affiliate Lab"
+        ],
+        "summary": "One Published Post.",
+        "operationId": "GetPublishedPost",
+        "parameters": [
+          {
+            "name": "postId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublishedPostResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3286,6 +3644,53 @@
           },
           "password": {
             "type": "string"
+          }
+        }
+      },
+      "AffiliateLinkRequest": {
+        "required": [
+          "url"
+        ],
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "label": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "AffiliateLinkResponse": {
+        "required": [
+          "id",
+          "url",
+          "label",
+          "publishedPostCount",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "url": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "publishedPostCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -3797,6 +4202,35 @@
           }
         }
       },
+      "PagedResponseOfAffiliateLinkResponse": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AffiliateLinkResponse"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "PagedResponseOfAuditLogEntryResponse": {
         "required": [
           "items",
@@ -4029,6 +4463,35 @@
           }
         }
       },
+      "PagedResponseOfPublishedPostResponse": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublishedPostResponse"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "PagedResponseOfRenderedVideoResponse": {
         "required": [
           "items",
@@ -4100,6 +4563,35 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/RenderJobResponse"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PagedResponseOfSocialAccountResponse": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SocialAccountResponse"
             }
           },
           "page": {
@@ -4516,6 +5008,136 @@
           "variantCount": {
             "type": "integer",
             "format": "int32"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PublishedPostLinkResponse": {
+        "required": [
+          "id",
+          "url",
+          "label"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "url": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          }
+        }
+      },
+      "PublishedPostRequest": {
+        "required": [
+          "renderedVideoId",
+          "socialAccountId",
+          "publishedOn",
+          "url"
+        ],
+        "type": "object",
+        "properties": {
+          "renderedVideoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "socialAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "publishedOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "url": {
+            "type": "string"
+          },
+          "affiliateLinkId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "PublishedPostResponse": {
+        "required": [
+          "id",
+          "renderedVideoId",
+          "productId",
+          "productName",
+          "projectId",
+          "variantId",
+          "creativeTemplate",
+          "hook",
+          "socialAccount",
+          "publishedOn",
+          "url",
+          "affiliateLink",
+          "affiliateLinkShared",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "renderedVideoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "productId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "variantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "creativeTemplate": {
+            "$ref": "#/components/schemas/CreativeTemplate"
+          },
+          "hook": {
+            "type": "string"
+          },
+          "socialAccount": {
+            "$ref": "#/components/schemas/SocialAccountResponse"
+          },
+          "publishedOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "url": {
+            "type": "string"
+          },
+          "affiliateLink": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PublishedPostLinkResponse"
+              }
+            ]
+          },
+          "affiliateLinkShared": {
+            "type": "boolean"
           },
           "createdAt": {
             "type": "string",
@@ -5080,6 +5702,55 @@
             "type": "string"
           }
         }
+      },
+      "SocialAccountRequest": {
+        "required": [
+          "platform",
+          "handle"
+        ],
+        "type": "object",
+        "properties": {
+          "platform": {
+            "$ref": "#/components/schemas/SocialPlatform"
+          },
+          "handle": {
+            "type": "string"
+          }
+        }
+      },
+      "SocialAccountResponse": {
+        "required": [
+          "id",
+          "platform",
+          "handle",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "platform": {
+            "$ref": "#/components/schemas/SocialPlatform"
+          },
+          "handle": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SocialPlatform": {
+        "enum": [
+          "TikTok",
+          "Facebook",
+          "Instagram",
+          "YouTube",
+          "Shopee"
+        ]
       },
       "StatusResponse": {
         "required": [

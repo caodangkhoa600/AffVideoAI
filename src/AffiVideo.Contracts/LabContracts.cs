@@ -82,3 +82,57 @@ public sealed class PercentAttribute() : ValidationAttribute("Enter a rate from 
             && rate <= 100
             && decimal.Round(rate, Product.CommissionRateDecimals) == rate);
 }
+
+/// <param name="Handle">What the account is called on its platform.</param>
+public sealed record SocialAccountRequest(
+    SocialPlatform Platform,
+    [Required, StringLength(SocialAccount.HandleMaxLength)] string Handle);
+
+public sealed record SocialAccountResponse(Guid Id, SocialPlatform Platform, string Handle, DateTimeOffset CreatedAt);
+
+/// <param name="Label">What the member calls the link, when it has a name of its own.</param>
+public sealed record AffiliateLinkRequest(
+    [Required, StringLength(Product.UrlMaxLength), WebAddress] string Url,
+    [StringLength(AffiliateLink.LabelMaxLength)] string? Label = null);
+
+/// <param name="Label">Empty when the link has no name of its own.</param>
+/// <param name="PublishedPostCount">
+/// How many Published Posts carry the link. Commission can be shown for a Published Post only when this is 1.
+/// </param>
+public sealed record AffiliateLinkResponse(Guid Id, string Url, string Label, int PublishedPostCount, DateTimeOffset CreatedAt);
+
+/// <summary>That an approved Rendered Video was posted, by hand, on an account at a URL.</summary>
+/// <param name="PublishedOn">The day it was posted.</param>
+/// <param name="Url">Where the Published Post is. A URL is recorded once.</param>
+/// <param name="AffiliateLinkId">The affiliate link it carries, when it carries one.</param>
+public sealed record PublishedPostRequest(
+    Guid RenderedVideoId,
+    Guid SocialAccountId,
+    DateOnly PublishedOn,
+    [Required, StringLength(Product.UrlMaxLength), WebAddress] string Url,
+    Guid? AffiliateLinkId = null);
+
+/// <summary>A Published Post with the Rendered Video it shows and what that was made from, as those are now.</summary>
+/// <param name="AffiliateLink">Null when it carries none.</param>
+/// <param name="AffiliateLinkShared">
+/// Whether another Published Post carries the same affiliate link. Commission can then be shown
+/// for the link or the Product, never for this Published Post.
+/// </param>
+public sealed record PublishedPostResponse(
+    Guid Id,
+    Guid RenderedVideoId,
+    Guid ProductId,
+    string ProductName,
+    Guid ProjectId,
+    Guid VariantId,
+    CreativeTemplate CreativeTemplate,
+    string Hook,
+    SocialAccountResponse SocialAccount,
+    DateOnly PublishedOn,
+    string Url,
+    PublishedPostLinkResponse? AffiliateLink,
+    bool AffiliateLinkShared,
+    DateTimeOffset CreatedAt);
+
+/// <summary>The affiliate link a Published Post carries.</summary>
+public sealed record PublishedPostLinkResponse(Guid Id, string Url, string Label);

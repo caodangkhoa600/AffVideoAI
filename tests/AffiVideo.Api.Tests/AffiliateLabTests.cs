@@ -48,6 +48,14 @@ public sealed class AffiliateLabTests(AffiVideoApp app)
             await member.GetAsync($"{Lab}/campaigns/{nothing}/variants"),
             await member.PutAsync($"{Lab}/campaigns/{nothing}/variants/{variant.Id}", new { }),
             await member.DeleteAsync($"{Lab}/campaigns/{nothing}/variants/{variant.Id}"),
+            await member.GetAsync($"{Lab}/social-accounts"),
+            await member.PostAsync($"{Lab}/social-accounts", new SocialAccountRequest(SocialPlatform.TikTok, "@lumo.vn")),
+            await member.GetAsync($"{Lab}/affiliate-links"),
+            await member.PostAsync($"{Lab}/affiliate-links", new AffiliateLinkRequest("https://s.shopee.vn/lumo")),
+            await member.GetAsync($"{Lab}/published-posts"),
+            await member.GetAsync($"{Lab}/published-posts/{nothing}"),
+            await member.PostAsync($"{Lab}/published-posts", new PublishedPostRequest(
+                nothing, nothing, new DateOnly(2026, 10, 12), "https://www.tiktok.com/@lumo/video/1")),
         ];
 
         Assert.All(responses, response => Assert.Equal(HttpStatusCode.NotFound, response.StatusCode));

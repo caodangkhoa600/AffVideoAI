@@ -33,10 +33,10 @@ public interface IRenderedVideos
 
     /// <summary>
     /// Deletes a Rendered Video in either state, with its file, and records it in the
-    /// audit log. The job that made it is kept, with nothing to show for it.
+    /// audit log. The job that made it is kept, with nothing to show for it. One
+    /// that has a Published Post is kept: that is the record of where it is live.
     /// </summary>
-    /// <returns>False when there is no such Rendered Video.</returns>
-    Task<bool> DeleteAsync(Guid videoId, CancellationToken cancellationToken);
+    Task<RenderedVideoDeletion> DeleteAsync(Guid videoId, CancellationToken cancellationToken);
 }
 
 /// <summary>What narrows the library, and its order. Whatever is left out narrows nothing.</summary>
@@ -74,6 +74,17 @@ public sealed record RenderedVideoRecord(
     string? ApprovedByEmail,
     IReadOnlyList<ReviewFlag> Flags,
     IReadOnlyList<ProductionCostRecord> Costs);
+
+public enum RenderedVideoDeletion
+{
+    Deleted,
+
+    /// <summary>There is no such Rendered Video.</summary>
+    NotFound,
+
+    /// <summary>Nothing was deleted: a Published Post names the Rendered Video.</summary>
+    HasPublishedPost,
+}
 
 /// <summary>Either the MP4, for the caller to dispose, or the reason it may not be downloaded, in words for the member.</summary>
 public sealed record RenderedVideoDownload(RenderedVideoRecord Record, Stream? Content, string? Refused);

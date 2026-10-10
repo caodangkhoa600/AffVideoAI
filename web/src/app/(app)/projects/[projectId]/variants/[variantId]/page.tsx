@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Suspense } from "react";
 import type { Variant } from "@/lib/api/client";
+import { useSession } from "@/lib/session";
 import { creativeTemplateName } from "../../../creative-templates";
 import { useProject, useVariant } from "../../../use-project";
 import { StoryboardVersions } from "./storyboard-versions";
@@ -46,6 +47,7 @@ function RequestedVariant() {
 function VariantStoryboards({ variant }: { variant: Variant }) {
   // The Product the Scenes' photos belong to.
   const project = useProject(variant.projectId);
+  const session = useSession();
 
   return (
     <>
@@ -59,6 +61,15 @@ function VariantStoryboards({ variant }: { variant: Variant }) {
           <Link href={`/projects/${variant.projectId}`} className="underline underline-offset-4">
             Back to the Project
           </Link>
+          {/* Only for an Organization that has the Affiliate Lab. */}
+          {session.data?.organization.affiliateLabEnabled && (
+            <>
+              {" · "}
+              <Link href={`/lab/published-posts?variantId=${variant.id}`} className="underline underline-offset-4">
+                Published Posts of this Variant
+              </Link>
+            </>
+          )}
         </p>
       </div>
       <StoryboardVersions variant={variant} productId={project.data?.productId} render />

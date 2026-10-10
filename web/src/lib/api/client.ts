@@ -34,6 +34,10 @@ export type EstimatedAmount = components["schemas"]["EstimatedAmountResponse"];
 export type LabProduct = components["schemas"]["LabProductResponse"];
 export type Campaign = components["schemas"]["CampaignResponse"];
 export type CampaignVariant = components["schemas"]["CampaignVariantResponse"];
+export type SocialAccount = components["schemas"]["SocialAccountResponse"];
+export type SocialPlatform = components["schemas"]["SocialPlatform"];
+export type AffiliateLink = components["schemas"]["AffiliateLinkResponse"];
+export type PublishedPost = components["schemas"]["PublishedPostResponse"];
 // Only ever an optional query parameter, so the description has it as nullable.
 export type RenderedVideoOrder = NonNullable<components["schemas"]["RenderedVideoOrder"]>;
 

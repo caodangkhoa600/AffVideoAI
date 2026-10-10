@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { useState } from "react";
 import { Field, TextAreaField } from "@/components/field";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,12 @@ export function ProductLab({ productId }: { productId: string }) {
         <p className="text-sm text-muted-foreground">
           Your research on this Product, and what the affiliate programme pays for it when you know.
         </p>
+        <Link
+          href={`/lab/published-posts?productId=${productId}`}
+          className="self-start text-sm font-medium underline underline-offset-4"
+        >
+          Published Posts of this Product
+        </Link>
       </div>
       {lab.isError ? (
         <p role="alert" className="text-sm text-destructive">

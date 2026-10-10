@@ -77,6 +77,12 @@ function CampaignDetails({ campaign }: { campaign: Campaign }) {
           Campaign
           {campaign.status === "Archived" && <span data-testid="campaign-archived"> · Archived</span>}
         </p>
+        <Link
+          href={`/lab/published-posts?campaignId=${campaign.id}`}
+          className="self-start font-medium underline underline-offset-4"
+        >
+          Published Posts of this Campaign
+        </Link>
       </div>
       {/* Keyed so the form starts again from the saved name. */}
       <Rename key={campaign.name} campaign={campaign} onChanged={reload} />

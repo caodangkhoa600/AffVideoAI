@@ -675,7 +675,7 @@ export interface paths {
         get: operations["GetRenderedVideo"];
         put?: never;
         post?: never;
-        /** Deletes a Rendered Video and its file, approved or not. Nothing brings it back. The Storyboard version it was rendered from is kept and can be rendered again. */
+        /** Deletes a Rendered Video and its file, approved or not. Nothing brings it back. The Storyboard version it was rendered from is kept and can be rendered again. Answers 409 for one that has a Published Post. */
         delete: operations["DeleteRenderedVideo"];
         options?: never;
         head?: never;
@@ -873,6 +873,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/lab/social-accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The Organization's social accounts, by platform and then by handle. */
+        get: operations["ListSocialAccounts"];
+        put?: never;
+        /** Records a social account: a platform and a handle on it. Answers 409 for one that is already recorded. */
+        post: operations["CreateSocialAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/affiliate-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The Organization's affiliate links, newest first, each with how many Published Posts carry it. */
+        get: operations["ListAffiliateLinks"];
+        put?: never;
+        /** Records an affiliate link. The address is only kept, never requested. Answers 409 for one that is already recorded. */
+        post: operations["CreateAffiliateLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/published-posts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The Organization's Published Posts, the latest publication date first. A Campaign, a Product, a Variant, a platform and a social account each narrow the list. */
+        get: operations["ListPublishedPosts"];
+        put?: never;
+        /** Records that an approved Rendered Video was posted, by hand, on a social account at a URL, with the affiliate link it carries if any. Nothing is posted. Answers 409 for a Rendered Video that is not approved, and for a URL that is already recorded. */
+        post: operations["RecordPublishedPost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/published-posts/{postId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One Published Post. */
+        get: operations["GetPublishedPost"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -880,6 +951,20 @@ export interface components {
         AddMemberRequest: {
             email: string;
             password: string;
+        };
+        AffiliateLinkRequest: {
+            url: string;
+            label?: null | string;
+        };
+        AffiliateLinkResponse: {
+            /** Format: uuid */
+            id: string;
+            url: string;
+            label: string;
+            /** Format: int32 */
+            publishedPostCount: number;
+            /** Format: date-time */
+            createdAt: string;
         };
         AntiforgeryTokenResponse: {
             requestToken: string;
@@ -1025,6 +1110,15 @@ export interface components {
             name: string;
             affiliateLabEnabled: boolean;
         };
+        PagedResponseOfAffiliateLinkResponse: {
+            items: components["schemas"]["AffiliateLinkResponse"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+            /** Format: int32 */
+            total: number;
+        };
         PagedResponseOfAuditLogEntryResponse: {
             items: components["schemas"]["AuditLogEntryResponse"][];
             /** Format: int32 */
@@ -1097,6 +1191,15 @@ export interface components {
             /** Format: int32 */
             total: number;
         };
+        PagedResponseOfPublishedPostResponse: {
+            items: components["schemas"]["PublishedPostResponse"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+            /** Format: int32 */
+            total: number;
+        };
         PagedResponseOfRenderedVideoResponse: {
             items: components["schemas"]["RenderedVideoResponse"][];
             /** Format: int32 */
@@ -1117,6 +1220,15 @@ export interface components {
         };
         PagedResponseOfRenderJobResponse: {
             items: components["schemas"]["RenderJobResponse"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+            /** Format: int32 */
+            total: number;
+        };
+        PagedResponseOfSocialAccountResponse: {
+            items: components["schemas"]["SocialAccountResponse"][];
             /** Format: int32 */
             page: number;
             /** Format: int32 */
@@ -1235,6 +1347,46 @@ export interface components {
             objective: string;
             /** Format: int32 */
             variantCount: number;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        PublishedPostLinkResponse: {
+            /** Format: uuid */
+            id: string;
+            url: string;
+            label: string;
+        };
+        PublishedPostRequest: {
+            /** Format: uuid */
+            renderedVideoId: string;
+            /** Format: uuid */
+            socialAccountId: string;
+            /** Format: date */
+            publishedOn: string;
+            url: string;
+            /** Format: uuid */
+            affiliateLinkId?: null | string;
+        };
+        PublishedPostResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            renderedVideoId: string;
+            /** Format: uuid */
+            productId: string;
+            productName: string;
+            /** Format: uuid */
+            projectId: string;
+            /** Format: uuid */
+            variantId: string;
+            creativeTemplate: components["schemas"]["CreativeTemplate"];
+            hook: string;
+            socialAccount: components["schemas"]["SocialAccountResponse"];
+            /** Format: date */
+            publishedOn: string;
+            url: string;
+            affiliateLink: null | components["schemas"]["PublishedPostLinkResponse"];
+            affiliateLinkShared: boolean;
             /** Format: date-time */
             createdAt: string;
         };
@@ -1392,6 +1544,20 @@ export interface components {
             email: string;
             password: string;
         };
+        SocialAccountRequest: {
+            platform: components["schemas"]["SocialPlatform"];
+            handle: string;
+        };
+        SocialAccountResponse: {
+            /** Format: uuid */
+            id: string;
+            platform: components["schemas"]["SocialPlatform"];
+            handle: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        /** @enum {unknown} */
+        SocialPlatform: "TikTok" | "Facebook" | "Instagram" | "YouTube" | "Shopee";
         StatusResponse: {
             database: components["schemas"]["DependencyStatusResponse"];
             objectStorage: components["schemas"]["DependencyStatusResponse"];
@@ -3289,6 +3455,15 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
         };
     };
     GetRenderedVideoContent: {
@@ -3764,6 +3939,244 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ListSocialAccounts: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagedResponseOfSocialAccountResponse"];
+                };
+            };
+        };
+    };
+    CreateSocialAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SocialAccountRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialAccountResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListAffiliateLinks: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagedResponseOfAffiliateLinkResponse"];
+                };
+            };
+        };
+    };
+    CreateAffiliateLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AffiliateLinkRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AffiliateLinkResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListPublishedPosts: {
+        parameters: {
+            query?: {
+                campaignId?: string;
+                productId?: string;
+                variantId?: string;
+                platform?: components["schemas"]["SocialPlatform"];
+                socialAccountId?: string;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagedResponseOfPublishedPostResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+        };
+    };
+    RecordPublishedPost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublishedPostRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublishedPostResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetPublishedPost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                postId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublishedPostResponse"];
+                };
             };
             /** @description Not Found */
             404: {

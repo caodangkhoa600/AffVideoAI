@@ -81,6 +81,9 @@ v1.MapRenderedVideos();
 var lab = v1.MapLab();
 lab.MapLabProducts();
 lab.MapCampaigns();
+lab.MapSocialAccounts();
+lab.MapAffiliateLinks();
+lab.MapPublishedPosts();
 
 app.Run();
 

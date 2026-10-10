@@ -5,6 +5,7 @@ using AffiVideo.Domain;
 using AffiVideo.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Npgsql;
 
 namespace AffiVideo.Infrastructure.Rendering;
 
@@ -155,14 +156,18 @@ internal sealed class ScopedRenderedVideos(
         }
     }
 
-    public async Task<bool> DeleteAsync(Guid videoId, CancellationToken cancellationToken)
+    public async Task<RenderedVideoDeletion> DeleteAsync(Guid videoId, CancellationToken cancellationToken)
     {
         var member = CallingMember();
         // Someone may approve the video between its being read and deleted here; then it is read again.
         for (var attempt = 1; ; attempt++)
         {
             var video = await database.RenderedVideos.SingleOrDefaultAsync(v => v.Id == videoId, cancellationToken);
-            if (video is null) return false;
+            if (video is null) return RenderedVideoDeletion.NotFound;
+            if (await database.PublishedPosts.AnyAsync(post => post.RenderedVideoId == videoId, cancellationToken))
+            {
+                return RenderedVideoDeletion.HasPublishedPost;
+            }
 
             database.RenderedVideos.Remove(video);
             var job = await database.RenderJobs.SingleOrDefaultAsync(j => j.Id == video.RenderJobId, cancellationToken);
@@ -177,6 +182,11 @@ internal sealed class ScopedRenderedVideos(
                 database.ChangeTracker.Clear();
                 continue;
             }
+            catch (DbUpdateException exception) when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.ForeignKeyViolation })
+            {
+                // A Published Post was recorded for it after the check above. Nothing of this attempt is saved.
+                return RenderedVideoDeletion.HasPublishedPost;
+            }
 
             // The record is what makes the file reachable, and it is gone. A file left
             // behind is wasted space, not a reason to fail the request, and it is
@@ -189,7 +199,7 @@ internal sealed class ScopedRenderedVideos(
             {
                 logger.LogWarning(exception, "The file at {StorageKey} could not be deleted and is left behind", video.StorageKey);
             }
-            return true;
+            return RenderedVideoDeletion.Deleted;
         }
     }
 

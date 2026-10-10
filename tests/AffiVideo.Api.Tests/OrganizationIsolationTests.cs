@@ -423,6 +423,44 @@ public sealed class OrganizationIsolationTests(AffiVideoApp app)
     }
 
     [Fact]
+    public async Task A_member_of_one_Lab_Organization_is_refused_the_Published_Posts_social_accounts_and_affiliate_links_of_another()
+    {
+        var theirs = await PublishedPostTests.LabAsync(app);
+        var mine = await app.CreateOrganizationAsync(affiliateLab: true);
+        using var me = await app.SignedInAsync(mine.Owner);
+        using var them = await app.SignedInAsync(theirs.Owner);
+        var day = new DateOnly(2026, 10, 12);
+        var theirAccount = await PublishedPostTests.AccountAsync(them, Domain.SocialPlatform.TikTok, PublishedPostTests.NewHandle());
+        var theirLink = await PublishedPostTests.LinkAsync(them, PublishedPostTests.NewUrl());
+        var theirPost = await PublishedPostTests.RecordedAsync(them, theirs.Earbuds.Id, theirAccount.Id, day, affiliateLinkId: theirLink.Id);
+        // What they recorded is not taken in my Organization: I record the same account and the same link as my own.
+        var myAccount = await PublishedPostTests.AccountAsync(me, Domain.SocialPlatform.TikTok, theirAccount.Handle);
+        var myLink = await PublishedPostTests.LinkAsync(me, theirLink.Url);
+
+        var read = await me.GetAsync($"{PublishedPostTests.Posts}/{theirPost.Id}");
+        var ofTheirVideo = await me.PostAsync(PublishedPostTests.Posts, new PublishedPostRequest(
+            theirs.Earbuds.Id, myAccount.Id, day, PublishedPostTests.NewUrl(), myLink.Id));
+        var withAllOfTheirs = await me.PostAsync(PublishedPostTests.Posts, new PublishedPostRequest(
+            theirs.Earbuds.Id, theirAccount.Id, day, PublishedPostTests.NewUrl(), theirLink.Id));
+
+        Assert.Equal(HttpStatusCode.NotFound, read.StatusCode);
+        // Theirs are named in the refusal exactly as ones that do not exist would be.
+        Assert.Equal(["renderedVideoId"], await PublishedPostTests.RefusedFieldsAsync(ofTheirVideo));
+        Assert.Equal(["affiliateLinkId", "renderedVideoId", "socialAccountId"], await PublishedPostTests.RefusedFieldsAsync(withAllOfTheirs));
+        Assert.Equal(0, (await PublishedPostTests.ListAsync(me)).Total);
+        Assert.Equal(0, (await PublishedPostTests.ListAsync(me, $"?productId={theirs.Earbuds.ProductId}")).Total);
+        Assert.Equal(0, (await PublishedPostTests.ListAsync(me, $"?variantId={theirs.Earbuds.VariantId}&socialAccountId={theirAccount.Id}")).Total);
+        Assert.Equal(
+            [myAccount.Id],
+            (await me.GetAsync<PagedResponse<SocialAccountResponse>>(PublishedPostTests.Accounts)).Items.Select(a => a.Id));
+        Assert.Equal(
+            [(myLink.Id, 0)],
+            (await me.GetAsync<PagedResponse<AffiliateLinkResponse>>(PublishedPostTests.Links)).Items.Select(l => (l.Id, l.PublishedPostCount)));
+        Assert.Equal(theirPost, await them.GetAsync<PublishedPostResponse>($"{PublishedPostTests.Posts}/{theirPost.Id}"));
+        Assert.Equal([theirPost.Id], (await PublishedPostTests.ListAsync(them, $"?socialAccountId={theirAccount.Id}")).Items.Select(p => p.Id));
+    }
+
+    [Fact]
     public async Task A_Product_list_and_its_categories_hold_only_what_belongs_to_that_Organization()
     {
         var theirs = await app.CreateOrganizationAsync();

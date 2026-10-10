@@ -120,15 +120,22 @@ internal static class RenderedVideoEndpoints
                 "Nothing else about the video changes. A Fact withdrawn afterwards flags it again. Answers 409 for one that is " +
                 "not flagged, or not by any of these Facts.");
 
-        videos.MapDelete("/{videoId:guid}", async Task<Results<NoContent, NotFound>> (
+        videos.MapDelete("/{videoId:guid}", async Task<Results<NoContent, NotFound, ProblemHttpResult>> (
                 Guid videoId, IRenderedVideos library, CancellationToken cancellationToken) =>
-                await library.DeleteAsync(videoId, cancellationToken)
-                    ? TypedResults.NoContent()
-                    : TypedResults.NotFound())
+                await library.DeleteAsync(videoId, cancellationToken) switch
+                {
+                    RenderedVideoDeletion.Deleted => TypedResults.NoContent(),
+                    RenderedVideoDeletion.NotFound => TypedResults.NotFound(),
+                    _ => TypedResults.Problem(
+                        "This Rendered Video has a Published Post, which is the record of where it is live. It cannot be deleted.",
+                        statusCode: StatusCodes.Status409Conflict),
+                })
+            .ProducesProblem(StatusCodes.Status409Conflict)
             .WithName("DeleteRenderedVideo")
             .WithSummary(
                 "Deletes a Rendered Video and its file, approved or not. Nothing brings it back. " +
-                "The Storyboard version it was rendered from is kept and can be rendered again.");
+                "The Storyboard version it was rendered from is kept and can be rendered again. " +
+                "Answers 409 for one that has a Published Post.");
     }
 
     // A browser may keep the file, but asks before using it again, so every

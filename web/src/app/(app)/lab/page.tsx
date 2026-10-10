@@ -21,6 +21,9 @@ export default function LabPage() {
         <p className="text-sm text-muted-foreground">
           The Products you are considering, and the Campaigns that group Variants for an experiment.
         </p>
+        <Link href="/lab/published-posts" className="self-start font-medium underline underline-offset-4">
+          Published Posts
+        </Link>
       </div>
       <Shortlist />
       <Campaigns />
