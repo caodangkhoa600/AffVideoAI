@@ -56,6 +56,8 @@ public sealed class AffiliateLabTests(AffiVideoApp app)
             await member.GetAsync($"{Lab}/published-posts/{nothing}"),
             await member.PostAsync($"{Lab}/published-posts", new PublishedPostRequest(
                 nothing, nothing, new DateOnly(2026, 10, 12), "https://www.tiktok.com/@lumo/video/1")),
+            await member.GetAsync($"{Lab}/published-posts/{nothing}/performance-snapshots"),
+            await member.PostAsync($"{Lab}/published-posts/{nothing}/performance-snapshots", new { }),
         ];
 
         Assert.All(responses, response => Assert.Equal(HttpStatusCode.NotFound, response.StatusCode));

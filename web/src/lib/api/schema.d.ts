@@ -944,6 +944,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/lab/published-posts/{postId}/performance-snapshots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The Performance Snapshots of a Published Post, the latest first: by the moment the totals apply to, then by when they were entered. The first is the current figure. */
+        get: operations["ListPerformanceSnapshots"];
+        put?: never;
+        /** Records the running totals a member read off the platform for a Published Post, as manual entry. A total left out is unknown, not zero. Totals lower than in the snapshot before are accepted, and the answer names them. */
+        post: operations["RecordPerformanceSnapshot"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1022,6 +1040,25 @@ export interface components {
         };
         /** @enum {unknown} */
         CreativeTemplate: "LuxuryCinematic" | "ProductShowcase" | "ProblemSolution";
+        CurrentPerformanceResponse: {
+            /** Format: uuid */
+            snapshotId: string;
+            /** Format: date-time */
+            takenAt: string;
+            /** Format: int64 */
+            views: null | number;
+            /** Format: int64 */
+            likes: null | number;
+            /** Format: int64 */
+            comments: null | number;
+            /** Format: int64 */
+            shares: null | number;
+            /** Format: int64 */
+            clicks: null | number;
+            source: components["schemas"]["PerformanceSource"];
+            /** Format: date-time */
+            recordedAt: string;
+        };
         DependencyStatusResponse: {
             reachable: boolean;
         };
@@ -1173,6 +1210,15 @@ export interface components {
             /** Format: int32 */
             total: number;
         };
+        PagedResponseOfPerformanceSnapshotResponse: {
+            items: components["schemas"]["PerformanceSnapshotResponse"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+            /** Format: int32 */
+            total: number;
+        };
         PagedResponseOfProductResponse: {
             items: components["schemas"]["ProductResponse"][];
             /** Format: int32 */
@@ -1254,6 +1300,46 @@ export interface components {
             /** Format: int32 */
             total: number;
         };
+        /** @enum {unknown} */
+        PerformanceMetric: "Views" | "Likes" | "Comments" | "Shares" | "Clicks";
+        PerformanceSnapshotRequest: {
+            /** Format: date-time */
+            takenAt: string;
+            /** Format: int64 */
+            views?: null | number;
+            /** Format: int64 */
+            likes?: null | number;
+            /** Format: int64 */
+            comments?: null | number;
+            /** Format: int64 */
+            shares?: null | number;
+            /** Format: int64 */
+            clicks?: null | number;
+        };
+        PerformanceSnapshotResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            publishedPostId: string;
+            /** Format: date-time */
+            takenAt: string;
+            /** Format: int64 */
+            views: null | number;
+            /** Format: int64 */
+            likes: null | number;
+            /** Format: int64 */
+            comments: null | number;
+            /** Format: int64 */
+            shares: null | number;
+            /** Format: int64 */
+            clicks: null | number;
+            source: components["schemas"]["PerformanceSource"];
+            /** Format: date-time */
+            recordedAt: string;
+            lowerThanPrevious: components["schemas"]["PerformanceMetric"][];
+        };
+        /** @enum {unknown} */
+        PerformanceSource: "Manual";
         ProblemDetails: {
             type?: null | string;
             title?: null | string;
@@ -1387,6 +1473,7 @@ export interface components {
             url: string;
             affiliateLink: null | components["schemas"]["PublishedPostLinkResponse"];
             affiliateLinkShared: boolean;
+            currentPerformance: null | components["schemas"]["CurrentPerformanceResponse"];
             /** Format: date-time */
             createdAt: string;
         };
@@ -4176,6 +4263,80 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublishedPostResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ListPerformanceSnapshots: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path: {
+                postId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagedResponseOfPerformanceSnapshotResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    RecordPerformanceSnapshot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                postId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PerformanceSnapshotRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PerformanceSnapshotResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
                 };
             };
             /** @description Not Found */

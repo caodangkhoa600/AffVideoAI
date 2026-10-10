@@ -118,6 +118,7 @@ public sealed record PublishedPostRequest(
 /// Whether another Published Post carries the same affiliate link. Commission can then be shown
 /// for the link or the Product, never for this Published Post.
 /// </param>
+/// <param name="CurrentPerformance">Its latest Performance Snapshot, which is its current figure. Null when it has none.</param>
 public sealed record PublishedPostResponse(
     Guid Id,
     Guid RenderedVideoId,
@@ -132,7 +133,74 @@ public sealed record PublishedPostResponse(
     string Url,
     PublishedPostLinkResponse? AffiliateLink,
     bool AffiliateLinkShared,
+    CurrentPerformanceResponse? CurrentPerformance,
     DateTimeOffset CreatedAt);
 
 /// <summary>The affiliate link a Published Post carries.</summary>
 public sealed record PublishedPostLinkResponse(Guid Id, string Url, string Label);
+
+/// <summary>
+/// The running totals of a Published Post as a member read them off the platform.
+/// Each is the total so far, not what was gained since the last snapshot. One that
+/// is left out is unknown, which is not zero. At least one is given.
+/// </summary>
+/// <param name="TakenAt">The moment the totals apply to: when they were read. Not in the future.</param>
+public sealed record PerformanceSnapshotRequest(
+    DateTimeOffset TakenAt,
+    [RunningTotal] long? Views = null,
+    [RunningTotal] long? Likes = null,
+    [RunningTotal] long? Comments = null,
+    [RunningTotal] long? Shares = null,
+    [RunningTotal] long? Clicks = null) : IValidatableObject
+{
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (Views is null && Likes is null && Comments is null && Shares is null && Clicks is null)
+        {
+            yield return new ValidationResult("Enter at least one figure.", [nameof(Views)]);
+        }
+    }
+}
+
+/// <summary>A Performance Snapshot. A total that is null is unknown, not zero.</summary>
+/// <param name="TakenAt">The moment the totals apply to.</param>
+/// <param name="Source">Where the figures came from.</param>
+/// <param name="RecordedAt">When the snapshot was entered.</param>
+/// <param name="LowerThanPrevious">
+/// The totals that are lower than in the snapshot before this one. A running total does not
+/// usually go down, so each is worth checking. Empty when none is.
+/// </param>
+public sealed record PerformanceSnapshotResponse(
+    Guid Id,
+    Guid PublishedPostId,
+    DateTimeOffset TakenAt,
+    long? Views,
+    long? Likes,
+    long? Comments,
+    long? Shares,
+    long? Clicks,
+    PerformanceSource Source,
+    DateTimeOffset RecordedAt,
+    IReadOnlyList<PerformanceMetric> LowerThanPrevious);
+
+/// <summary>The current figure of a Published Post: its latest Performance Snapshot. A total that is null is unknown, not zero.</summary>
+/// <param name="TakenAt">The moment the totals apply to.</param>
+/// <param name="Source">Where the figures came from.</param>
+/// <param name="RecordedAt">When the snapshot was entered.</param>
+public sealed record CurrentPerformanceResponse(
+    Guid SnapshotId,
+    DateTimeOffset TakenAt,
+    long? Views,
+    long? Likes,
+    long? Comments,
+    long? Shares,
+    long? Clicks,
+    PerformanceSource Source,
+    DateTimeOffset RecordedAt);
+
+/// <summary>A count so far: a whole number of zero or more.</summary>
+[AttributeUsage(AttributeTargets.Parameter | AttributeTargets.Property)]
+public sealed class RunningTotalAttribute() : ValidationAttribute("Enter a whole number of zero or more.")
+{
+    public override bool IsValid(object? value) => value is null or long and >= 0;
+}

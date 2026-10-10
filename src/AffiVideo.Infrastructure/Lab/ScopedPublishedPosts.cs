@@ -172,11 +172,16 @@ internal sealed class ScopedPublishedPosts(AffiVideoDbContext database, Caller c
             VariantId = variant.Id,
             CreativeTemplate = variant.CreativeTemplate,
             Hook = variant.Hook,
+            // The order of PerformanceSnapshotQueries.LatestFirst, written out: a method of ours cannot be translated in here.
+            Current = database.PerformanceSnapshots
+                .Where(s => s.PublishedPostId == post.Id)
+                .OrderByDescending(s => s.TakenAt).ThenByDescending(s => s.RecordedAt).ThenByDescending(s => s.Id)
+                .FirstOrDefault(),
         };
 
     private static PublishedPostRecord ToRecord(PostInContext found) => new(
         found.Post, found.Account, found.AffiliateLink, found.AffiliateLinkShared,
-        found.ProductId, found.ProductName, found.ProjectId, found.VariantId, found.CreativeTemplate, found.Hook);
+        found.ProductId, found.ProductName, found.ProjectId, found.VariantId, found.CreativeTemplate, found.Hook, found.Current);
 
     private sealed class PostInContext
     {
@@ -199,6 +204,8 @@ internal sealed class ScopedPublishedPosts(AffiVideoDbContext database, Caller c
         public required CreativeTemplate CreativeTemplate { get; init; }
 
         public required string Hook { get; init; }
+
+        public required PerformanceSnapshot? Current { get; init; }
     }
 }
 

@@ -461,6 +461,25 @@ public sealed class OrganizationIsolationTests(AffiVideoApp app)
     }
 
     [Fact]
+    public async Task A_member_of_one_Lab_Organization_is_refused_the_Performance_Snapshots_of_another()
+    {
+        var theirs = await PublishedPostTests.LabAsync(app);
+        var mine = await app.CreateOrganizationAsync(affiliateLab: true);
+        using var me = await app.SignedInAsync(mine.Owner);
+        using var them = await app.SignedInAsync(theirs.Owner);
+        var theirPost = await PerformanceSnapshotTests.PublishedPostAsync(them, theirs.Earbuds.Id);
+        var request = new PerformanceSnapshotRequest(new DateTimeOffset(2026, 10, 5, 9, 0, 0, TimeSpan.Zero), Views: 1200);
+        var theirSnapshot = await PerformanceSnapshotTests.RecordedAsync(them, theirPost.Id, request);
+
+        var read = await me.GetAsync(PerformanceSnapshotTests.Snapshots(theirPost.Id));
+        var recorded = await me.PostAsync(PerformanceSnapshotTests.Snapshots(theirPost.Id), request with { Views = 1 });
+
+        Assert.Equal(HttpStatusCode.NotFound, read.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, recorded.StatusCode);
+        Assert.Equal([theirSnapshot.Id], (await PerformanceSnapshotTests.ListAsync(them, theirPost.Id)).Items.Select(s => s.Id));
+    }
+
+    [Fact]
     public async Task A_Product_list_and_its_categories_hold_only_what_belongs_to_that_Organization()
     {
         var theirs = await app.CreateOrganizationAsync();

@@ -73,6 +73,7 @@ public static class InfrastructureSetup
         services.AddScoped<ISocialAccounts, ScopedSocialAccounts>();
         services.AddScoped<IAffiliateLinks, ScopedAffiliateLinks>();
         services.AddScoped<IPublishedPosts, ScopedPublishedPosts>();
+        services.AddScoped<IPerformanceSnapshots, ScopedPerformanceSnapshots>();
         services.AddScoped<DemonstrationSeed>();
         return services;
     }

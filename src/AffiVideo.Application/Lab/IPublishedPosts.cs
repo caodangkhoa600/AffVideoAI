@@ -49,6 +49,7 @@ public sealed record PublishedPostFilter(
 
 /// <summary>A Published Post with the Rendered Video it shows and what that was made from, as those are now.</summary>
 /// <param name="AffiliateLinkShared">Whether another Published Post carries the same affiliate link.</param>
+/// <param name="Current">Its latest Performance Snapshot, which is its current figure. Null when it has none.</param>
 public sealed record PublishedPostRecord(
     PublishedPost Post,
     SocialAccount Account,
@@ -59,7 +60,8 @@ public sealed record PublishedPostRecord(
     Guid ProjectId,
     Guid VariantId,
     CreativeTemplate CreativeTemplate,
-    string Hook);
+    string Hook,
+    PerformanceSnapshot? Current);
 
 /// <summary>
 /// The Published Post as recorded; or what in the request names nothing of the

@@ -57,6 +57,8 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
 
     public DbSet<PublishedPost> PublishedPosts => Set<PublishedPost>();
 
+    public DbSet<PerformanceSnapshot> PerformanceSnapshots => Set<PerformanceSnapshot>();
+
     /// <summary>The keys that protect session cookies and anti-forgery tokens, kept here so sessions outlive a restart of the API.</summary>
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
@@ -344,6 +346,16 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
             // A URL is recorded once, even when it is recorded twice at the same moment.
             post.HasIndex(p => new { p.OrganizationId, p.Url }).IsUnique();
             post.HasIndex(p => new { p.OrganizationId, p.PublishedOn });
+        });
+
+        builder.Entity<PerformanceSnapshot>(snapshot =>
+        {
+            snapshot.HasOne<Organization>().WithMany().HasForeignKey(s => s.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            // History is never lost: a Published Post cannot be deleted from under its snapshots.
+            snapshot.HasOne<PublishedPost>().WithMany().HasForeignKey(s => s.PublishedPostId).OnDelete(DeleteBehavior.Restrict);
+            snapshot.Property(s => s.Source).HasConversion<string>().HasMaxLength(20);
+            // The latest snapshot of a Published Post is its current figure.
+            snapshot.HasIndex(s => new { s.PublishedPostId, s.TakenAt, s.RecordedAt });
         });
 
         var filter = typeof(AffiVideoDbContext).GetMethod(nameof(FilterToCallerOrganization), BindingFlags.NonPublic | BindingFlags.Instance)!;

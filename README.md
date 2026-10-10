@@ -264,10 +264,42 @@ flagging work built on Withdrawn Facts (ticket 13), the Luxury Cinematic
 and Problem–Solution templates (ticket 14), uploaded narration and music
 (ticket 15), production cost records (ticket 16), the create video
 wizard, dashboard and end-to-end test (ticket 17), which the founder ran and
-accepted, the Affiliate Lab flag and Campaigns (ticket 18), and Published
-Posts (ticket 19).
+accepted, the Affiliate Lab flag and Campaigns (ticket 18), Published
+Posts (ticket 19), and Performance Snapshots (ticket 20).
 
-Next: Performance Snapshots (ticket 20).
+Next: Commission records (ticket 22).
+
+Notes from Performance Snapshots:
+
+- A Performance Snapshot is the running totals a member read off the platform
+  for one Published Post:
+  `POST /api/v1/lab/published-posts/{postId}/performance-snapshots` with
+  `takenAt` (the moment the totals apply to) and any of `views`, `likes`,
+  `comments`, `shares` and `clicks`. Its source is always `Manual`
+  (`PerformanceSource` in the domain); nothing else records one yet.
+- A total left out is kept as null, which is unknown and not zero, and is
+  shown as "Unknown". At least one total is needed. A total below zero and a
+  moment more than five minutes in the future are refused with 400.
+- Nothing changes or removes a snapshot. A wrong figure is corrected by a
+  newer snapshot.
+- `GET` on the same address lists them, the latest first: by `takenAt`, then
+  by when they were entered (`recordedAt`). So a snapshot entered today about
+  last week is history, and of two about the same moment the one entered later
+  is the newer.
+- The first of that list is the Published Post's current figure, and a
+  Published Post carries it as `currentPerformance` (null when it has no
+  snapshot). It is the latest snapshot as a whole: a total that snapshot leaves
+  out is unknown now, even if an older one knew it.
+- Totals lower than in the snapshot before are accepted. Each snapshot names
+  them in `lowerThanPrevious`, and the form shows a warning. Only a total both
+  snapshots know is compared. The snapshot before is the latest about an
+  earlier moment: one about the same moment is a correction and is not
+  compared with what it corrects. It is worked out when read, so a snapshot
+  entered about an earlier moment can make the one after it lower.
+- The page is `/lab/published-posts/{postId}`, linked as "Performance" from
+  each Published Post in the list: the current figures with their source and
+  when they were read and entered, the form, views over time and every
+  snapshot.
 
 Notes from Published Posts:
 

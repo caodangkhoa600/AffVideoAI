@@ -84,6 +84,7 @@ lab.MapCampaigns();
 lab.MapSocialAccounts();
 lab.MapAffiliateLinks();
 lab.MapPublishedPosts();
+lab.MapPerformanceSnapshots();
 
 app.Run();
 

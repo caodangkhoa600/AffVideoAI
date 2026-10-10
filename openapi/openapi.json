@@ -3628,6 +3628,110 @@
           }
         }
       }
+    },
+    "/api/v1/lab/published-posts/{postId}/performance-snapshots": {
+      "get": {
+        "tags": [
+          "Affiliate Lab"
+        ],
+        "summary": "The Performance Snapshots of a Published Post, the latest first: by the moment the totals apply to, then by when they were entered. The first is the current figure.",
+        "operationId": "ListPerformanceSnapshots",
+        "parameters": [
+          {
+            "name": "postId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResponseOfPerformanceSnapshotResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Affiliate Lab"
+        ],
+        "summary": "Records the running totals a member read off the platform for a Published Post, as manual entry. A total left out is unknown, not zero. Totals lower than in the snapshot before are accepted, and the answer names them.",
+        "operationId": "RecordPerformanceSnapshot",
+        "parameters": [
+          {
+            "name": "postId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PerformanceSnapshotRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PerformanceSnapshotResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3872,6 +3976,72 @@
           "ProductShowcase",
           "ProblemSolution"
         ]
+      },
+      "CurrentPerformanceResponse": {
+        "required": [
+          "snapshotId",
+          "takenAt",
+          "views",
+          "likes",
+          "comments",
+          "shares",
+          "clicks",
+          "source",
+          "recordedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "snapshotId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "takenAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "views": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "likes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "comments": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "shares": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "clicks": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "source": {
+            "$ref": "#/components/schemas/PerformanceSource"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
       },
       "DependencyStatusResponse": {
         "required": [
@@ -4405,6 +4575,35 @@
           }
         }
       },
+      "PagedResponseOfPerformanceSnapshotResponse": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PerformanceSnapshotResponse"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "PagedResponseOfProductResponse": {
         "required": [
           "items",
@@ -4665,6 +4864,145 @@
             "format": "int32"
           }
         }
+      },
+      "PerformanceMetric": {
+        "enum": [
+          "Views",
+          "Likes",
+          "Comments",
+          "Shares",
+          "Clicks"
+        ]
+      },
+      "PerformanceSnapshotRequest": {
+        "required": [
+          "takenAt"
+        ],
+        "type": "object",
+        "properties": {
+          "takenAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "views": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "likes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "comments": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "shares": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "clicks": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "PerformanceSnapshotResponse": {
+        "required": [
+          "id",
+          "publishedPostId",
+          "takenAt",
+          "views",
+          "likes",
+          "comments",
+          "shares",
+          "clicks",
+          "source",
+          "recordedAt",
+          "lowerThanPrevious"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "publishedPostId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "takenAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "views": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "likes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "comments": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "shares": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "clicks": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "source": {
+            "$ref": "#/components/schemas/PerformanceSource"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lowerThanPrevious": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PerformanceMetric"
+            }
+          }
+        }
+      },
+      "PerformanceSource": {
+        "enum": [
+          "Manual"
+        ]
       },
       "ProblemDetails": {
         "type": "object",
@@ -5083,6 +5421,7 @@
           "url",
           "affiliateLink",
           "affiliateLinkShared",
+          "currentPerformance",
           "createdAt"
         ],
         "type": "object",
@@ -5138,6 +5477,16 @@
           },
           "affiliateLinkShared": {
             "type": "boolean"
+          },
+          "currentPerformance": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CurrentPerformanceResponse"
+              }
+            ]
           },
           "createdAt": {
             "type": "string",

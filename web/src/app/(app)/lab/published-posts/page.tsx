@@ -17,6 +17,7 @@ import {
   type SocialPlatform,
 } from "@/lib/api/client";
 import { creativeTemplateName } from "../../projects/creative-templates";
+import { METRICS, formatMoment, formatTotal, sourceName } from "./performance";
 
 const LOADING = <p className="text-sm text-muted-foreground">Loading…</p>;
 
@@ -587,6 +588,22 @@ function RecordedPost({ post }: { post: PublishedPost }) {
         ) : (
           "No affiliate link"
         )}
+      </p>
+      <p className="text-sm text-muted-foreground" data-testid="post-performance">
+        {post.currentPerformance ? (
+          <>
+            {METRICS.map(({ metric, key }) => `${metric} ${formatTotal(post.currentPerformance?.[key]).toLowerCase()}`).join(" · ")}
+            {" · "}
+            {sourceName(post.currentPerformance.source).toLowerCase()}, as of {formatMoment(post.currentPerformance.takenAt)}, entered{" "}
+            {formatMoment(post.currentPerformance.recordedAt)}
+            {" · "}
+          </>
+        ) : (
+          "No Performance Snapshot yet · "
+        )}
+        <Link href={`/lab/published-posts/${post.id}`} className="font-medium text-foreground underline underline-offset-4">
+          Performance
+        </Link>
       </p>
     </li>
   );

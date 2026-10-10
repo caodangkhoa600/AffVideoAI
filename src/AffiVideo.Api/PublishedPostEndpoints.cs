@@ -127,6 +127,7 @@ internal static class PublishedPostEndpoints
         record.Post.Url,
         record.AffiliateLink is { } link ? new PublishedPostLinkResponse(link.Id, link.Url, link.Label) : null,
         record.AffiliateLinkShared,
+        record.Current is { } current ? PerformanceSnapshotEndpoints.ToCurrent(current) : null,
         record.Post.CreatedAt);
 
     private static SocialAccountResponse ToResponse(SocialAccount account) =>
