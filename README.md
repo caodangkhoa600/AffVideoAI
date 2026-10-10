@@ -139,9 +139,15 @@ worker among them, since the worker renders.
    opening line, in Vietnamese) and the duration, 15 to 30 seconds. These are
    fixed once you go on.
 6. **Storyboard.** Press **Generate Storyboard** and read the Scenes. **Edit
-   the Scenes** changes text, photo, order and durations; **Regenerate this
-   Scene** plans one again. Each makes a new version.
-7. **Video.** Press **Render video**. The stage is shown while the worker
+   the Scenes** changes text, photo, order and durations, and makes a new
+   version. **Regenerate this Scene** plans one again from the Facts and photos
+   as they are now; it is refused, with the reason, when the Scene would come
+   out the same.
+7. **Sound.** Optional. Upload your own narration, your own music, or both
+   (MP3 or WAV), confirming you hold the rights. They belong to this video's
+   Variant and are mixed in when it is rendered. Without them the video is
+   silent.
+8. **Video.** Press **Render video**. The stage is shown while the worker
    renders, a minute or two, and longer the first time a photo is cut out. Watch
    the video, press **Approve**, then **Download MP4**.
 
@@ -149,8 +155,7 @@ The wizard can be left at any step: **Create video** leads back to the step it
 was left at, and so does the address of the step. **Start another video**
 begins again from the Product. Everything the wizard makes is an ordinary
 Product, Project, Variant, Storyboard and Rendered Video, and is also on their
-own pages, where narration and music are added and a Variant is duplicated
-with another Hook.
+own pages, where a Variant is duplicated with another Hook.
 
 ## Keeping Organizations apart
 
@@ -265,8 +270,8 @@ Campaigns (ticket 18).
 
 Notes from the create video wizard and dashboard:
 
-- The wizard is one page, `/create`, with six steps: Product, Photos, Facts,
-  Creative direction, Storyboard, Video. It keeps nothing of its own in the
+- The wizard is one page, `/create`, with seven steps: Product, Photos, Facts,
+  Creative direction, Storyboard, Sound, Video. It keeps nothing of its own in the
   database: each step is the same component as on the Product's, Project's or
   Variant's page, working on the same records.
 - Where a member is, is in the address: the step, and the identifiers of the
@@ -288,6 +293,13 @@ Notes from the create video wizard and dashboard:
   step, and ahead only once the creative direction is chosen. Whether a photo is large enough and a Fact
   is in the video's language is said when the Storyboard is generated.
 - The Video step renders the newest Storyboard version.
+- Narration and music belong to a Variant, and every video made in the wizard
+  has a Variant of its own. Audio uploaded for one video is not heard in
+  another: each is given its own in the Sound step.
+- Regenerating a Scene that would come out exactly as it is answers 409 and
+  makes no version. The mock planner writes the same Scene from the same Hook,
+  Product name, Confirmed Facts and photos, so a Scene only changes once one
+  of those has, or once a person has edited its text.
 - `GET /api/v1/render-jobs/in-progress` lists the Organization's render jobs
   that have not ended, newest first, each with the Product, Variant and
   Storyboard version it renders. The dashboard asks for it every two seconds

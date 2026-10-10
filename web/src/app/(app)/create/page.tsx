@@ -7,7 +7,7 @@ import { useSession } from "@/lib/session";
 import { useProduct } from "../products/use-product";
 import { useProject, useVariant } from "../projects/use-project";
 import { forgetPosition, hrefOf, positionOf, reachable, savedPosition, savePosition, STEPS, type Position } from "./position";
-import { DirectionStep, FactsStep, PhotosStep, ProductStep, StoryboardStep, VideoStep } from "./steps";
+import { DirectionStep, FactsStep, PhotosStep, ProductStep, SoundStep, StoryboardStep, VideoStep } from "./steps";
 
 const LOADING = <p className="text-sm text-muted-foreground">Loading…</p>;
 
@@ -121,10 +121,12 @@ function WizardAt({ position: asked, onStartAnother }: { position: Position; onS
 
       {step === "product" ? (
         <ProductStep position={position} product={product.data ?? undefined} go={go} />
-      ) : (step === "storyboard" || step === "video") && (!variant.data || !project.data) ? (
+      ) : (step === "storyboard" || step === "sound" || step === "video") && (!variant.data || !project.data) ? (
         LOADING
       ) : step === "storyboard" ? (
         <StoryboardStep variant={variant.data!} productId={project.data!.productId} go={go} />
+      ) : step === "sound" ? (
+        <SoundStep variant={variant.data!} go={go} />
       ) : step === "video" ? (
         <VideoStep variant={variant.data!} go={go} />
       ) : !product.data || (position.projectId && !project.data) || (position.variantId && !variant.data) ? (

@@ -15,6 +15,7 @@ import { ProductFacts, useFacts } from "../products/[productId]/product-facts";
 import { ProductForm } from "../products/product-form";
 import { StoryboardRender } from "../projects/[projectId]/variants/[variantId]/storyboard-render";
 import { StoryboardVersions, useStoryboards } from "../projects/[projectId]/variants/[variantId]/storyboard-versions";
+import { VariantAudioSection } from "../projects/[projectId]/variants/[variantId]/variant-audio";
 import { CREATIVE_TEMPLATES, creativeTemplateName } from "../projects/creative-templates";
 import type { Position } from "./position";
 
@@ -424,7 +425,7 @@ export function StoryboardStep({ variant, productId, go }: { variant: Variant; p
       {storyboards.data?.total === 0 && <AnotherHook variant={variant} go={go} />}
       <Moves
         onBack={() => go({ step: "direction" })}
-        onNext={() => go({ step: "video" })}
+        onNext={() => go({ step: "sound" })}
         waiting={(storyboards.data?.total ?? 0) === 0 ? "Generate the Storyboard to go on." : undefined}
       />
     </>
@@ -498,7 +499,25 @@ function AnotherHook({ variant, go }: { variant: Variant; go: Go }) {
   );
 }
 
-/** Step 6: the video. Rendering the newest Storyboard version, watching the result, approving and downloading it. */
+/**
+ * Step 6: the video's sound, which is the narration and the music of its Variant. Neither is needed:
+ * a video with no sound of its own carries a silent track.
+ */
+export function SoundStep({ variant, go }: { variant: Variant; go: Go }) {
+  return (
+    <>
+      <About title="Add narration and music">
+        Optional. Upload your own voice recording, your own music, or both, and they are mixed into the video when it
+        is rendered. A video already rendered keeps the sound it has: render again to hear a change. Without either,
+        the video is silent.
+      </About>
+      <VariantAudioSection variant={variant} />
+      <Moves onBack={() => go({ step: "storyboard" })} onNext={() => go({ step: "video" })} />
+    </>
+  );
+}
+
+/** Step 7: the video. Rendering the newest Storyboard version, watching the result, approving and downloading it. */
 export function VideoStep({ variant, go }: { variant: Variant; go: Go }) {
   const storyboards = useStoryboards(variant);
   const newest = storyboards.data?.items[0];
@@ -533,16 +552,13 @@ export function VideoStep({ variant, go }: { variant: Variant; go: Go }) {
     <>
       {about}
       <p className="text-sm text-muted-foreground" data-testid="wizard-video-version">
-        This renders Storyboard version {newest.version}, the newest. Narration and music are added on{" "}
-        <Link href={`/projects/${variant.projectId}/variants/${variant.id}`} className="underline underline-offset-4">
-          the Variant&apos;s page
-        </Link>
-        , before rendering.
+        This renders Storyboard version {newest.version}, the newest, with the narration and music the Sound step has
+        when the render starts.
       </p>
       {/* Keyed by the version, so a job being watched is never shown under another version. */}
       <StoryboardRender key={newest.id} variant={variant} storyboard={newest} />
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="outline" onClick={() => go({ step: "storyboard" })} data-testid="wizard-back">
+        <Button variant="outline" onClick={() => go({ step: "sound" })} data-testid="wizard-back">
           Back
         </Button>
         <Button variant="outline" asChild>

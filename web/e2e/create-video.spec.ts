@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { deflateSync } from "node:zlib";
 import { expect, test } from "@playwright/test";
 
@@ -8,6 +9,9 @@ const PASSWORD = process.env.AFFIVIDEO_PASSWORD ?? "demo-owner-password";
 
 const FACTS = ["Pin dùng liên tục 30 giờ", "Chống nước chuẩn IPX5"];
 const HOOK = "Nghe nhạc cả ngày không lo hết pin";
+
+// A second of tone, which the API's own tests upload as narration too.
+const NARRATION = path.join(__dirname, "..", "..", "tests", "AffiVideo.Api.Tests", "Fixtures", "tone.mp3");
 
 // How long a render may take before the test gives up on it.
 const LONGEST_RENDER_MS = 9 * 60_000;
@@ -83,6 +87,14 @@ test("a member signs in and takes a new Product to an approved, downloaded video
   await expect(page.getByTestId("storyboard")).toContainText(HOOK);
   for (const fact of FACTS) await expect(page.getByTestId("storyboard")).toContainText(fact);
   await page.getByTestId("wizard-next").click();
+
+  // Add narration. It is the member's own file, and is only taken once they confirm they hold the rights to it.
+  await expect(page).toHaveURL(/step=sound/);
+  const narration = page.getByTestId("variant-audio-narration");
+  await narration.getByRole("checkbox").check();
+  await narration.getByLabel("Upload narration").setInputFiles(NARRATION);
+  await expect(narration.getByTestId("variant-audio-details")).toBeVisible();
+  await page.getByTestId("wizard-next").click();
   await expect(page).toHaveURL(/step=video/);
 
   // Leaving the wizard and returning through the dashboard resumes at the same step.
@@ -112,6 +124,8 @@ test("a member signs in and takes a new Product to an approved, downloaded video
   expect(preview.status()).toBe(200);
   expect(preview.headers()["content-type"]).toBe("video/mp4");
   expect(isMp4(await preview.body())).toBe(true);
+  // The narration added in the wizard is in this video.
+  await expect(page.getByTestId("rendered-video-audio")).toHaveText("narration");
 
   // Approve, which is what allows the download.
   await expect(page.getByTestId("rendered-video-state")).toHaveText("Ready for review");

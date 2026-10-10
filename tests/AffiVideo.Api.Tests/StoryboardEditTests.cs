@@ -282,6 +282,30 @@ public sealed class StoryboardEditTests(AffiVideoApp app)
     }
 
     [Fact]
+    public async Task Regenerating_a_Scene_that_would_come_out_the_same_is_refused_and_makes_no_version()
+    {
+        using var member = await SignedInToNewOrganizationAsync();
+        var product = await StoryboardTests.NewProductAsync(member);
+        await StoryboardTests.UploadPhotoAsync(member, product);
+        await StoryboardTests.ConfirmedFactAsync(member, product, Battery);
+        var variant = await StoryboardTests.NewVariantAsync(member, product);
+        var first = await StoryboardTests.GeneratedAsync(member, variant);
+
+        // Nothing the planner writes from has changed, and the planner writes the same from the same.
+        var refused = new List<HttpResponseMessage>();
+        foreach (var scene in first.Scenes) refused.Add(await RegenerateAsync(member, variant, 1, scene.Position));
+
+        Assert.All(refused, response => Assert.Equal(HttpStatusCode.Conflict, response.StatusCode));
+        Assert.Contains("would come out exactly as it is", await ReasonAsync(refused[0]));
+        Assert.Equal(1, (await StoryboardTests.ListAsync(member, variant)).Total);
+
+        // Once there is something new to write from, the Scene that shows it is planned again.
+        await StoryboardTests.ConfirmedFactAsync(member, product, "Chống ồn chủ động");
+        var facts = first.Scenes.Single(scene => scene.Layout == SceneLayout.Facts).Position;
+        Assert.Equal(HttpStatusCode.Created, (await RegenerateAsync(member, variant, 1, facts)).StatusCode);
+    }
+
+    [Fact]
     public async Task Regenerating_a_Scene_fails_with_the_reason_when_it_cannot_be_planned()
     {
         using var member = await SignedInToNewOrganizationAsync();

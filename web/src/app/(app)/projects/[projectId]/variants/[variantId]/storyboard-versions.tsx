@@ -96,7 +96,9 @@ export function StoryboardVersions({
       <div className="flex flex-col gap-3">
         <p className="text-sm text-muted-foreground">
           A Storyboard is planned from the Product&apos;s Confirmed Facts and photos by the mock planner, with no AI.
-          Generating again, editing and regenerating a Scene each add a version and keep the earlier ones.
+          Generating again, editing and regenerating a Scene each add a version and keep the earlier ones. The
+          planner writes the same Scene from the same Facts and photos, so regenerating one changes it only after a
+          Fact or a photo has changed, or after its text was edited.
         </p>
         <div>
           <Button onClick={generate} disabled={generating || !storyboards.data}>

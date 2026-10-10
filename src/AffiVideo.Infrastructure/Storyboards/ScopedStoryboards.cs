@@ -110,10 +110,16 @@ internal sealed class ScopedStoryboards(
         var scenes = from.Scenes
             .Select(scene => scene.Position == position ? written : scene.Edited(scene.Position, new SceneChange(scene.Position)))
             .ToList();
+        // The planner writes the same from the same: a version that repeats this one would tell the member nothing.
+        var same = StoryboardEditing.Differ(from.Scenes, scenes)
+            ? null
+            : $"Scene {position} would come out exactly as it is, so no version was made. A Scene is written from the Hook, the " +
+              "Product's name, its Confirmed Facts and its photos, and none of those has changed since. Confirm or withdraw a Fact, " +
+              "add a photo, or edit the Scene's text yourself.";
 
         return await CheckedAndSavedAsync(
             variant, project, template, from.CreativeTemplate, from.TemplateVersion, from.Planner, from.RenderMode, scenes, material,
-            cancellationToken);
+            cancellationToken, refusedOnceChecked: same);
     }
 
     public async Task<Page<StoryboardRecord>?> ListAsync(Guid projectId, Guid variantId, PageRequest page, CancellationToken cancellationToken)
@@ -250,7 +256,7 @@ internal sealed class ScopedStoryboards(
     private async Task<StoryboardGeneration?> CheckedAndSavedAsync(
         Variant variant, Project project, CreativeTemplateDefinition template,
         CreativeTemplate creativeTemplate, int templateVersion, StoryboardPlanner planner, RenderMode renderMode,
-        IReadOnlyList<Scene> scenes, Material material, CancellationToken cancellationToken)
+        IReadOnlyList<Scene> scenes, Material material, CancellationToken cancellationToken, string? refusedOnceChecked = null)
     {
         var organizationId = caller.OrganizationId
             ?? throw new InvalidOperationException("A Storyboard is made for the caller's Organization, and there is no caller.");
@@ -270,6 +276,8 @@ internal sealed class ScopedStoryboards(
                 $"a Scene shows a photo, not the logo, of at least {ProductAsset.MinVideoPhotoSide} pixels on each side."));
         problems.AddRange(StoryboardRules.LayoutProblems(scenes, template));
         if (problems.Count > 0) return StoryboardGeneration.Refuse(string.Join(" ", problems));
+        // Scenes with nothing wrong with them that are still not to be kept: the caller's own reason.
+        if (refusedOnceChecked is not null) return StoryboardGeneration.Refuse(refusedOnceChecked);
 
         for (var attempt = 1; ; attempt++)
         {

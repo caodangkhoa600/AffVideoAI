@@ -60,3 +60,14 @@
   - The joins from a job to its Product repeat those of the library's query.
   - The Playwright test is not part of `dotnet test` and needs the system started first; nothing runs it automatically.
   - The spec says "No tokens in browser storage". What is stored is identifiers and a step name; the README's sentence was narrowed from "nothing is kept in browser storage" to say so.
+
+- 2026-10-10, the founder's first run found three things. All three are answered below; the box stays open for the rest of the run.
+
+  "I add the audio, but no sound after render." Read from the founder's own database and files, not guessed: one narration was uploaded, at 02:59 UTC, to the Variant "Dòng điện thoại dành cho mọi người". The video rendered for that Variant ten seconds later has it, and measures -24 dB mean. The video rendered at 03:02 is of another Variant, the one the wizard made ("Cần 1 chiếc điện thoại cho mọi việc?"), which has no audio, and it measures -91 dB: silent. Mixing works. Narration and Music belong to a Variant, every video the wizard makes has a Variant of its own, and the wizard had nowhere to give it sound.
+
+  "On create video there is no place to add sound." The same gap, listed above under "Left as it is". The wizard now has a Sound step between Storyboard and Video, which is the Variant's narration and music section. The Playwright test uploads a narration there and finds the Rendered Video says it has narration; it passed against five services of its own.
+
+  "Regenerate the Scene keeps the same, only the version increases." As designed until now, and useless: the mock planner writes the same Scene from the same Hook, Product name, Confirmed Facts and photos, so regenerating an untouched Scene made a new version identical to the last. It is now answered 409 with that reason and makes no version; a Scene is still regenerated once a Fact or a photo has changed or its text was edited. A test at the HTTP seam was written first and seen to fail on all four Scenes (201 where 409 was expected). The page says what regenerating does beside the button.
+
+  Not done, and the founder's to decide: making regeneration give a different wording each time. With no AI that means writing several sentence patterns for each Scene of each creative template and choosing among them, and the spec has the mock planner give the same Storyboard for the same inputs.
+

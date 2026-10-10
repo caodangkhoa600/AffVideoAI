@@ -5,6 +5,7 @@ export const STEPS = [
   { id: "facts", title: "Facts" },
   { id: "direction", title: "Creative direction" },
   { id: "storyboard", title: "Storyboard" },
+  { id: "sound", title: "Sound" },
   { id: "video", title: "Video" },
 ] as const;
 
@@ -42,12 +43,12 @@ export function hrefOf(position: Position): string {
 }
 
 /**
- * Whether a step can be shown yet. The Product comes first; a Storyboard and a video
+ * Whether a step can be shown yet. The Product comes first; a Storyboard, its sound and a video
  * need the creative direction to have been chosen, which is when the video gets its Variant.
  */
 export function reachable(step: Step, position: Position): boolean {
   if (step === "product") return true;
-  if (step === "storyboard" || step === "video") return !!position.variantId;
+  if (step === "storyboard" || step === "sound" || step === "video") return !!position.variantId;
   return !!position.productId;
 }
 
