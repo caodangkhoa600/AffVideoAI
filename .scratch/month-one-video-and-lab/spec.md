@@ -1,6 +1,6 @@
 # Month one: one-image-to-video workflow and the Affiliate Lab
 
-Status: ready-for-agent
+Status: done
 
 ## Problem Statement
 
