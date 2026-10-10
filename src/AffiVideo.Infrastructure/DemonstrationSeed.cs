@@ -36,6 +36,8 @@ internal sealed class DemonstrationSeed(
 
         // The system acts for the demonstration Organization from here on.
         caller.Identify(owner.OrganizationId, memberId: null);
+        // Our own affiliate operation runs in this Organization (ADR 0001).
+        anythingCreated |= await provisioner.EnableAffiliateLabAsync(owner.OrganizationId, cancellationToken);
         var now = clock.GetUtcNow();
         if (!await database.Products.AnyAsync(p => p.Id == DemonstrationProduct.Id, cancellationToken))
         {

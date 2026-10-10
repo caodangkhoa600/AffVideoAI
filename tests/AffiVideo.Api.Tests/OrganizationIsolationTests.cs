@@ -383,6 +383,46 @@ public sealed class OrganizationIsolationTests(AffiVideoApp app)
     }
 
     [Fact]
+    public async Task A_member_of_one_Lab_Organization_is_refused_the_Campaigns_and_Lab_Products_of_another()
+    {
+        var theirs = await app.CreateOrganizationAsync(affiliateLab: true);
+        var mine = await app.CreateOrganizationAsync(affiliateLab: true);
+        using var me = await app.SignedInAsync(mine.Owner);
+        using var them = await app.SignedInAsync(theirs.Owner);
+        var theirProduct = await StoryboardTests.NewProductAsync(them, "Theirs");
+        var theirVariant = await StoryboardTests.NewVariantAsync(them, theirProduct);
+        var theirCampaign = await CampaignTests.CreateAsync(them, "Theirs");
+        (await CampaignTests.AddVariantAsync(them, theirCampaign.Id, theirVariant.Id)).EnsureSuccessStatusCode();
+        var myVariant = await StoryboardTests.NewVariantAsync(me, await StoryboardTests.NewProductAsync(me, "Mine"));
+        var myCampaign = await CampaignTests.CreateAsync(me, "Mine");
+        var theirCampaignPath = $"{CampaignTests.Campaigns}/{theirCampaign.Id}";
+        var theirLabProduct = $"{AffiliateLabTests.Lab}/products/{theirProduct}";
+
+        HttpResponseMessage[] responses =
+        [
+            await me.GetAsync(theirCampaignPath),
+            await me.PutAsync(theirCampaignPath, new CampaignRequest("Taken over")),
+            await me.PostAsync($"{theirCampaignPath}/archive", new { }),
+            await me.GetAsync($"{theirCampaignPath}/variants"),
+            await CampaignTests.AddVariantAsync(me, theirCampaign.Id, myVariant.Id),
+            await me.DeleteAsync($"{theirCampaignPath}/variants/{theirVariant.Id}"),
+            // Their Variant is no Variant of mine to add to my own Campaign.
+            await CampaignTests.AddVariantAsync(me, myCampaign.Id, theirVariant.Id),
+            await me.GetAsync(theirLabProduct),
+            await me.PutAsync(theirLabProduct, new LabProductRequest(Shortlisted: true, ResearchNotes: "Taken over")),
+        ];
+
+        Assert.All(responses, response => Assert.Equal(HttpStatusCode.NotFound, response.StatusCode));
+        Assert.Equal([myCampaign.Id], (await CampaignTests.ListAsync(me)).Items.Select(c => c.Id));
+        Assert.Equal(0, (await CampaignTests.VariantsAsync(me, myCampaign.Id)).Total);
+        Assert.Equal(["Mine"], (await me.GetAsync<PagedResponse<LabProductResponse>>($"{AffiliateLabTests.Lab}/products")).Items.Select(p => p.Name));
+        var kept = await them.GetAsync<CampaignResponse>(theirCampaignPath);
+        Assert.Equal(("Theirs", Domain.CampaignStatus.Active, 1), (kept.Name, kept.Status, kept.VariantCount));
+        Assert.Equal([theirVariant.Id], (await CampaignTests.VariantsAsync(them, theirCampaign.Id)).Items.Select(v => v.VariantId));
+        Assert.False((await them.GetAsync<LabProductResponse>(theirLabProduct)).Shortlisted);
+    }
+
+    [Fact]
     public async Task A_Product_list_and_its_categories_hold_only_what_belongs_to_that_Organization()
     {
         var theirs = await app.CreateOrganizationAsync();

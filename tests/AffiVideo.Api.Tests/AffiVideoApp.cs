@@ -88,15 +88,29 @@ public sealed class AffiVideoApp : IAsyncLifetime
     /// A new Organization with one Owner, made by the code the seed command uses:
     /// sign-up is closed, so there is no way to make one over HTTP.
     /// </summary>
-    public Task<TestOrganization> CreateOrganizationAsync() => CreateOrganizationAsync(_factory!);
+    /// <param name="affiliateLab">Whether the Organization has the Affiliate Lab, which only the system gives.</param>
+    public Task<TestOrganization> CreateOrganizationAsync(bool affiliateLab = false) => CreateOrganizationAsync(_factory!, affiliateLab);
 
-    internal static async Task<TestOrganization> CreateOrganizationAsync(WebApplicationFactory<Program> factory)
+    /// <summary>Gives an Organization the Affiliate Lab, as the seed command does for the demonstration Organization.</summary>
+    public async Task EnableAffiliateLabAsync(Guid organizationId)
+    {
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        await scope.ServiceProvider.GetRequiredService<IOrganizationProvisioner>()
+            .EnableAffiliateLabAsync(organizationId, CancellationToken.None);
+    }
+
+    internal static async Task<TestOrganization> CreateOrganizationAsync(WebApplicationFactory<Program> factory, bool affiliateLab = false)
     {
         var unique = Guid.NewGuid().ToString("N");
         var owner = new Credentials($"owner-{unique}@example.test", $"owner-password-{unique}");
         await using var scope = factory.Services.CreateAsyncScope();
         var id = await scope.ServiceProvider.GetRequiredService<IOrganizationProvisioner>()
             .CreateAsync($"Organization {unique}", owner.Email, owner.Password, CancellationToken.None);
+        if (affiliateLab)
+        {
+            await scope.ServiceProvider.GetRequiredService<IOrganizationProvisioner>()
+                .EnableAffiliateLabAsync(id!.Value, CancellationToken.None);
+        }
         return new TestOrganization(id!.Value, owner);
     }
 

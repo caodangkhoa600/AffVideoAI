@@ -4,12 +4,12 @@
 
 **Blocked by:** 07
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] The flag is set per Organization and is on for the demonstration Organization
-- [ ] Lab pages are hidden and Lab endpoints refuse an Organization without the flag
-- [ ] A Product can carry Lab research notes and a commission rate or amount; these use the shared Product, not a separate table of products
-- [ ] A Campaign can be created, renamed and archived
-- [ ] Variants from different Products can be added to and removed from a Campaign
-- [ ] Removing a Variant from a Campaign, or archiving a Campaign, does not delete the Variant
-- [ ] A member of another Lab-enabled Organization is refused the Campaign by identifier
+- [x] The flag is set per Organization and is on for the demonstration Organization
+- [x] Lab pages are hidden and Lab endpoints refuse an Organization without the flag
+- [x] A Product can carry Lab research notes and a commission rate or amount; these use the shared Product, not a separate table of products
+- [x] A Campaign can be created, renamed and archived
+- [x] Variants from different Products can be added to and removed from a Campaign
+- [x] Removing a Variant from a Campaign, or archiving a Campaign, does not delete the Variant
+- [x] A member of another Lab-enabled Organization is refused the Campaign by identifier

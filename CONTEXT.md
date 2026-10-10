@@ -158,6 +158,10 @@ A photo shown whole, with rounded corners, because no cut-out of it passed its c
 
 ### Affiliate Lab
 
+**Shortlist**:
+The Products a Lab member is considering promoting, each with research notes and its commission rate or amount when known. A shortlisted Product is the same Product as everywhere else.
+_Avoid_: Watchlist, candidates, research list
+
 **Campaign**:
 A grouping of Variants across Products for one experiment. It references Variants and never owns them.
 

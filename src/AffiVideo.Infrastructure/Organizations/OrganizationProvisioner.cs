@@ -4,6 +4,7 @@ using AffiVideo.Domain;
 using AffiVideo.Infrastructure.Identity;
 using AffiVideo.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 
 namespace AffiVideo.Infrastructure.Organizations;
 
@@ -38,5 +39,17 @@ internal sealed class OrganizationProvisioner(
         }
         await transaction.CommitAsync(cancellationToken);
         return organization.Id;
+    }
+
+    public async Task<bool> EnableAffiliateLabAsync(Guid organizationId, CancellationToken cancellationToken)
+    {
+        // The system acts for the Organization it is changing.
+        caller.Identify(organizationId, memberId: null);
+        var organization = await database.Organizations.SingleAsync(o => o.Id == organizationId, cancellationToken);
+        if (organization.AffiliateLabEnabled) return false;
+
+        organization.EnableAffiliateLab();
+        await database.SaveChangesAsync(cancellationToken);
+        return true;
     }
 }

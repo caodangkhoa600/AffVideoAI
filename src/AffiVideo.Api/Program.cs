@@ -58,6 +58,7 @@ if (args is ["seed"])
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.UseSessions();
+app.UseAffiliateLabGate();
 
 // Every endpoint needs a signed-in member unless it says otherwise.
 app.MapOpenApi().AllowAnonymous();
@@ -77,6 +78,9 @@ v1.MapVariantAudio();
 v1.MapStoryboards();
 v1.MapRenders();
 v1.MapRenderedVideos();
+var lab = v1.MapLab();
+lab.MapLabProducts();
+lab.MapCampaigns();
 
 app.Run();
 

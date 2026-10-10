@@ -62,7 +62,7 @@ internal static class OrganizationEndpoints
             .WithSummary("The sensitive actions taken in the Organization, newest first. Owners only.");
     }
 
-    public static OrganizationResponse ToResponse(this Organization organization) => new(organization.Id, organization.Name);
+    public static OrganizationResponse ToResponse(this Organization organization) => new(organization.Id, organization.Name, organization.AffiliateLabEnabled);
 
     private static MemberResponse ToResponse(MemberSummary member) => new(member.Id, member.Email, member.Role);
 }

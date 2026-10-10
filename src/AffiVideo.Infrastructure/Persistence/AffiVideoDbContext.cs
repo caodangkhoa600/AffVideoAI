@@ -47,6 +47,10 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
 
     public DbSet<ProductionCostRecord> ProductionCostRecords => Set<ProductionCostRecord>();
 
+    public DbSet<Campaign> Campaigns => Set<Campaign>();
+
+    public DbSet<CampaignVariant> CampaignVariants => Set<CampaignVariant>();
+
     /// <summary>The keys that protect session cookies and anti-forgery tokens, kept here so sessions outlive a restart of the API.</summary>
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
@@ -96,6 +100,10 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
             product.Property(p => p.AffiliateUrl).HasMaxLength(Product.UrlMaxLength);
             product.Property(p => p.TargetAudience).HasMaxLength(Product.TargetAudienceMaxLength);
             product.Property(p => p.Status).HasConversion<string>().HasMaxLength(20);
+            product.Property(p => p.ResearchNotes).HasMaxLength(Product.ResearchNotesMaxLength);
+            product.Property(p => p.CommissionRatePercent).HasPrecision(Product.CommissionRatePrecision, Product.CommissionRateDecimals);
+            product.Property(p => p.CommissionAmount).HasPrecision(Product.PricePrecision, Product.PriceDecimals);
+            product.Property(p => p.CommissionCurrency).HasMaxLength(Product.CurrencyLength);
             product.HasIndex(p => new { p.OrganizationId, p.Name });
         });
 
@@ -279,6 +287,25 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
             // An attempt has one record, whoever comes to write it.
             cost.HasIndex(c => new { c.RenderJobId, c.Attempt }).IsUnique();
             cost.HasIndex(c => c.ProductId);
+        });
+
+        builder.Entity<Campaign>(campaign =>
+        {
+            campaign.HasOne<Organization>().WithMany().HasForeignKey(c => c.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            campaign.Property(c => c.Name).HasMaxLength(Campaign.NameMaxLength);
+            campaign.Property(c => c.Status).HasConversion<string>().HasMaxLength(20);
+            campaign.HasIndex(c => new { c.OrganizationId, c.CreatedAt });
+        });
+
+        builder.Entity<CampaignVariant>(grouped =>
+        {
+            // A Campaign groups a Variant once, even when it is added twice at the same moment.
+            grouped.HasKey(g => new { g.CampaignId, g.VariantId });
+            grouped.HasOne<Organization>().WithMany().HasForeignKey(g => g.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            grouped.HasOne<Campaign>().WithMany().HasForeignKey(g => g.CampaignId).OnDelete(DeleteBehavior.Cascade);
+            // The Campaign does not own the Variant: when a Variant goes with its Project, only its place in the Campaign goes with it.
+            grouped.HasOne<Variant>().WithMany().HasForeignKey(g => g.VariantId).OnDelete(DeleteBehavior.Cascade);
+            grouped.HasIndex(g => g.VariantId);
         });
 
         var filter = typeof(AffiVideoDbContext).GetMethod(nameof(FilterToCallerOrganization), BindingFlags.NonPublic | BindingFlags.Instance)!;

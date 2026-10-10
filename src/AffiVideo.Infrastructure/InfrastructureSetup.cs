@@ -1,4 +1,5 @@
 using AffiVideo.Application;
+using AffiVideo.Application.Lab;
 using AffiVideo.Application.Organizations;
 using AffiVideo.Application.Products;
 using AffiVideo.Application.Projects;
@@ -9,6 +10,7 @@ using AffiVideo.Application.Storyboards;
 using AffiVideo.Application.SystemStatus;
 using AffiVideo.Domain;
 using AffiVideo.Infrastructure.Identity;
+using AffiVideo.Infrastructure.Lab;
 using AffiVideo.Infrastructure.Organizations;
 using AffiVideo.Infrastructure.Persistence;
 using AffiVideo.Infrastructure.Planning;
@@ -66,6 +68,8 @@ public static class InfrastructureSetup
         services.AddScoped<IStoryboards, ScopedStoryboards>();
         services.AddScoped<IRenders, ScopedRenders>();
         services.AddScoped<IRenderedVideos, ScopedRenderedVideos>();
+        services.AddScoped<ILabProducts, ScopedLabProducts>();
+        services.AddScoped<ICampaigns, ScopedCampaigns>();
         services.AddScoped<DemonstrationSeed>();
         return services;
     }
@@ -102,7 +106,7 @@ public static class InfrastructureSetup
 
     /// <summary>
     /// Creates the demonstration Organization, its Owner, its sample Product and
-    /// that Product's Facts, each unless it is already there. Only the explicit seed command calls this.
+    /// that Product's Facts, and gives the Organization the Affiliate Lab, each unless it is already there. Only the explicit seed command calls this.
     /// </summary>
     /// <returns>Whether anything was created.</returns>
     public static async Task<bool> SeedAsync(this IServiceProvider services, CancellationToken cancellationToken)

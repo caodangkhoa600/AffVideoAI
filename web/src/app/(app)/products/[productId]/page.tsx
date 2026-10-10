@@ -6,8 +6,10 @@ import { useParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { api, type Product } from "@/lib/api/client";
+import { useSession } from "@/lib/session";
 import { ProductAssets } from "./product-assets";
 import { ProductFacts } from "./product-facts";
+import { ProductLab } from "./product-lab";
 import { ProductMissing } from "./product-missing";
 import { ProductProductionCost } from "./product-production-cost";
 import { useProduct } from "../use-product";
@@ -34,6 +36,7 @@ function RequestedProduct() {
 }
 
 function ProductDetails({ product }: { product: Product }) {
+  const session = useSession();
   return (
     <>
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -81,6 +84,7 @@ function ProductDetails({ product }: { product: Product }) {
       <ProductFacts productId={product.id} />
       <ProductAssets productId={product.id} />
       <ProductProductionCost productId={product.id} />
+      {session.data?.organization.affiliateLabEnabled && <ProductLab productId={product.id} />}
     </>
   );
 }

@@ -2805,6 +2805,471 @@
           }
         }
       }
+    },
+    "/api/v1/lab/products": {
+      "get": {
+        "tags": [
+          "Affiliate Lab"
+        ],
+        "summary": "The Organization's Products with what the Affiliate Lab keeps about each, by name. `shortlisted=true` is the shortlist.",
+        "operationId": "ListLabProducts",
+        "parameters": [
+          {
+            "name": "shortlisted",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResponseOfLabProductResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lab/products/{productId}": {
+      "get": {
+        "tags": [
+          "Affiliate Lab"
+        ],
+        "summary": "What the Affiliate Lab keeps about one Product.",
+        "operationId": "GetLabProduct",
+        "parameters": [
+          {
+            "name": "productId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabProductResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Affiliate Lab"
+        ],
+        "summary": "Replaces what the Affiliate Lab keeps about a Product: whether it is shortlisted, the research notes, and the commission as a rate or as an amount. Nothing else about the Product changes.",
+        "operationId": "UpdateLabProduct",
+        "parameters": [
+          {
+            "name": "productId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabProductRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabProductResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/lab/campaigns": {
+      "get": {
+        "tags": [
+          "Affiliate Lab"
+        ],
+        "summary": "The Organization's Campaigns, newest first. A status narrows the list.",
+        "operationId": "ListCampaigns",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/CampaignStatus"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResponseOfCampaignResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Affiliate Lab"
+        ],
+        "summary": "Creates a Campaign with no Variants in it.",
+        "operationId": "CreateCampaign",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CampaignRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lab/campaigns/{campaignId}": {
+      "get": {
+        "tags": [
+          "Affiliate Lab"
+        ],
+        "summary": "One Campaign.",
+        "operationId": "GetCampaign",
+        "parameters": [
+          {
+            "name": "campaignId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Affiliate Lab"
+        ],
+        "summary": "Renames a Campaign.",
+        "operationId": "RenameCampaign",
+        "parameters": [
+          {
+            "name": "campaignId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CampaignRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/lab/campaigns/{campaignId}/archive": {
+      "post": {
+        "tags": [
+          "Affiliate Lab"
+        ],
+        "summary": "Archives a Campaign. It keeps its Variants, and no Variant is deleted. Archiving one that is already archived changes nothing.",
+        "operationId": "ArchiveCampaign",
+        "parameters": [
+          {
+            "name": "campaignId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/lab/campaigns/{campaignId}/variants": {
+      "get": {
+        "tags": [
+          "Affiliate Lab"
+        ],
+        "summary": "The Variants the Campaign groups, in the order they were added, each with its Project and Product.",
+        "operationId": "ListCampaignVariants",
+        "parameters": [
+          {
+            "name": "campaignId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResponseOfCampaignVariantResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/lab/campaigns/{campaignId}/variants/{variantId}": {
+      "put": {
+        "tags": [
+          "Affiliate Lab"
+        ],
+        "summary": "Adds a Variant, of any Product, to the Campaign. Adding one that is already in it changes nothing.",
+        "operationId": "AddCampaignVariant",
+        "parameters": [
+          {
+            "name": "campaignId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "variantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Affiliate Lab"
+        ],
+        "summary": "Takes a Variant out of the Campaign. The Variant itself is kept.",
+        "operationId": "RemoveCampaignVariant",
+        "parameters": [
+          {
+            "name": "campaignId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "variantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2885,6 +3350,97 @@
             "format": "uuid"
           },
           "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CampaignRequest": {
+        "required": [
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "CampaignResponse": {
+        "required": [
+          "id",
+          "name",
+          "status",
+          "variantCount",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CampaignStatus"
+          },
+          "variantCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CampaignStatus": {
+        "enum": [
+          "Active",
+          "Archived"
+        ]
+      },
+      "CampaignVariantResponse": {
+        "required": [
+          "variantId",
+          "projectId",
+          "productId",
+          "productName",
+          "creativeTemplate",
+          "hook",
+          "addedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "variantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "projectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "productId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "creativeTemplate": {
+            "$ref": "#/components/schemas/CreativeTemplate"
+          },
+          "hook": {
+            "type": "string"
+          },
+          "addedAt": {
             "type": "string",
             "format": "date-time"
           }
@@ -3099,6 +3655,102 @@
         "type": "string",
         "format": "binary"
       },
+      "LabProductRequest": {
+        "required": [
+          "shortlisted"
+        ],
+        "type": "object",
+        "properties": {
+          "shortlisted": {
+            "type": "boolean"
+          },
+          "researchNotes": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "commissionRatePercent": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "commissionAmount": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "commissionCurrency": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "LabProductResponse": {
+        "required": [
+          "productId",
+          "name",
+          "brand",
+          "category",
+          "status",
+          "shortlisted",
+          "researchNotes",
+          "commissionRatePercent",
+          "commissionAmount",
+          "commissionCurrency"
+        ],
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "brand": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ProductStatus"
+          },
+          "shortlisted": {
+            "type": "boolean"
+          },
+          "researchNotes": {
+            "type": "string"
+          },
+          "commissionRatePercent": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "commissionAmount": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "commissionCurrency": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "MemberResponse": {
         "required": [
           "id",
@@ -3128,7 +3780,8 @@
       "OrganizationResponse": {
         "required": [
           "id",
-          "name"
+          "name",
+          "affiliateLabEnabled"
         ],
         "type": "object",
         "properties": {
@@ -3138,6 +3791,9 @@
           },
           "name": {
             "type": "string"
+          },
+          "affiliateLabEnabled": {
+            "type": "boolean"
           }
         }
       },
@@ -3170,6 +3826,64 @@
           }
         }
       },
+      "PagedResponseOfCampaignResponse": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CampaignResponse"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PagedResponseOfCampaignVariantResponse": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CampaignVariantResponse"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "PagedResponseOfFactResponse": {
         "required": [
           "items",
@@ -3183,6 +3897,35 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/FactResponse"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PagedResponseOfLabProductResponse": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LabProductResponse"
             }
           },
           "page": {
@@ -4624,6 +5367,9 @@
     },
     {
       "name": "Rendered Videos"
+    },
+    {
+      "name": "Affiliate Lab"
     }
   ]
 }

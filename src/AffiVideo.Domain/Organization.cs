@@ -15,5 +15,10 @@ public sealed class Organization
 
     public string Name { get; private set; }
 
+    /// <summary>Whether the Organization has the Affiliate Lab: Campaigns, Published Posts and what follows from them (ADR 0001).</summary>
+    public bool AffiliateLabEnabled { get; private set; }
+
     public void Rename(string name) => Name = name;
+
+    public void EnableAffiliateLab() => AffiliateLabEnabled = true;
 }

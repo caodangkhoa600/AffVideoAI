@@ -3,7 +3,8 @@ using AffiVideo.Domain;
 
 namespace AffiVideo.Contracts;
 
-public sealed record OrganizationResponse(Guid Id, string Name);
+/// <param name="AffiliateLabEnabled">Whether the Organization has the Affiliate Lab. Without it, everything under <c>/api/v1/lab</c> answers 404.</param>
+public sealed record OrganizationResponse(Guid Id, string Name, bool AffiliateLabEnabled);
 
 public sealed record UpdateOrganizationRequest([Required, StringLength(Organization.NameMaxLength)] string Name);
 

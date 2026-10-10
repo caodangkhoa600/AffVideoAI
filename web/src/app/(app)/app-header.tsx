@@ -18,6 +18,9 @@ const LINKS = [
   { href: "/settings", label: "Settings" },
 ] as const;
 
+// Only for an Organization that has the Affiliate Lab. The API refuses the rest whatever the page shows.
+const LAB_LINK = { href: "/lab", label: "Lab" } as const;
+
 export function AppHeader() {
   const session = useSession();
   const queryClient = useQueryClient();
@@ -52,7 +55,7 @@ export function AppHeader() {
           {session.data?.organization.name ?? "AffiVideo"}
         </span>
         <nav className="flex gap-4 text-sm">
-          {LINKS.map(({ href, label }) => (
+          {[...LINKS, ...(session.data?.organization.affiliateLabEnabled ? [LAB_LINK] : [])].map(({ href, label }) => (
             <Link key={href} href={href} className="text-muted-foreground hover:text-foreground">
               {label}
             </Link>

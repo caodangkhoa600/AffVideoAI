@@ -4,7 +4,7 @@
 
 **Blocked by:** 11, 12
 
-**Status:** ready-for-human
+**Status:** done
 
 - [x] The wizard covers: add or pick a Product and photos, Confirm Facts, choose creative template, Hook and duration, review and edit the Storyboard, render, preview, approve and download
 - [x] Leaving the wizard and returning resumes at the same step
@@ -12,7 +12,7 @@
 - [x] The dashboard shows recent Projects, recent Rendered Videos and jobs in progress
 - [x] A Playwright test runs sign in, create Product, upload image, Confirm Facts, generate Storyboard, render, preview, approve and download, with no paid AI
 - [x] The README documents the demonstration flow
-- [ ] The founder has run the flow on their own Product and given feedback
+- [x] The founder has run the flow on their own Product and given feedback
 
 ## Comments
 
@@ -71,3 +71,5 @@
 
   Not done, and the founder's to decide: making regeneration give a different wording each time. With no AI that means writing several sentence patterns for each Scene of each creative template and choosing among them, and the spec has the mock planner give the same Storyboard for the same inputs.
 
+
+- 2026-10-10, the founder: "ticket 17 oke". The last box is ticked and the ticket is done.

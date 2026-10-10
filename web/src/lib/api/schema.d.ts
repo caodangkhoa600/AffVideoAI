@@ -750,6 +750,129 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/lab/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The Organization's Products with what the Affiliate Lab keeps about each, by name. `shortlisted=true` is the shortlist. */
+        get: operations["ListLabProducts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/products/{productId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What the Affiliate Lab keeps about one Product. */
+        get: operations["GetLabProduct"];
+        /** Replaces what the Affiliate Lab keeps about a Product: whether it is shortlisted, the research notes, and the commission as a rate or as an amount. Nothing else about the Product changes. */
+        put: operations["UpdateLabProduct"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/campaigns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The Organization's Campaigns, newest first. A status narrows the list. */
+        get: operations["ListCampaigns"];
+        put?: never;
+        /** Creates a Campaign with no Variants in it. */
+        post: operations["CreateCampaign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/campaigns/{campaignId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One Campaign. */
+        get: operations["GetCampaign"];
+        /** Renames a Campaign. */
+        put: operations["RenameCampaign"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/campaigns/{campaignId}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archives a Campaign. It keeps its Variants, and no Variant is deleted. Archiving one that is already archived changes nothing. */
+        post: operations["ArchiveCampaign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/campaigns/{campaignId}/variants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The Variants the Campaign groups, in the order they were added, each with its Project and Product. */
+        get: operations["ListCampaignVariants"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/campaigns/{campaignId}/variants/{variantId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Adds a Variant, of any Product, to the Campaign. Adding one that is already in it changes nothing. */
+        put: operations["AddCampaignVariant"];
+        post?: never;
+        /** Takes a Variant out of the Campaign. The Variant itself is kept. */
+        delete: operations["RemoveCampaignVariant"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -778,6 +901,36 @@ export interface components {
             subjectId: null | string;
             /** Format: date-time */
             occurredAt: string;
+        };
+        CampaignRequest: {
+            name: string;
+        };
+        CampaignResponse: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            status: components["schemas"]["CampaignStatus"];
+            /** Format: int32 */
+            variantCount: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        /** @enum {unknown} */
+        CampaignStatus: "Active" | "Archived";
+        CampaignVariantResponse: {
+            /** Format: uuid */
+            variantId: string;
+            /** Format: uuid */
+            projectId: string;
+            /** Format: uuid */
+            productId: string;
+            productName: string;
+            creativeTemplate: components["schemas"]["CreativeTemplate"];
+            hook: string;
+            /** Format: date-time */
+            addedAt: string;
         };
         ClearFlagRequest: {
             factIds: string[];
@@ -834,6 +987,30 @@ export interface components {
         };
         /** Format: binary */
         IFormFile: string;
+        LabProductRequest: {
+            shortlisted: boolean;
+            researchNotes?: null | string;
+            /** Format: double */
+            commissionRatePercent?: null | number;
+            /** Format: double */
+            commissionAmount?: null | number;
+            commissionCurrency?: null | string;
+        };
+        LabProductResponse: {
+            /** Format: uuid */
+            productId: string;
+            name: string;
+            brand: string;
+            category: string;
+            status: components["schemas"]["ProductStatus"];
+            shortlisted: boolean;
+            researchNotes: string;
+            /** Format: double */
+            commissionRatePercent: null | number;
+            /** Format: double */
+            commissionAmount: null | number;
+            commissionCurrency: null | string;
+        };
         MemberResponse: {
             /** Format: uuid */
             id: string;
@@ -846,6 +1023,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             name: string;
+            affiliateLabEnabled: boolean;
         };
         PagedResponseOfAuditLogEntryResponse: {
             items: components["schemas"]["AuditLogEntryResponse"][];
@@ -856,8 +1034,35 @@ export interface components {
             /** Format: int32 */
             total: number;
         };
+        PagedResponseOfCampaignResponse: {
+            items: components["schemas"]["CampaignResponse"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+            /** Format: int32 */
+            total: number;
+        };
+        PagedResponseOfCampaignVariantResponse: {
+            items: components["schemas"]["CampaignVariantResponse"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+            /** Format: int32 */
+            total: number;
+        };
         PagedResponseOfFactResponse: {
             items: components["schemas"]["FactResponse"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+            /** Format: int32 */
+            total: number;
+        };
+        PagedResponseOfLabProductResponse: {
+            items: components["schemas"]["LabProductResponse"][];
             /** Format: int32 */
             page: number;
             /** Format: int32 */
@@ -3226,6 +3431,346 @@ export interface operations {
                 content: {
                     "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
+            };
+        };
+    };
+    ListLabProducts: {
+        parameters: {
+            query?: {
+                shortlisted?: boolean;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagedResponseOfLabProductResponse"];
+                };
+            };
+        };
+    };
+    GetLabProduct: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                productId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabProductResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    UpdateLabProduct: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                productId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LabProductRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabProductResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ListCampaigns: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["CampaignStatus"];
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagedResponseOfCampaignResponse"];
+                };
+            };
+        };
+    };
+    CreateCampaign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CampaignRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+        };
+    };
+    GetCampaign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                campaignId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    RenameCampaign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                campaignId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CampaignRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ArchiveCampaign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                campaignId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ListCampaignVariants: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path: {
+                campaignId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagedResponseOfCampaignVariantResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AddCampaignVariant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                campaignId: string;
+                variantId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    RemoveCampaignVariant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                campaignId: string;
+                variantId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

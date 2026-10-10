@@ -37,7 +37,8 @@ the only thing that changes the schema; nothing does so at startup. Run it again
 after pulling changes that add a migration.
 
 `seed` creates the demonstration Organization, its Owner and a fictional sample
-Product, the AirBeat X1, with three Confirmed Facts in Vietnamese. It adds only
+Product, the AirBeat X1, with three Confirmed Facts in Vietnamese, and gives the
+Organization the Affiliate Lab. It adds only
 what is missing, so run it again after pulling changes that add to the seed;
 otherwise running it again changes nothing.
 
@@ -261,12 +262,40 @@ render and preview (ticket 09), job reliability (ticket 10), approve,
 download and the library (ticket 11), Storyboard editing (ticket 12),
 flagging work built on Withdrawn Facts (ticket 13), the Luxury Cinematic
 and Problem–Solution templates (ticket 14), uploaded narration and music
-(ticket 15), production cost records (ticket 16) and the create video
-wizard, dashboard and end-to-end test (ticket 17).
+(ticket 15), production cost records (ticket 16), the create video
+wizard, dashboard and end-to-end test (ticket 17), which the founder ran and
+accepted, and the Affiliate Lab flag and Campaigns (ticket 18).
 
-The work stops here for the founder to run the demonstration flow on their own
-Product and say what they found. Next after that: the Affiliate Lab and
-Campaigns (ticket 18).
+Next: Published Posts (ticket 19).
+
+Notes from the Affiliate Lab flag and Campaigns:
+
+- The Affiliate Lab is a flag on an Organization (`affiliateLabEnabled`, ADR
+  0001). No endpoint sets it: the seed gives it to the demonstration
+  Organization, and for any other it is set in the database
+  (`UPDATE "Organizations" SET "AffiliateLabEnabled" = true WHERE ...`).
+- Everything of the Lab is under `/api/v1/lab`, and all of it answers 404 to a
+  member of an Organization without the flag, before anything of the request
+  is read. The flag is read from the database on each request, so it works
+  from the moment it is set, with no new session. The web app shows the Lab
+  link and the `/lab` pages only to an Organization that has it.
+- What the Lab keeps about a Product is on the Product itself: whether it is
+  on the shortlist, research notes of at most 4000 characters, and the
+  commission as a rate (0 to 100, two decimals) or as an amount for an order
+  with its currency, never both. `GET` and `PUT /api/v1/lab/products/{id}`
+  read and replace it, `GET /api/v1/lab/products?shortlisted=true` is the
+  shortlist, and the Product's page has an Affiliate Lab section. Editing the
+  Product leaves it, and an Organization without the Lab never sees it.
+- A Campaign has a name and is Active or Archived: `/api/v1/lab/campaigns`
+  to create and list (newest first, `status` narrows), `PUT` to rename,
+  `POST .../archive`. Nothing brings an archived Campaign back or deletes one.
+- `PUT` and `DELETE /api/v1/lab/campaigns/{id}/variants/{variantId}` add a
+  Variant, of any Product, and take it out; `GET .../variants` lists them in
+  the order they were added, each with its Project and Product. A Variant can
+  be in several Campaigns, and an archived Campaign can still be changed. The
+  Campaign only refers to a Variant: taking one out, or archiving, leaves the
+  Variant as it was. Deleting a Project takes its Variants out of every
+  Campaign with it.
 
 Notes from the create video wizard and dashboard:
 
