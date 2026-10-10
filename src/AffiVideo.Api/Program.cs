@@ -86,6 +86,7 @@ lab.MapAffiliateLinks();
 lab.MapPublishedPosts();
 lab.MapPerformanceSnapshots();
 lab.MapCommission();
+lab.MapLabDashboard();
 
 app.Run();
 

@@ -75,6 +75,8 @@ public static class InfrastructureSetup
         services.AddScoped<IPublishedPosts, ScopedPublishedPosts>();
         services.AddScoped<IPerformanceSnapshots, ScopedPerformanceSnapshots>();
         services.AddScoped<ICommissionRecords, ScopedCommissionRecords>();
+        services.Configure<LabDashboardOptions>(configuration.GetSection(LabDashboardOptions.Section));
+        services.AddScoped<ILabDashboard, ScopedLabDashboard>();
         services.AddScoped<DemonstrationSeed>();
         return services;
     }

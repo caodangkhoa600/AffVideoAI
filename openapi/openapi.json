@@ -3934,6 +3934,27 @@
           }
         }
       }
+    },
+    "/api/v1/lab/dashboard": {
+      "get": {
+        "tags": [
+          "Affiliate Lab"
+        ],
+        "summary": "Latest Published Post performance grouped by Product, creative template, Hook and Campaign. Unknown figures stay unknown; Commission is attributed only where its record permits.",
+        "operationId": "GetLabDashboard",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabDashboardResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4680,6 +4701,161 @@
       "IFormFile": {
         "type": "string",
         "format": "binary"
+      },
+      "LabDashboardGroupResponse": {
+        "required": [
+          "key",
+          "name",
+          "posts",
+          "tooSmallToCompare",
+          "views",
+          "likes",
+          "comments",
+          "shares",
+          "clicks",
+          "clickThroughRate",
+          "conversionRate",
+          "commission",
+          "postSources",
+          "clickThroughRateSources",
+          "conversionRateSources"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "posts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tooSmallToCompare": {
+            "type": "boolean"
+          },
+          "views": {
+            "$ref": "#/components/schemas/LabDashboardMetricResponse"
+          },
+          "likes": {
+            "$ref": "#/components/schemas/LabDashboardMetricResponse"
+          },
+          "comments": {
+            "$ref": "#/components/schemas/LabDashboardMetricResponse"
+          },
+          "shares": {
+            "$ref": "#/components/schemas/LabDashboardMetricResponse"
+          },
+          "clicks": {
+            "$ref": "#/components/schemas/LabDashboardMetricResponse"
+          },
+          "clickThroughRate": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "conversionRate": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "commission": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommissionTotalResponse"
+            }
+          },
+          "postSources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "clickThroughRateSources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "conversionRateSources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "LabDashboardMetricResponse": {
+        "required": [
+          "value",
+          "sources"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "LabDashboardResponse": {
+        "required": [
+          "minimumPosts",
+          "minimumViews",
+          "products",
+          "creativeTemplates",
+          "hooks",
+          "campaigns"
+        ],
+        "type": "object",
+        "properties": {
+          "minimumPosts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "minimumViews": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "products": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LabDashboardGroupResponse"
+            }
+          },
+          "creativeTemplates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LabDashboardGroupResponse"
+            }
+          },
+          "hooks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LabDashboardGroupResponse"
+            }
+          },
+          "campaigns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LabDashboardGroupResponse"
+            }
+          }
+        }
       },
       "LabProductRequest": {
         "required": [
