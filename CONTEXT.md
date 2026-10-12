@@ -76,6 +76,10 @@ _Avoid_: Opener, headline
 A versioned, ordered list of Scenes for a Variant. Any edit produces a new Storyboard version.
 _Avoid_: Shot plan, script, timeline
 
+**Planner**:
+What wrote the text of a Storyboard version: the mock planner, which fills fixed sentence patterns, or a named language model. A Storyboard version has exactly one.
+_Avoid_: Writer, generator, AI
+
 **Scene**:
 One timed segment of a Storyboard or of a Commercial, with its text, source assets and Technique.
 _Avoid_: Shot, segment
@@ -149,12 +153,16 @@ The Technique that puts a Still behind the Product's Cut-out. The Product is sti
 The Technique that fills a whole Scene with a Clip in which the Product does not appear.
 _Avoid_: B-roll, lifestyle shot
 
+**Description**:
+The words a Still or Clip is made from, saying what the picture of a generated Scene is to show. Within a Project, Scenes with the same description share their Stills and Clips.
+_Avoid_: Prompt, image prompt
+
 **Still**:
 A generated image that a member approves before it is used. It becomes a generated backdrop as it is, or the start of a Clip. Like a Clip, it is kept so it can be used again.
 _Avoid_: Storyboard image, keyframe, preview
 
 **Clip**:
-A generated video made from an approved Still, for generated footage or for a Scene of a Commercial. It is kept so it can be used again: by every Variant of its Project, and by another Project when a member picks it.
+A generated video made from an approved Still, for generated footage or for a Scene of a Commercial. It is kept so it can be used again: by every Variant of its Project whose Scene has the same description, and by another Project when a member picks it.
 _Avoid_: Shot, generation, take
 
 **Render Mode**:
