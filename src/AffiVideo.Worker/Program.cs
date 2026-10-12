@@ -1,6 +1,7 @@
 using AffiVideo.Application.Providers;
 using AffiVideo.Infrastructure;
 using AffiVideo.Worker;
+using AffiVideo.Worker.Generation;
 using AffiVideo.Worker.Rendering;
 
 var builder = Host.CreateApplicationBuilder(args);
@@ -18,5 +19,6 @@ builder.Services.AddScoped<VideoLayers>();
 builder.Services.AddScoped<SceneClips>();
 builder.Services.AddScoped<RenderJobRunner>();
 builder.Services.AddHostedService<RenderWorker>();
+builder.Services.AddHostedService<StillWorker>();
 
 builder.Build().Run();

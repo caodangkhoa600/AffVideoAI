@@ -1,4 +1,5 @@
 using AffiVideo.Application;
+using AffiVideo.Application.Generation;
 using AffiVideo.Application.Lab;
 using AffiVideo.Application.Organizations;
 using AffiVideo.Application.Products;
@@ -9,6 +10,7 @@ using AffiVideo.Application.Storage;
 using AffiVideo.Application.Storyboards;
 using AffiVideo.Application.SystemStatus;
 using AffiVideo.Domain;
+using AffiVideo.Infrastructure.Generation;
 using AffiVideo.Infrastructure.Identity;
 using AffiVideo.Infrastructure.Lab;
 using AffiVideo.Infrastructure.Organizations;
@@ -24,6 +26,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 
 namespace AffiVideo.Infrastructure;
 
@@ -65,7 +68,11 @@ public static class InfrastructureSetup
         services.AddScoped<IVariantAudio, ScopedVariantAudio>();
         // The only planner there is. A real language model is registered in its place, never beside it.
         services.AddSingleton<ILanguageModel, MockLanguageModel>();
+        services.Configure<GenerationOptions>(configuration.GetSection(GenerationOptions.Section));
         services.AddScoped<IStoryboards, ScopedStoryboards>();
+        // What the estimate of a generation is made with. The worker checks the same rates as it starts.
+        services.Configure<ProductionCostOptions>(configuration.GetSection(ProductionCostOptions.Section));
+        services.AddScoped<IGeneration, ScopedGeneration>();
         services.AddScoped<IRenders, ScopedRenders>();
         services.AddScoped<IRenderedVideos, ScopedRenderedVideos>();
         services.AddScoped<ILabProducts, ScopedLabProducts>();
@@ -82,8 +89,8 @@ public static class InfrastructureSetup
     }
 
     /// <summary>
-    /// The render queue as the worker sees it, across Organizations. Only the worker
-    /// asks for this: nothing in the API can claim a job.
+    /// The render queue and the queue of Stills as the worker sees them, across Organizations, and the
+    /// image provider. Only the worker asks for this: nothing in the API can claim a job or call a provider.
     /// </summary>
     public static IServiceCollection AddRenderQueue(this IServiceCollection services, IConfiguration configuration)
     {
@@ -96,6 +103,15 @@ public static class InfrastructureSetup
                 $"The rates under {ProductionCostOptions.Section} cannot be used: the version is a name, " +
                 $"the currency a three-letter code in capitals, and a rate is from zero to {RenderRates.MaxAmount:0}.")
             .ValidateOnStart();
+        // The Stills a member confirmed wait in a queue of their own, served under the same leases.
+        services.AddScoped<IStillQueue, StillQueue>();
+        // Whatever is configured to make them. A real provider is registered in the fake's place, never beside it.
+        services.AddSingleton<IImageGenerator>(provider =>
+            provider.GetRequiredService<IOptions<GenerationOptions>>().Value switch
+            {
+                { ImageProvider: ImageProvider.Fake, Fake: var fake } => new FakeImageGenerator(fake),
+                _ => new NoImageGenerator(),
+            });
         return services.AddScoped<IRenderQueue, RenderQueue>();
     }
 

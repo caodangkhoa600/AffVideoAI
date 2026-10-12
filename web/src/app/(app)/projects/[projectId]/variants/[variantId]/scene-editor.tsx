@@ -26,6 +26,8 @@ type Draft = {
   assetId: string;
   /** In seconds, as typed. */
   duration: string;
+  /** What the Scene's generated picture is to show. Null for a Scene that has none. */
+  description: string | null;
 };
 
 const draftOf = (scene: Scene): Draft => ({
@@ -35,6 +37,7 @@ const draftOf = (scene: Scene): Draft => ({
   narrationText: scene.narrationText,
   assetId: scene.assetIds[0] ?? "",
   duration: String(scene.durationMs / 1000),
+  description: scene.description,
 });
 
 const milliseconds = (duration: string) => Math.round(Number(duration) * 1000);
@@ -102,6 +105,7 @@ export function SceneEditor({
         narrationText: draft.narrationText.trim() === was.narrationText ? undefined : draft.narrationText,
         assetId: draft.assetId === was.assetId ? undefined : draft.assetId,
         durationMs: milliseconds(draft.duration) === scene.durationMs ? undefined : milliseconds(draft.duration),
+        description: draft.description === null || draft.description.trim() === was.description ? undefined : draft.description,
       };
     });
     const { error, response } = await api
@@ -197,6 +201,21 @@ export function SceneEditor({
                   onChange={(event) => change(index, { narrationText: event.target.value })}
                 />
               </div>
+              {draft.description !== null && (
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor={`${id}-description`}>Generated picture</Label>
+                  <Textarea
+                    id={`${id}-description`}
+                    value={draft.description}
+                    maxLength={1000}
+                    onChange={(event) => change(index, { description: event.target.value })}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    What the backdrop behind the Product is to show, as the image provider is told. A different
+                    description needs a Still of its own, which is a new paid generation.
+                  </p>
+                </div>
+              )}
               <div className="flex flex-col gap-2">
                 <Label htmlFor={`${id}-duration`}>Duration in seconds</Label>
                 <Input

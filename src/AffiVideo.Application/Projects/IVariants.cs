@@ -10,7 +10,8 @@ namespace AffiVideo.Application.Projects;
 public interface IVariants
 {
     /// <returns>Null when there is no such Project.</returns>
-    Task<Variant?> AddAsync(Guid projectId, CreativeTemplate creativeTemplate, string hook, CancellationToken cancellationToken);
+    Task<Variant?> AddAsync(
+        Guid projectId, CreativeTemplate creativeTemplate, string hook, RenderMode renderMode, CancellationToken cancellationToken);
 
     /// <summary>Oldest first. Null when there is no such Project.</summary>
     Task<Page<Variant>?> ListAsync(Guid projectId, PageRequest page, CancellationToken cancellationToken);

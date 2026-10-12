@@ -76,6 +76,7 @@ v1.MapProjects();
 v1.MapVariants();
 v1.MapVariantAudio();
 v1.MapStoryboards();
+v1.MapGeneration();
 v1.MapRenders();
 v1.MapRenderedVideos();
 var lab = v1.MapLab();

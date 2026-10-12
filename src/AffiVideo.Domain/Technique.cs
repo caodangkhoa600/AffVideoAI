@@ -9,8 +9,11 @@ public enum Technique
     /// <summary>A photo that is scaled, moved, rotated or faded, and never repainted.</summary>
     ImageMotion,
 
-    /// <summary>A video generated from a photo. Generative.</summary>
-    ImageToVideo,
+    /// <summary>A Still behind the Product's Cut-out. The Product is still its photo. Generative.</summary>
+    GeneratedBackdrop,
+
+    /// <summary>A Clip that fills the Scene, in which the Product does not appear. Generative.</summary>
+    GeneratedFootage,
 
     /// <summary>A video the Organization supplied.</summary>
     VideoAsset,
@@ -30,6 +33,13 @@ public enum RenderMode
 
     /// <summary>Generative Techniques are allowed alongside the others.</summary>
     Hybrid,
+}
+
+public static class Techniques
+{
+    /// <summary>Whether the Scene's picture is generated: a generated backdrop or generated footage.</summary>
+    public static bool IsGenerated(this Technique technique) =>
+        technique is Technique.GeneratedBackdrop or Technique.GeneratedFootage;
 }
 
 public static class RenderModes
@@ -54,23 +64,30 @@ public static class PlanningEngine
     /// Scene's own preferences that the Render Mode allows and that can be made
     /// from what there is.
     /// </summary>
+    /// <param name="canGenerateStills">Whether an image provider exists to make a Still with.</param>
     public static IReadOnlyList<Technique> AssignTechniques(
-        int usablePhotos, CreativeTemplateDefinition template, int targetDurationSeconds, RenderMode renderMode)
+        int usablePhotos, CreativeTemplateDefinition template, int targetDurationSeconds, RenderMode renderMode,
+        bool canGenerateStills = false)
     {
         var durations = template.SceneDurations(targetDurationSeconds);
-        return template.Scenes.Select((scene, index) => TechniqueFor(scene, usablePhotos, durations[index], renderMode)).ToArray();
+        return template.Scenes
+            .Select((scene, index) => TechniqueFor(scene, usablePhotos, durations[index], renderMode, canGenerateStills))
+            .ToArray();
     }
 
     /// <summary>The Technique for one Scene of a template that lasts this long, chosen the same way.</summary>
-    public static Technique TechniqueFor(SceneSlot scene, int usablePhotos, int sceneMilliseconds, RenderMode renderMode) =>
+    public static Technique TechniqueFor(
+        SceneSlot scene, int usablePhotos, int sceneMilliseconds, RenderMode renderMode, bool canGenerateStills = false) =>
         scene.Techniques
-            .Where(technique => renderMode.Allows(technique) && CanBeMade(technique, usablePhotos, sceneMilliseconds))
+            .Where(technique => renderMode.Allows(technique) && CanBeMade(technique, usablePhotos, sceneMilliseconds, canGenerateStills))
             // Type needs nothing but the text, so it is what is left when nothing else can be made.
             .DefaultIfEmpty(Technique.TextAnimation)
             .First();
 
-    private static bool CanBeMade(Technique technique, int usablePhotos, int sceneMilliseconds) => technique switch
+    private static bool CanBeMade(Technique technique, int usablePhotos, int sceneMilliseconds, bool canGenerateStills) => technique switch
     {
+        // The backdrop goes behind the Product's photo, so there has to be one.
+        Technique.GeneratedBackdrop => canGenerateStills && usablePhotos > 0,
         Technique.StaticImage => usablePhotos > 0,
         Technique.ImageMotion => usablePhotos > 0 && sceneMilliseconds >= MinImageMotionMilliseconds,
         Technique.TextAnimation => true,

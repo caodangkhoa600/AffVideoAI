@@ -31,9 +31,11 @@ public sealed record ProjectResponse(
     DateTimeOffset CreatedAt);
 
 /// <param name="Hook">The opening line, meant to stop the viewer scrolling.</param>
+/// <param name="RenderMode">Product Lock when left out. Hybrid lets some Scenes have generated pictures; the Product is its photo in both.</param>
 public sealed record VariantRequest(
     CreativeTemplate CreativeTemplate,
-    [Required, StringLength(Variant.HookMaxLength)] string Hook);
+    [Required, StringLength(Variant.HookMaxLength)] string Hook,
+    RenderMode RenderMode = RenderMode.ProductLock);
 
 /// <param name="Hook">The Hook of the new Variant, which must not be the one the duplicated Variant has.</param>
 public sealed record DuplicateVariantRequest(
@@ -45,6 +47,7 @@ public sealed record VariantResponse(
     Guid ProjectId,
     CreativeTemplate CreativeTemplate,
     string Hook,
+    RenderMode RenderMode,
     DateTimeOffset CreatedAt);
 
 /// <summary>A language a video can be made in. A blank one is for [Required] to refuse.</summary>

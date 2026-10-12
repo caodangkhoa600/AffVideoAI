@@ -80,12 +80,28 @@ public sealed record FactPacing(int LeadInMs, int AroundEachFactMs, int WordStep
 /// <param name="Techniques">The Techniques the Scene can be produced with, the one it would rather have first.</param>
 /// <param name="MinDurationMs">The shortest the Scene can be made for everything in its layout to arrive and be seen, in milliseconds.</param>
 /// <param name="Photo">Which of the Product's photos the Scene shows.</param>
+/// <param name="Description">
+/// What the picture of the Scene is to show when it is generated, in words for the image provider, with
+/// <see cref="CategoryPlaceholder"/> and <see cref="AudiencePlaceholder"/> where those are placed. Null for a Scene that is never generated.
+/// </param>
 public sealed record SceneSlot(
     SceneLayout Layout,
     int Share,
     IReadOnlyList<Technique> Techniques,
     int MinDurationMs,
-    ScenePhoto Photo = ScenePhoto.First);
+    ScenePhoto Photo = ScenePhoto.First,
+    string? Description = null)
+{
+    public const string CategoryPlaceholder = "{category}";
+    public const string AudiencePlaceholder = "{audience}";
+
+    /// <summary>
+    /// The description of the Scene's generated picture for this Product and audience. What a member
+    /// typed is placed in it whole, as data, and never read for meaning. Null for a Scene that is never generated.
+    /// </summary>
+    public string? DescriptionFor(string category, string audience) =>
+        Description?.Replace(CategoryPlaceholder, category.Trim()).Replace(AudiencePlaceholder, audience.Trim());
+}
 
 /// <summary>
 /// A layout of a creative template. Each fixes what the lines of a Scene's
@@ -160,14 +176,20 @@ public static class CreativeTemplates
     /// </summary>
     private static readonly CreativeTemplateDefinition ProductShowcase = new(
         CreativeTemplate.ProductShowcase,
-        Version: 1,
+        // 2: the Hook may have a generated backdrop.
+        Version: 2,
         Scenes:
         [
             // The shortest each can be made: the thirteenth word of a Hook is in place at 1.92 seconds, the
             // name of the reveal by about 1.5, and the call to action at 1.85, to be read for a moment after.
             // What a Facts Scene needs beyond its two seconds depends on its Facts, and is the pacing below.
-            new SceneSlot(SceneLayout.Hook, Share: 3, [Technique.ImageMotion, Technique.StaticImage], MinDurationMs: 2000),
-            new SceneSlot(SceneLayout.Reveal, Share: 5, [Technique.ImageToVideo, Technique.ImageMotion, Technique.StaticImage], MinDurationMs: 2000),
+            new SceneSlot(
+                SceneLayout.Hook, Share: 3, [Technique.GeneratedBackdrop, Technique.ImageMotion, Technique.StaticImage], MinDurationMs: 2000,
+                Description:
+                    "A bright, clean setting where " + SceneSlot.CategoryPlaceholder + " would be used by " + SceneSlot.AudiencePlaceholder +
+                    ", photographed as the backdrop of an advertisement: an empty surface in the lower middle of the frame for a product " +
+                    "to stand on, soft daylight, shallow depth of field, vertical 9:16. No product, no people, no text, no logos."),
+            new SceneSlot(SceneLayout.Reveal, Share: 5, [Technique.ImageMotion, Technique.StaticImage], MinDurationMs: 2000),
             new SceneSlot(SceneLayout.Facts, Share: 7, [Technique.TextAnimation], MinDurationMs: 2000, ScenePhoto.Last),
             new SceneSlot(SceneLayout.Closing, Share: 5, [Technique.ImageMotion, Technique.StaticImage], MinDurationMs: 2500),
         ],
@@ -192,12 +214,18 @@ public static class CreativeTemplates
     /// </summary>
     private static readonly CreativeTemplateDefinition LuxuryCinematic = new(
         CreativeTemplate.LuxuryCinematic,
-        Version: 1,
+        // 2: the Hook may have a generated backdrop.
+        Version: 2,
         Scenes:
         [
             // The shortest each can be made: the Hook's last word has faded in by 1.9 seconds whatever
             // its length, and the longest name and call to action by about 2.7, each to be read for a moment after.
-            new SceneSlot(SceneLayout.Hook, Share: 6, [Technique.ImageMotion, Technique.StaticImage], MinDurationMs: 2500),
+            new SceneSlot(
+                SceneLayout.Hook, Share: 6, [Technique.GeneratedBackdrop, Technique.ImageMotion, Technique.StaticImage], MinDurationMs: 2500,
+                Description:
+                    "A dark, elegant studio set for a luxury advertisement of " + SceneSlot.CategoryPlaceholder + " aimed at " +
+                    SceneSlot.AudiencePlaceholder + ": a polished stone surface in the lower middle of the frame for a product to stand on, " +
+                    "a single soft light from one side, deep shadows, vertical 9:16. No product, no people, no text, no logos."),
             new SceneSlot(SceneLayout.Facts, Share: 8, [Technique.TextAnimation], MinDurationMs: 2000, ScenePhoto.Last),
             new SceneSlot(SceneLayout.Closing, Share: 6, [Technique.ImageMotion, Technique.StaticImage], MinDurationMs: 3000),
         ],

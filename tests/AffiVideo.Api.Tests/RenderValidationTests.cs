@@ -87,11 +87,11 @@ public sealed class RenderValidationTests
     public void A_Scene_planned_with_a_generative_Technique_is_not_rendered_in_Product_Lock()
     {
         var photo = Asset();
-        var generative = new Scene(1, SceneLayout.Reveal, Technique.ImageToVideo, 5000, ["Lumo 500"], "", [photo.Id], []);
+        var generative = new Scene(1, SceneLayout.Reveal, Technique.GeneratedFootage, 5000, ["Lumo 500"], "", [photo.Id], []);
 
         var problems = StoryboardRules.RenderProblems(Storyboard([generative]), [photo]);
 
-        Assert.Contains("ImageToVideo", Assert.Single(problems));
+        Assert.Contains("GeneratedFootage", Assert.Single(problems));
     }
 
     private static Storyboard Storyboard(

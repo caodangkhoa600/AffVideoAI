@@ -538,4 +538,35 @@ public sealed class OrganizationIsolationTests(AffiVideoApp app)
 
         Assert.Equal([mine.Owner.Email], members.Items.Select(m => m.Email));
     }
+
+    [Fact]
+    public async Task A_member_of_one_Organization_is_refused_a_Still_of_another_and_its_picture_and_can_decide_nothing_about_it()
+    {
+        await using var stack = await app.NewStackAsync(StillGenerationTests.FakeImages(rate: 0.04m));
+        using var them = await stack.NewMemberAsync();
+        using var me = await stack.NewMemberAsync();
+        var variant = await HybridStoryboardTests.HybridVariantAsync(them);
+        await StoryboardTests.GeneratedAsync(them, variant);
+        var worker = await stack.StartWorkerAsync(StillGenerationTests.FakeImageWorker);
+        var still = await StillGenerationTests.EndedAsync(them, await StillGenerationTests.ConfirmedAsync(them, variant, 1), worker);
+        var generation = StillGenerationTests.Generation(variant, 1);
+        (string, string) key = ("Idempotency-Key", Guid.NewGuid().ToString());
+
+        HttpResponseMessage[] refused =
+        [
+            await me.GetAsync($"/api/v1/stills/{still.Id}"),
+            await me.GetAsync($"/api/v1/stills/{still.Id}/content"),
+            await me.PostAsync($"/api/v1/stills/{still.Id}/approve", new { }),
+            await me.PostAsync($"/api/v1/stills/{still.Id}/another", new AnotherStillRequest(0.04m), key),
+            await me.GetAsync($"{ProjectTests.Projects}/{variant.ProjectId}/stills"),
+            await me.GetAsync(generation),
+            await me.PostAsync(generation, new ConfirmGenerationRequest(0.04m), key),
+        ];
+
+        Assert.All(refused, response => Assert.Equal(HttpStatusCode.NotFound, response.StatusCode));
+        // It is theirs as it was: ready for review, with its picture, and the only one.
+        Assert.Equal(AffiVideo.Domain.StillState.ReadyForReview, (await them.GetAsync<StillResponse>($"/api/v1/stills/{still.Id}")).State);
+        Assert.Equal(HttpStatusCode.OK, (await them.GetAsync($"/api/v1/stills/{still.Id}/content")).StatusCode);
+        Assert.Equal(1, (await StillGenerationTests.StillsAsync(them, variant)).Total);
+    }
 }

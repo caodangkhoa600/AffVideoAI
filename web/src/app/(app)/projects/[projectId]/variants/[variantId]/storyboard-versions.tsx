@@ -5,8 +5,9 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { api, problemDetail, type Scene, type SceneLayout, type Storyboard, type Variant } from "@/lib/api/client";
 import { FlaggedForReview } from "../../../../flagged-for-review";
-import { TECHNIQUES } from "../../../techniques";
+import { renderModeName, TECHNIQUES } from "../../../techniques";
 import { SceneEditor } from "./scene-editor";
+import { StoryboardGeneration } from "./storyboard-generation";
 import { StoryboardRender } from "./storyboard-render";
 
 const LOADING = <p className="text-sm text-muted-foreground">Loading…</p>;
@@ -164,6 +165,10 @@ export function StoryboardVersions({
                 onAdded={added}
                 onFlagCleared={() => queryClient.invalidateQueries({ queryKey: key })}
               />
+              {/* Paid generation comes before rendering, and only Hybrid has any. */}
+              {shown.renderMode === "Hybrid" && (
+                <StoryboardGeneration key={`generation-${shown.id}`} variant={variant} storyboard={shown} />
+              )}
               {/* Keyed by the version, so a job being watched is never shown under another version. */}
               {render && <StoryboardRender key={`render-${shown.id}`} variant={variant} storyboard={shown} />}
             </>
@@ -228,7 +233,7 @@ function StoryboardVersion({
         <h2 className="text-xl font-semibold tracking-tight">Version {storyboard.version}</h2>
         <p className="text-sm text-muted-foreground">
           {storyboard.scenes.length} Scenes · {seconds(total)} ·{" "}
-          {storyboard.renderMode === "ProductLock" ? "Product Lock" : storyboard.renderMode} · made on{" "}
+          {renderModeName(storyboard.renderMode)} · made on{" "}
           {new Date(storyboard.createdAt).toLocaleString()}
         </p>
         <p className="w-fit rounded-md border bg-muted px-2 py-1 text-sm" data-testid="storyboard-planner">
@@ -313,6 +318,12 @@ function SceneRow({
           <span className="text-muted-foreground">Narration: </span>
           {scene.narrationText}
         </p>
+        {scene.description !== null && (
+          <p className="break-words text-sm" data-testid="scene-description">
+            <span className="text-muted-foreground">Generated picture: </span>
+            {scene.description}
+          </p>
+        )}
         {scene.facts.length === 0 ? (
           !scene.manuallyEdited && <p className="text-sm text-muted-foreground">Uses no Facts.</p>
         ) : (

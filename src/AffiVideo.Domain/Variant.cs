@@ -1,7 +1,8 @@
 namespace AffiVideo.Domain;
 
 /// <summary>
-/// One creative treatment of a Project: a creative template and a Hook. Neither
+/// One creative treatment of a Project: a creative template and a Hook, made in
+/// a Render Mode. None of them
 /// ever changes, and nor does the identifier, so that results stay attached to
 /// the creative idea they were measured for. A different Hook is a different Variant.
 /// </summary>
@@ -14,13 +15,16 @@ public sealed class Variant : IOwnedByOrganization
     {
     }
 
-    public Variant(Guid id, Guid organizationId, Guid projectId, CreativeTemplate creativeTemplate, string hook, DateTimeOffset createdAt)
+    public Variant(
+        Guid id, Guid organizationId, Guid projectId, CreativeTemplate creativeTemplate, string hook, RenderMode renderMode,
+        DateTimeOffset createdAt)
     {
         Id = id;
         OrganizationId = organizationId;
         ProjectId = projectId;
         CreativeTemplate = creativeTemplate;
         Hook = hook.Trim();
+        RenderMode = renderMode;
         CreatedAt = createdAt;
     }
 
@@ -35,14 +39,17 @@ public sealed class Variant : IOwnedByOrganization
     /// <summary>The opening line, meant to stop the viewer scrolling.</summary>
     public string Hook { get; private set; } = "";
 
+    /// <summary>Which Techniques the planning engine may use for the Variant's videos.</summary>
+    public RenderMode RenderMode { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
 
     /// <summary>Whether this is the Hook the Variant already has, however it is spaced or capitalised.</summary>
     public bool HasHook(string hook) => string.Equals(Hook, hook.Trim(), StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>A separate Variant of the same Project with the same creative template and another Hook.</summary>
+    /// <summary>A separate Variant of the same Project with the same creative template and Render Mode and another Hook.</summary>
     public Variant DuplicateWith(Guid id, string hook, DateTimeOffset now) =>
-        new(id, OrganizationId, ProjectId, CreativeTemplate, hook, now);
+        new(id, OrganizationId, ProjectId, CreativeTemplate, hook, RenderMode, now);
 }
 
 /// <summary>How a Variant looks and reads: its Scene structure, layout, typography and motion.</summary>

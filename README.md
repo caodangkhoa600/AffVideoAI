@@ -269,6 +269,10 @@ Posts (ticket 19), Performance Snapshots (ticket 20), Commission records
 (ticket 22), the corrections to them (ticket 27), and the Affiliate Lab
 dashboard (ticket 23). Every ticket of month one is done or set aside.
 
+Hybrid video (`.scratch/hybrid-video`): the provider test (ticket 01) and a
+Still for a generated backdrop (ticket 02) are done. A Hybrid Storyboard
+cannot be rendered until ticket 03.
+
 Notes from the Affiliate Lab dashboard:
 
 - `GET /api/v1/lab/dashboard` answers four lists of groups: `products`,
@@ -597,9 +601,11 @@ Notes from Storyboard generation:
   Each Scene keeps the identifier and a copy of the text of the Facts it
   used. A usable photo is a photo (not the logo) of at least 400
   pixels on each side; the Facts Scene shows the newest, the others the oldest.
-- Every Storyboard is planned in Product Lock, where the planning engine
-  assigns only static image, image motion and text animation. Hybrid exists as
-  a value and chooses nothing else until there is a provider to generate with.
+- A Storyboard is planned in its Variant's Render Mode. In Product Lock the
+  planning engine assigns only static image, image motion and text animation.
+  In Hybrid it may also give the Hook Scene a generated backdrop, when the
+  creative template allows it and an image provider is configured; see the
+  notes from Stills below.
 - When a Storyboard cannot be planned the answer is 409 with the reason: no
   Confirmed Fact in the language, no usable photo, a Fact with too many words
   to be read even alone, or a Hook, Fact or Product name too long for its
@@ -793,6 +799,85 @@ Notes from uploaded narration and music:
 - The whole upload and the decoded sound are held in memory while the API
   decodes. For one MP3 at the limits that is the 20 MB file, the samples as
   they are decoded and the WAV made of them: about 200 MB at worst.
+
+Notes from Stills for a generated backdrop (Hybrid video, ticket 02):
+
+- A Variant has a Render Mode, Product Lock unless Hybrid is chosen when it is
+  added (`renderMode`). It never changes, and a duplicate keeps it. The create
+  video wizard still makes Product Lock Variants only; Hybrid is chosen on the
+  Project's page.
+- The Technique list has generated backdrop and generated footage, and no
+  image-to-video (ADR 0004). Only generated backdrop is planned so far: for the
+  Hook Scene of Product Showcase and Luxury Cinematic, whose Hook shows the
+  Product. Problem–Solution's Hook is type alone, so it has none.
+- What generates is a setting of the API and the worker, `Generation__ImageProvider`
+  (`IMAGE_PROVIDER` in `.env`): `None` or `Fake`. With `None`, Hybrid plans
+  exactly what Product Lock does and `GET .../storyboards/{version}/generation`
+  says generation is unavailable. `Fake` returns one fixed striped picture,
+  calls nobody, and is labelled as fake in the data (`fake`, `provider`,
+  `model`) and on the page. There is no real provider yet (ticket 09).
+- A generated Scene has a `description`: the creative template's, with the
+  Product's category and the Project's audience placed in it whole. A member
+  replaces it by editing the Scene, which makes the next Storyboard version.
+  Bringing in descriptions took Product Showcase and Luxury Cinematic to
+  template version 2.
+- Nothing is generated without a confirmation (ADR 0003). The estimate
+  (`GET .../generation`) lists the Stills that would be made, their total, what
+  the Project has spent and its ceiling. `POST .../generation` needs an
+  `Idempotency-Key` and `confirmedTotal`, and is answered 409 unless that is
+  the estimate's total now.
+- A Still is a record of its own (`Stills`), owned by the Organization and kept
+  at `organizations/{id}/stills/{id}.png`, reachable only through
+  `GET /api/v1/stills/{id}/content`. It belongs to the Project it was made
+  for: a Scene of any Variant of that Project that describes the same picture
+  has the same Still, so a second Variant pays nothing.
+- Stills wait in a queue of their own, the `Stills` table, served by the
+  worker under the same lease, attempts and waits as render jobs
+  (`RenderQueue` settings). States: queued, generating, ready for review,
+  approved, rejected, failed. Only a technical failure the provider did not
+  charge for is tried again without the member; a refusal, a failure that was
+  charged for, and a failure on the last attempt end the Still as failed, with
+  a reason. A Scene whose Still failed has none, and the estimate offers it
+  again.
+- Two things fail a Still as charged for, and are never tried again without
+  the member (ADR 0003). A Still whose worker stopped, so that its lease ran
+  out: unlike a render job it does not go back to the queue, because nobody
+  knows whether the provider charged. And a picture the provider made that
+  the worker could not store.
+- `POST /api/v1/stills/{id}/approve` accepts a Still that is ready for review.
+  `POST /api/v1/stills/{id}/another` rejects one that has been made and queues
+  another of the same picture: a new paid generation, which needs an
+  `Idempotency-Key` and `confirmedAmount`, and is answered 409 unless that is
+  what another is estimated at now (`anotherStillAmount` in the estimate). The
+  rejected Still is kept.
+- A Project's generation has a ceiling, the Organization's
+  (`GenerationCeiling`, 5 in the currency of the rates). Nothing changes it yet
+  (ticket 07). A confirmation or another take that would pass it is answered
+  409 with the amounts. What is queued counts as spent, and so does every Still
+  that was made, rejected ones included; a failure the provider did not charge
+  for does not.
+- A confirmation and a request for another hold the Project's row while they
+  decide (`SELECT ... FOR UPDATE`), so requests that arrive at the same moment
+  are decided one at a time: a Scene's Still is paid for once, and the ceiling
+  cannot be passed between them.
+- Every Still that is made or fails for good leaves one production cost record
+  (`GenerationCostRecords`): provider, model, estimated amount, currency and
+  rates version. The amount is the estimate the Still was confirmed at, or zero
+  when the provider did not charge. It is on the Still (`cost`) and is not yet
+  part of a Product's production cost total (ticket 07).
+- The rate is `ProductionCost__FakeStill` (0.04), a setting of the API, which
+  makes the estimate. The fake charges nobody: the amount stands in for a real
+  provider's.
+- The fake can be made to misbehave, to see what a member is shown:
+  `Generation__Fake__TechnicalFailures`, `Generation__Fake__BillsFailures`,
+  `Generation__Fake__Refuses` and `Generation__Fake__DelaySeconds`, on the
+  worker.
+- A Hybrid Storyboard cannot be rendered yet: a render of one fails validation
+  with "Only a Storyboard in Product Lock can be rendered so far." Drawing the
+  Still behind the Cut-out is ticket 03.
+- On the Variant's page a Hybrid Storyboard version has "Generated pictures":
+  the estimate, the confirmation, and each Still with its state, to approve or
+  to replace with another.
 
 Notes from production cost records:
 

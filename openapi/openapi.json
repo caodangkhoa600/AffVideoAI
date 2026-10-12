@@ -109,6 +109,244 @@
         }
       }
     },
+    "/api/v1/projects/{projectId}/stills": {
+      "get": {
+        "tags": [
+          "Generation"
+        ],
+        "summary": "The Stills made for the Project, newest first, rejected and failed ones included.",
+        "operationId": "ListStills",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResponseOfStillResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/stills/{stillId}": {
+      "get": {
+        "tags": [
+          "Generation"
+        ],
+        "summary": "One Still and the state it is in.",
+        "operationId": "GetStill",
+        "parameters": [
+          {
+            "name": "stillId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StillResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/stills/{stillId}/approve": {
+      "post": {
+        "tags": [
+          "Generation"
+        ],
+        "summary": "Records that the member accepts a Still that is ready for review, in the member's name. Answers 409 with the reason for a Still in any other state.",
+        "operationId": "ApproveStill",
+        "parameters": [
+          {
+            "name": "stillId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StillResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/stills/{stillId}/another": {
+      "post": {
+        "tags": [
+          "Generation"
+        ],
+        "summary": "Rejects a Still that has been made and queues another of the same picture in its place. This is a new paid generation, made only for the amount the member confirms, and it counts against the Project's ceiling. The rejected Still is kept, with what it cost. Answers 409 with the reason for a Still that has not been made, when the confirmed amount is not what another is estimated at now, or when it would take the Project past its ceiling. A request repeated with the same Idempotency-Key is answered 200 with the Still the first one queued.",
+        "operationId": "AskForAnotherStill",
+        "parameters": [
+          {
+            "name": "stillId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnotherStillRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StillResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StillResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/stills/{stillId}/content": {
+      "get": {
+        "tags": [
+          "Generation"
+        ],
+        "summary": "The picture of a Still that has been made, as a PNG. Answers 404 until it is made.",
+        "operationId": "GetStillContent",
+        "parameters": [
+          {
+            "name": "stillId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
     "/api/v1/render-jobs/in-progress": {
       "get": {
         "tags": [
@@ -1486,7 +1724,7 @@
         "tags": [
           "Variants"
         ],
-        "summary": "Adds a Variant to the Project: a creative template and a Hook.",
+        "summary": "Adds a Variant to the Project: a creative template, a Hook and a Render Mode.",
         "operationId": "AddVariant",
         "parameters": [
           {
@@ -2125,7 +2363,7 @@
         "tags": [
           "Storyboards"
         ],
-        "summary": "Makes the Variant's next Storyboard version from this one, edited: on-screen and narration text, the photo a Scene shows, the order of the Scenes and their durations. This version stays as it is. A Scene whose text changes is marked Manually Edited, and its text is no longer checked against Facts. Answers 409 with the reason when the edit changes nothing, leaves a Scene out, breaks the target duration, shows an image the Product does not have, moves the Hook from the start, or does not fit a layout.",
+        "summary": "Makes the Variant's next Storyboard version from this one, edited: on-screen and narration text, the photo a Scene shows, the order of the Scenes, their durations and the description of a generated picture. This version stays as it is. A Scene whose text changes is marked Manually Edited, and its text is no longer checked against Facts. Answers 409 with the reason when the edit changes nothing, leaves a Scene out, breaks the target duration, shows an image the Product does not have, moves the Hook from the start, or does not fit a layout.",
         "operationId": "EditStoryboard",
         "parameters": [
           {
@@ -2328,6 +2566,157 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/StoryboardResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/variants/{variantId}/storyboards/{version}/generation": {
+      "get": {
+        "tags": [
+          "Generation"
+        ],
+        "summary": "What generation for this Storyboard version would make, what that is estimated to cost, and what the Project has spent against its ceiling. It spends nothing. With no image provider configured, it says generation is unavailable.",
+        "operationId": "EstimateGeneration",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "variantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationEstimateResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Generation"
+        ],
+        "summary": "Confirms the estimate the member saw and queues its Stills for the worker. Nothing paid is generated without it. Answers 409 with the reason when the confirmed total is not the estimate's, when there is nothing to generate, when generation is unavailable, or when it would take the Project past its ceiling. A request repeated with the same Idempotency-Key is answered 200 with the Stills the first one queued.",
+        "operationId": "ConfirmGeneration",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "variantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmGenerationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfirmedGenerationResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfirmedGenerationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
                 }
               }
             }
@@ -4021,6 +4410,18 @@
           }
         }
       },
+      "AnotherStillRequest": {
+        "required": [
+          "confirmedAmount"
+        ],
+        "type": "object",
+        "properties": {
+          "confirmedAmount": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
       "AntiforgeryTokenResponse": {
         "required": [
           "requestToken"
@@ -4442,6 +4843,32 @@
           }
         }
       },
+      "ConfirmedGenerationResponse": {
+        "required": [
+          "stills"
+        ],
+        "type": "object",
+        "properties": {
+          "stills": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StillResponse"
+            }
+          }
+        }
+      },
+      "ConfirmGenerationRequest": {
+        "required": [
+          "confirmedTotal"
+        ],
+        "type": "object",
+        "properties": {
+          "confirmedTotal": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
       "CreativeTemplate": {
         "enum": [
           "LuxuryCinematic",
@@ -4553,6 +4980,31 @@
           }
         }
       },
+      "EstimatedStillResponse": {
+        "required": [
+          "scenePosition",
+          "technique",
+          "description",
+          "estimatedAmount"
+        ],
+        "type": "object",
+        "properties": {
+          "scenePosition": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "technique": {
+            "$ref": "#/components/schemas/Technique"
+          },
+          "description": {
+            "type": "string"
+          },
+          "estimatedAmount": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
       "FactRequest": {
         "required": [
           "text",
@@ -4653,6 +5105,69 @@
           "Withdrawn"
         ]
       },
+      "GenerationEstimateResponse": {
+        "required": [
+          "available",
+          "unavailable",
+          "stills",
+          "total",
+          "currency",
+          "spent",
+          "ceiling",
+          "imageProvider",
+          "sceneStills",
+          "anotherStillAmount"
+        ],
+        "type": "object",
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "unavailable": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "stills": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EstimatedStillResponse"
+            }
+          },
+          "total": {
+            "type": "number",
+            "format": "double"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "spent": {
+            "type": "number",
+            "format": "double"
+          },
+          "ceiling": {
+            "type": "number",
+            "format": "double"
+          },
+          "imageProvider": {
+            "$ref": "#/components/schemas/ImageProvider"
+          },
+          "sceneStills": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SceneStillResponse"
+            }
+          },
+          "anotherStillAmount": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        }
+      },
       "HttpValidationProblemDetails": {
         "type": "object",
         "properties": {
@@ -4701,6 +5216,12 @@
       "IFormFile": {
         "type": "string",
         "format": "binary"
+      },
+      "ImageProvider": {
+        "enum": [
+          "None",
+          "Fake"
+        ]
       },
       "LabDashboardGroupResponse": {
         "required": [
@@ -5499,6 +6020,35 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/SocialAccountResponse"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PagedResponseOfStillResponse": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StillResponse"
             }
           },
           "page": {
@@ -6707,6 +7257,12 @@
               "integer"
             ],
             "format": "int32"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -6745,7 +7301,8 @@
           "narrationText",
           "assetIds",
           "facts",
-          "manuallyEdited"
+          "manuallyEdited",
+          "description"
         ],
         "type": "object",
         "properties": {
@@ -6787,6 +7344,28 @@
           },
           "manuallyEdited": {
             "type": "boolean"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "SceneStillResponse": {
+        "required": [
+          "scenePosition",
+          "still"
+        ],
+        "type": "object",
+        "properties": {
+          "scenePosition": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "still": {
+            "$ref": "#/components/schemas/StillResponse"
           }
         }
       },
@@ -6884,6 +7463,195 @@
           }
         }
       },
+      "StillCostResponse": {
+        "required": [
+          "estimatedAmount",
+          "currency",
+          "provider",
+          "model",
+          "ratesVersion",
+          "recordedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "estimatedAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/ImageProvider"
+          },
+          "model": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ratesVersion": {
+            "type": "string"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "StillFailureKind": {
+        "enum": [
+          "Refused",
+          "Technical",
+          "WorkerLost"
+        ]
+      },
+      "StillFailureResponse": {
+        "required": [
+          "kind",
+          "message",
+          "billed"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/StillFailureKind"
+          },
+          "message": {
+            "type": "string"
+          },
+          "billed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "StillResponse": {
+        "required": [
+          "id",
+          "projectId",
+          "technique",
+          "description",
+          "state",
+          "provider",
+          "model",
+          "fake",
+          "estimatedAmount",
+          "currency",
+          "attempt",
+          "retryAt",
+          "failure",
+          "cost",
+          "approvedByMemberId",
+          "approvedAt",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "projectId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "technique": {
+            "$ref": "#/components/schemas/Technique"
+          },
+          "description": {
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/StillState"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/ImageProvider"
+          },
+          "model": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "fake": {
+            "type": "boolean"
+          },
+          "estimatedAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "attempt": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "retryAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "failure": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/StillFailureResponse"
+              }
+            ]
+          },
+          "cost": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/StillCostResponse"
+              }
+            ]
+          },
+          "approvedByMemberId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "approvedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "StillState": {
+        "enum": [
+          "Queued",
+          "Generating",
+          "ReadyForReview",
+          "Approved",
+          "Rejected",
+          "Failed"
+        ]
+      },
       "StoryboardEditRequest": {
         "required": [
           "scenes"
@@ -6965,7 +7733,8 @@
         "enum": [
           "StaticImage",
           "ImageMotion",
-          "ImageToVideo",
+          "GeneratedBackdrop",
+          "GeneratedFootage",
           "VideoAsset",
           "TextAnimation",
           "ThreeDRender"
@@ -7084,6 +7853,9 @@
           },
           "hook": {
             "type": "string"
+          },
+          "renderMode": {
+            "$ref": "#/components/schemas/RenderMode"
           }
         }
       },
@@ -7093,6 +7865,7 @@
           "projectId",
           "creativeTemplate",
           "hook",
+          "renderMode",
           "createdAt"
         ],
         "type": "object",
@@ -7111,6 +7884,9 @@
           "hook": {
             "type": "string"
           },
+          "renderMode": {
+            "$ref": "#/components/schemas/RenderMode"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -7125,6 +7901,9 @@
     },
     {
       "name": "Session"
+    },
+    {
+      "name": "Generation"
     },
     {
       "name": "Rendering"

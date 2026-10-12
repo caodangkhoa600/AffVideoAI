@@ -8,6 +8,8 @@ x-app-environment: &app-environment
   Storage__AccessKey: ${MINIO_ROOT_USER:?}
   Storage__SecretKey: ${MINIO_ROOT_PASSWORD:?}
   Storage__Bucket: ${STORAGE_BUCKET:?}
+  # What makes Stills for Hybrid: None or Fake. The API and the worker have to agree. Not required: None when it is not set.
+  Generation__ImageProvider: ${IMAGE_PROVIDER:-None}
 
 x-app-depends-on: &app-depends-on
   postgres:

@@ -6,6 +6,7 @@ import { Suspense } from "react";
 import type { Variant } from "@/lib/api/client";
 import { useSession } from "@/lib/session";
 import { creativeTemplateName } from "../../../creative-templates";
+import { renderModeName } from "../../../techniques";
 import { useProject, useVariant } from "../../../use-project";
 import { StoryboardVersions } from "./storyboard-versions";
 import { VariantAudioSection } from "./variant-audio";
@@ -57,7 +58,7 @@ function VariantStoryboards({ variant }: { variant: Variant }) {
           {variant.hook}
         </p>
         <p className="text-sm text-muted-foreground">
-          {creativeTemplateName(variant.creativeTemplate)} ·{" "}
+          {creativeTemplateName(variant.creativeTemplate)} · {renderModeName(variant.renderMode)} ·{" "}
           <Link href={`/projects/${variant.projectId}`} className="underline underline-offset-4">
             Back to the Project
           </Link>

@@ -51,7 +51,8 @@ internal static class StoryboardEndpoints
                 }
 
                 var changes = request.Scenes
-                    .Select(scene => new SceneChange(scene.Position, scene.OnScreenText, scene.NarrationText, scene.AssetId, scene.DurationMs))
+                    .Select(scene => new SceneChange(
+                        scene.Position, scene.OnScreenText, scene.NarrationText, scene.AssetId, scene.DurationMs, scene.Description))
                     .ToList();
                 return await storyboards.EditAsync(projectId, variantId, version, changes, cancellationToken) switch
                 {
@@ -65,7 +66,7 @@ internal static class StoryboardEndpoints
             .WithName("EditStoryboard")
             .WithSummary(
                 "Makes the Variant's next Storyboard version from this one, edited: on-screen and narration text, the photo a Scene shows, " +
-                "the order of the Scenes and their durations. This version stays as it is. A Scene whose text changes is marked " +
+                "the order of the Scenes, their durations and the description of a generated picture. This version stays as it is. A Scene whose text changes is marked " +
                 "Manually Edited, and its text is no longer checked against Facts. Answers 409 with the reason when the edit changes " +
                 "nothing, leaves a Scene out, breaks the target duration, shows an image the Product does not have, moves the Hook " +
                 "from the start, or does not fit a layout.");
@@ -126,7 +127,8 @@ internal static class StoryboardEndpoints
             scene.NarrationText,
             scene.AssetIds,
             scene.Facts.Select(fact => new SceneFactResponse(fact.FactId, fact.Text)).ToList(),
-            scene.ManuallyEdited)).ToList(),
+            scene.ManuallyEdited,
+            scene.Description)).ToList(),
         storyboard.CreatedAt,
         (flags ?? []).Select(ToResponse).ToList());
 

@@ -34,6 +34,7 @@ public sealed record ReviewFlagResponse(Guid FactId, string Text, DateTimeOffset
 /// <param name="AssetIds">The Product's assets the Scene shows.</param>
 /// <param name="Facts">The Facts the Scene's text was written from, in the order it uses them. None when a person wrote the text.</param>
 /// <param name="ManuallyEdited">Whether a person changed the Scene's text. Such text is the Organization's own and is not checked against Facts.</param>
+/// <param name="Description">What the Scene's generated picture is to show, in words for the provider. Null unless the Technique is a generated one.</param>
 public sealed record SceneResponse(
     int Position,
     SceneLayout Layout,
@@ -43,7 +44,8 @@ public sealed record SceneResponse(
     string NarrationText,
     IReadOnlyList<Guid> AssetIds,
     IReadOnlyList<SceneFactResponse> Facts,
-    bool ManuallyEdited);
+    bool ManuallyEdited,
+    string? Description);
 
 /// <param name="Text">The Fact's text as the Scene used it, kept with the Scene.</param>
 public sealed record SceneFactResponse(Guid FactId, string Text);
@@ -66,9 +68,11 @@ public sealed record StoryboardEditRequest(
 /// <param name="NarrationText">What a voice would say over the Scene. Changing it marks the Scene Manually Edited.</param>
 /// <param name="AssetId">The photo of the Product the Scene shows.</param>
 /// <param name="DurationMs">In milliseconds, a whole number of tenths of a second. The Scenes still have to sum to the target duration.</param>
+/// <param name="Description">What the generated picture of the Scene is to show, in place of the creative template's. Only for a Scene whose Technique is a generated one.</param>
 public sealed record SceneEditRequest(
     int Position,
     IReadOnlyList<string>? OnScreenText = null,
     string? NarrationText = null,
     Guid? AssetId = null,
-    int? DurationMs = null);
+    int? DurationMs = null,
+    string? Description = null);

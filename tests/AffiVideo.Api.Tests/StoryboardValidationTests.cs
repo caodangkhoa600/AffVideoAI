@@ -64,7 +64,8 @@ public sealed class StoryboardValidationTests
     }
 
     [Theory]
-    [InlineData(Technique.ImageToVideo)]
+    [InlineData(Technique.GeneratedBackdrop)]
+    [InlineData(Technique.GeneratedFootage)]
     [InlineData(Technique.VideoAsset)]
     [InlineData(Technique.ThreeDRender)]
     public void A_Scene_planned_with_a_Technique_the_Render_Mode_does_not_allow_is_rejected(Technique technique)
@@ -86,7 +87,7 @@ public sealed class StoryboardValidationTests
     {
         var problems = Problems([
             NewScene(1, durationMs: 4500, assets: [Guid.NewGuid()]),
-            NewScene(2, durationMs: 1000, Technique.ImageToVideo),
+            NewScene(2, durationMs: 1000, Technique.GeneratedFootage),
         ]);
 
         Assert.Equal(3, problems.Count);

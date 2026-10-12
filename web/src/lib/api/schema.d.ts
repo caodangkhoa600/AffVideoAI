@@ -57,6 +57,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{projectId}/stills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The Stills made for the Project, newest first, rejected and failed ones included. */
+        get: operations["ListStills"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stills/{stillId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One Still and the state it is in. */
+        get: operations["GetStill"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stills/{stillId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Records that the member accepts a Still that is ready for review, in the member's name. Answers 409 with the reason for a Still in any other state. */
+        post: operations["ApproveStill"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stills/{stillId}/another": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rejects a Still that has been made and queues another of the same picture in its place. This is a new paid generation, made only for the amount the member confirms, and it counts against the Project's ceiling. The rejected Still is kept, with what it cost. Answers 409 with the reason for a Still that has not been made, when the confirmed amount is not what another is estimated at now, or when it would take the Project past its ceiling. A request repeated with the same Idempotency-Key is answered 200 with the Still the first one queued. */
+        post: operations["AskForAnotherStill"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stills/{stillId}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The picture of a Still that has been made, as a PNG. Answers 404 until it is made. */
+        get: operations["GetStillContent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/render-jobs/in-progress": {
         parameters: {
             query?: never;
@@ -432,7 +517,7 @@ export interface paths {
         /** The Project's Variants, oldest first. */
         get: operations["ListVariants"];
         put?: never;
-        /** Adds a Variant to the Project: a creative template and a Hook. */
+        /** Adds a Variant to the Project: a creative template, a Hook and a Render Mode. */
         post: operations["AddVariant"];
         delete?: never;
         options?: never;
@@ -587,7 +672,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Makes the Variant's next Storyboard version from this one, edited: on-screen and narration text, the photo a Scene shows, the order of the Scenes and their durations. This version stays as it is. A Scene whose text changes is marked Manually Edited, and its text is no longer checked against Facts. Answers 409 with the reason when the edit changes nothing, leaves a Scene out, breaks the target duration, shows an image the Product does not have, moves the Hook from the start, or does not fit a layout. */
+        /** Makes the Variant's next Storyboard version from this one, edited: on-screen and narration text, the photo a Scene shows, the order of the Scenes, their durations and the description of a generated picture. This version stays as it is. A Scene whose text changes is marked Manually Edited, and its text is no longer checked against Facts. Answers 409 with the reason when the edit changes nothing, leaves a Scene out, breaks the target duration, shows an image the Product does not have, moves the Hook from the start, or does not fit a layout. */
         post: operations["EditStoryboard"];
         delete?: never;
         options?: never;
@@ -623,6 +708,24 @@ export interface paths {
         put?: never;
         /** Clears the flags the named Withdrawn Facts put on a Storyboard version a member has reviewed, in the member's name. The version stays as it is, and so does the flag on any Rendered Video made from it. A Fact withdrawn afterwards flags the version again. Answers 409 for a version that is not flagged, or not by any of these Facts. */
         post: operations["ClearStoryboardFlag"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/variants/{variantId}/storyboards/{version}/generation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What generation for this Storyboard version would make, what that is estimated to cost, and what the Project has spent against its ceiling. It spends nothing. With no image provider configured, it says generation is unavailable. */
+        get: operations["EstimateGeneration"];
+        put?: never;
+        /** Confirms the estimate the member saw and queues its Stills for the worker. Nothing paid is generated without it. Answers 409 with the reason when the confirmed total is not the estimate's, when there is nothing to generate, when generation is unavailable, or when it would take the Project past its ceiling. A request repeated with the same Idempotency-Key is answered 200 with the Stills the first one queued. */
+        post: operations["ConfirmGeneration"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1070,6 +1173,10 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
         };
+        AnotherStillRequest: {
+            /** Format: double */
+            confirmedAmount: number;
+        };
         AntiforgeryTokenResponse: {
             requestToken: string;
         };
@@ -1209,6 +1316,13 @@ export interface components {
             /** Format: date */
             periodEnd: string;
         };
+        ConfirmedGenerationResponse: {
+            stills: components["schemas"]["StillResponse"][];
+        };
+        ConfirmGenerationRequest: {
+            /** Format: double */
+            confirmedTotal: number;
+        };
         /** @enum {unknown} */
         CreativeTemplate: "LuxuryCinematic" | "ProductShowcase" | "ProblemSolution";
         CurrentPerformanceResponse: {
@@ -1241,6 +1355,14 @@ export interface components {
             amount: number;
             currency: string;
         };
+        EstimatedStillResponse: {
+            /** Format: int32 */
+            scenePosition: number;
+            technique: components["schemas"]["Technique"];
+            description: string;
+            /** Format: double */
+            estimatedAmount: number;
+        };
         FactRequest: {
             text: string;
             language: string;
@@ -1267,6 +1389,22 @@ export interface components {
         };
         /** @enum {unknown} */
         FactState: "Proposed" | "Confirmed" | "Withdrawn";
+        GenerationEstimateResponse: {
+            available: boolean;
+            unavailable: null | string;
+            stills: components["schemas"]["EstimatedStillResponse"][];
+            /** Format: double */
+            total: number;
+            currency: string;
+            /** Format: double */
+            spent: number;
+            /** Format: double */
+            ceiling: number;
+            imageProvider: components["schemas"]["ImageProvider"];
+            sceneStills: components["schemas"]["SceneStillResponse"][];
+            /** Format: double */
+            anotherStillAmount: null | number;
+        };
         HttpValidationProblemDetails: {
             type?: null | string;
             title?: null | string;
@@ -1280,6 +1418,8 @@ export interface components {
         };
         /** Format: binary */
         IFormFile: string;
+        /** @enum {unknown} */
+        ImageProvider: "None" | "Fake";
         LabDashboardGroupResponse: {
             key: string;
             name: string;
@@ -1506,6 +1646,15 @@ export interface components {
         };
         PagedResponseOfSocialAccountResponse: {
             items: components["schemas"]["SocialAccountResponse"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+            /** Format: int32 */
+            total: number;
+        };
+        PagedResponseOfStillResponse: {
+            items: components["schemas"]["StillResponse"][];
             /** Format: int32 */
             page: number;
             /** Format: int32 */
@@ -1846,6 +1995,7 @@ export interface components {
             assetId?: null | string;
             /** Format: int32 */
             durationMs?: null | number;
+            description?: null | string;
         };
         SceneFactResponse: {
             /** Format: uuid */
@@ -1866,6 +2016,12 @@ export interface components {
             assetIds: string[];
             facts: components["schemas"]["SceneFactResponse"][];
             manuallyEdited: boolean;
+            description: null | string;
+        };
+        SceneStillResponse: {
+            /** Format: int32 */
+            scenePosition: number;
+            still: components["schemas"]["StillResponse"];
         };
         SessionResponse: {
             member: components["schemas"]["MemberResponse"];
@@ -1893,6 +2049,54 @@ export interface components {
             database: components["schemas"]["DependencyStatusResponse"];
             objectStorage: components["schemas"]["DependencyStatusResponse"];
         };
+        StillCostResponse: {
+            /** Format: double */
+            estimatedAmount: number;
+            currency: string;
+            provider: components["schemas"]["ImageProvider"];
+            model: null | string;
+            ratesVersion: string;
+            /** Format: date-time */
+            recordedAt: string;
+        };
+        /** @enum {unknown} */
+        StillFailureKind: "Refused" | "Technical" | "WorkerLost";
+        StillFailureResponse: {
+            kind: components["schemas"]["StillFailureKind"];
+            message: string;
+            billed: boolean;
+        };
+        StillResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            projectId: null | string;
+            technique: components["schemas"]["Technique"];
+            description: string;
+            state: components["schemas"]["StillState"];
+            provider: components["schemas"]["ImageProvider"];
+            model: null | string;
+            fake: boolean;
+            /** Format: double */
+            estimatedAmount: number;
+            currency: string;
+            /** Format: int32 */
+            attempt: number;
+            /** Format: date-time */
+            retryAt: null | string;
+            failure: null | components["schemas"]["StillFailureResponse"];
+            cost: null | components["schemas"]["StillCostResponse"];
+            /** Format: uuid */
+            approvedByMemberId: null | string;
+            /** Format: date-time */
+            approvedAt: null | string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        /** @enum {unknown} */
+        StillState: "Queued" | "Generating" | "ReadyForReview" | "Approved" | "Rejected" | "Failed";
         StoryboardEditRequest: {
             scenes: components["schemas"]["SceneEditRequest"][];
         };
@@ -1916,7 +2120,7 @@ export interface components {
             flags: components["schemas"]["ReviewFlagResponse"][];
         };
         /** @enum {unknown} */
-        Technique: "StaticImage" | "ImageMotion" | "ImageToVideo" | "VideoAsset" | "TextAnimation" | "ThreeDRender";
+        Technique: "StaticImage" | "ImageMotion" | "GeneratedBackdrop" | "GeneratedFootage" | "VideoAsset" | "TextAnimation" | "ThreeDRender";
         TechniqueCountResponse: {
             technique: components["schemas"]["Technique"];
             /** Format: int32 */
@@ -1954,6 +2158,7 @@ export interface components {
         VariantRequest: {
             creativeTemplate: components["schemas"]["CreativeTemplate"];
             hook: string;
+            renderMode?: components["schemas"]["RenderMode"];
         };
         VariantResponse: {
             /** Format: uuid */
@@ -1962,6 +2167,7 @@ export interface components {
             projectId: string;
             creativeTemplate: components["schemas"]["CreativeTemplate"];
             hook: string;
+            renderMode: components["schemas"]["RenderMode"];
             /** Format: date-time */
             createdAt: string;
         };
@@ -2069,6 +2275,187 @@ export interface operations {
         responses: {
             /** @description No Content */
             204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ListStills: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagedResponseOfStillResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GetStill: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                stillId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StillResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ApproveStill: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                stillId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StillResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    AskForAnotherStill: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                stillId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnotherStillRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StillResponse"];
+                };
+            };
+            /** @description Accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StillResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetStillContent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                stillId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3590,6 +3977,101 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StoryboardResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    EstimateGeneration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                variantId: string;
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GenerationEstimateResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ConfirmGeneration: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                projectId: string;
+                variantId: string;
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmGenerationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfirmedGenerationResponse"];
+                };
+            };
+            /** @description Accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfirmedGenerationResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
                 };
             };
             /** @description Not Found */

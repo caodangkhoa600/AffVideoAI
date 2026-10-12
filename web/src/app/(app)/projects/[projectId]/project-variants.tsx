@@ -6,8 +6,9 @@ import { useId, useState } from "react";
 import { Field } from "@/components/field";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { api, fieldErrors, type CreativeTemplate, type Variant } from "@/lib/api/client";
+import { api, fieldErrors, type CreativeTemplate, type RenderMode, type Variant } from "@/lib/api/client";
 import { CREATIVE_TEMPLATES, creativeTemplateName } from "../creative-templates";
+import { RENDER_MODES, renderModeName } from "../techniques";
 
 // The API's limit (Variant in the domain).
 const HOOK_MAX_LENGTH = 200;
@@ -43,9 +44,12 @@ export function ProjectVariants({ projectId }: { projectId: string }) {
   // The Project itself is reloaded too: it says how many Variants it has.
   const reload = () => queryClient.invalidateQueries({ queryKey: ["projects"] });
 
-  const add = async (creativeTemplate: CreativeTemplate, hook: string) => {
+  const add = async (creativeTemplate: CreativeTemplate, hook: string, renderMode: RenderMode) => {
     const { error, response } = await api
-      .POST("/api/v1/projects/{projectId}/variants", { params: { path: { projectId } }, body: { creativeTemplate, hook } })
+      .POST("/api/v1/projects/{projectId}/variants", {
+        params: { path: { projectId } },
+        body: { creativeTemplate, hook, renderMode },
+      })
       .catch(() => ({ error: undefined, response: undefined }));
     if (!response?.ok) return refusal(error, "The Variant could not be added.");
     await reload();
@@ -61,7 +65,7 @@ export function ProjectVariants({ projectId }: { projectId: string }) {
         </h2>
         <p className="text-sm text-muted-foreground">
           One creative treatment each: a creative template and a Hook, the opening line meant to stop the viewer
-          scrolling. A Variant is never changed; a different Hook is a different Variant.
+          scrolling, made in a Render Mode. A Variant is never changed; a different Hook is a different Variant.
         </p>
       </div>
       <VariantForm key={added} onSubmit={add} />
@@ -113,7 +117,10 @@ function VariantRow({ variant, onDuplicated }: { variant: Variant; onDuplicated:
           <p className="break-words font-medium" data-testid="variant-hook">
             {variant.hook}
           </p>
-          <p className="text-sm text-muted-foreground">{creativeTemplateName(variant.creativeTemplate)}</p>
+          <p className="text-sm text-muted-foreground">
+            {creativeTemplateName(variant.creativeTemplate)} ·{" "}
+            <span data-testid="variant-render-mode">{renderModeName(variant.renderMode)}</span>
+          </p>
           <p className="break-all font-mono text-xs text-muted-foreground" data-testid="variant-id">
             {variant.id}
           </p>
@@ -135,8 +142,8 @@ function VariantRow({ variant, onDuplicated }: { variant: Variant; onDuplicated:
       {duplicating && (
         <>
           <p className="text-sm text-muted-foreground">
-            The new Variant keeps the {creativeTemplateName(variant.creativeTemplate)} template. Give it a Hook of its
-            own; this Variant stays as it is.
+            The new Variant keeps the {creativeTemplateName(variant.creativeTemplate)} template and{" "}
+            {renderModeName(variant.renderMode)}. Give it a Hook of its own; this Variant stays as it is.
           </p>
           <HookForm variant={variant} onSubmit={duplicate} onCancel={() => setDuplicating(false)} />
         </>
@@ -145,15 +152,16 @@ function VariantRow({ variant, onDuplicated }: { variant: Variant; onDuplicated:
   );
 }
 
-/** Adds a Variant: a creative template and a Hook. */
+/** Adds a Variant: a creative template, a Hook and a Render Mode. */
 function VariantForm({
   onSubmit,
 }: {
   /** Answers why the Variant was refused, or nothing when it was added. */
-  onSubmit: (creativeTemplate: CreativeTemplate, hook: string) => Promise<Refusal | undefined>;
+  onSubmit: (creativeTemplate: CreativeTemplate, hook: string, renderMode: RenderMode) => Promise<Refusal | undefined>;
 }) {
   const id = useId();
   const [creativeTemplate, setCreativeTemplate] = useState<CreativeTemplate>(CREATIVE_TEMPLATES[0].value);
+  const [renderMode, setRenderMode] = useState<RenderMode>(RENDER_MODES[0].value);
   const [hook, setHook] = useState("");
   const [saving, setSaving] = useState(false);
   const [refused, setRefused] = useState<Refusal>({});
@@ -165,7 +173,7 @@ function VariantForm({
       return;
     }
     setSaving(true);
-    const answer = await onSubmit(creativeTemplate, hook);
+    const answer = await onSubmit(creativeTemplate, hook, renderMode);
     // Added means the form is about to be emptied; only a refusal is shown here.
     if (answer) {
       setRefused(answer);
@@ -200,6 +208,22 @@ function VariantForm({
           error={refused.hook}
           hint="The opening line of the video, in Vietnamese."
         />
+      </div>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor={`${id}-render-mode`}>Render Mode</Label>
+        <select
+          id={`${id}-render-mode`}
+          value={renderMode}
+          onChange={(event) => setRenderMode(event.target.value as RenderMode)}
+          className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 sm:w-48 md:text-sm dark:bg-input/30"
+        >
+          {RENDER_MODES.map((mode) => (
+            <option key={mode.value} value={mode.value}>
+              {mode.name}
+            </option>
+          ))}
+        </select>
+        <p className="text-sm text-muted-foreground">{RENDER_MODES.find((mode) => mode.value === renderMode)?.about}</p>
       </div>
       {refused.message && (
         <p role="alert" className="text-sm text-destructive">

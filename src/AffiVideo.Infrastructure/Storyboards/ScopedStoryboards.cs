@@ -4,6 +4,7 @@ using AffiVideo.Application.Storyboards;
 using AffiVideo.Domain;
 using AffiVideo.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Npgsql;
 
 namespace AffiVideo.Infrastructure.Storyboards;
@@ -12,7 +13,8 @@ namespace AffiVideo.Infrastructure.Storyboards;
 // Variants, Products, Facts, assets and Storyboards. A Storyboard version is only
 // ever added: nothing here changes one, and an edit adds the next.
 internal sealed class ScopedStoryboards(
-    AffiVideoDbContext database, Caller caller, ILanguageModel languageModel, TimeProvider clock) : IStoryboards
+    AffiVideoDbContext database, Caller caller, ILanguageModel languageModel, IOptions<GenerationOptions> generation,
+    TimeProvider clock) : IStoryboards
 {
     // How often a version number taken by a Storyboard made at the same moment is given up for the next,
     // and how often flags someone else cleared at the same moment are read again.
@@ -48,10 +50,10 @@ internal sealed class ScopedStoryboards(
         if (TooLong(template, material.Product.Name, variant.Hook, facts) is { } reason) return StoryboardGeneration.Refuse(reason);
 
         var texts = await WriteAsync(template, project, material.Product, variant, facts, cancellationToken);
-        const RenderMode renderMode = RenderMode.ProductLock;
+        var renderMode = variant.RenderMode;
         var durations = template.SceneDurations(project.TargetDurationSeconds);
         var scenes = template.Scenes
-            .Select((slot, index) => Written(index + 1, slot, durations[index], renderMode, texts[index], facts, photos))
+            .Select((slot, index) => Written(index + 1, slot, durations[index], renderMode, texts[index], facts, material, project))
             .ToList();
 
         return await CheckedAndSavedAsync(
@@ -105,7 +107,7 @@ internal sealed class ScopedStoryboards(
         }
 
         var texts = await WriteAsync(template, project, material.Product, variant, facts, cancellationToken);
-        var written = Written(position, slot.Scene, replaced.DurationMs, from.RenderMode, texts[slot.Index], facts, material.Photos);
+        var written = Written(position, slot.Scene, replaced.DurationMs, from.RenderMode, texts[slot.Index], facts, material, project);
         // Every other Scene goes into the next version exactly as it is in this one.
         var scenes = from.Scenes
             .Select(scene => scene.Position == position ? written : scene.Edited(scene.Position, new SceneChange(scene.Position)))
@@ -239,17 +241,23 @@ internal sealed class ScopedStoryboards(
     }
 
     // One Scene as the planner wrote it and the planning engine produces it.
-    private static Scene Written(
+    private Scene Written(
         int position, SceneSlot slot, int durationMs, RenderMode renderMode, SceneText text,
-        IReadOnlyList<Fact> facts, IReadOnlyList<ProductAsset> photos) =>
-        new(
-            position, slot.Layout, PlanningEngine.TechniqueFor(slot, photos.Count, durationMs, renderMode), durationMs,
+        IReadOnlyList<Fact> facts, Material material, Project project)
+    {
+        var photos = material.Photos;
+        var technique = PlanningEngine.TechniqueFor(slot, photos.Count, durationMs, renderMode, generation.Value.CanGenerateStills);
+        return new(
+            position, slot.Layout, technique, durationMs,
             text.OnScreenText, text.NarrationText,
             [(slot.Photo == ScenePhoto.Last ? photos[^1] : photos[0]).Id],
             // The text is copied from the Fact as it is now. A Fact the brief did not offer has no
             // text to copy, and validation then refuses the Storyboard for citing it.
             text.FactIds.Select((factId, index) => new SceneFact(
-                index + 1, factId, facts.FirstOrDefault(fact => fact.Id == factId)?.Text ?? "")));
+                index + 1, factId, facts.FirstOrDefault(fact => fact.Id == factId)?.Text ?? "")),
+            // Only a Scene that is generated has a picture to describe.
+            description: technique.IsGenerated() ? slot.DescriptionFor(material.Product.Category, project.Audience) : null);
+    }
 
     // Whatever wrote the text, and whoever changed it, nothing is kept that breaks the duration, shows
     // what the Product does not have, cites a Fact that is not Confirmed or does not fit its layout.
@@ -275,6 +283,7 @@ internal sealed class ScopedStoryboards(
                 $"Scene {scene.Position} shows an image that cannot be shown in a video: " +
                 $"a Scene shows a photo, not the logo, of at least {ProductAsset.MinVideoPhotoSide} pixels on each side."));
         problems.AddRange(StoryboardRules.LayoutProblems(scenes, template));
+        problems.AddRange(StoryboardRules.DescriptionProblems(scenes));
         if (problems.Count > 0) return StoryboardGeneration.Refuse(string.Join(" ", problems));
         // Scenes with nothing wrong with them that are still not to be kept: the caller's own reason.
         if (refusedOnceChecked is not null) return StoryboardGeneration.Refuse(refusedOnceChecked);

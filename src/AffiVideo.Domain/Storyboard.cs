@@ -78,7 +78,7 @@ public sealed class Scene
     public Scene(
         int position, SceneLayout layout, Technique technique, int durationMs,
         IEnumerable<string> onScreenText, string narrationText, IEnumerable<Guid> assetIds, IEnumerable<SceneFact> facts,
-        bool manuallyEdited = false)
+        bool manuallyEdited = false, string? description = null)
     {
         Position = position;
         Layout = layout;
@@ -89,6 +89,7 @@ public sealed class Scene
         AssetIds = [.. assetIds];
         _facts.AddRange(facts);
         ManuallyEdited = manuallyEdited;
+        Description = description;
     }
 
     /// <summary>Counted from 1 within the Storyboard.</summary>
@@ -122,6 +123,12 @@ public sealed class Scene
     public bool ManuallyEdited { get; private set; }
 
     /// <summary>
+    /// What the Scene's generated picture is to show, in words for the provider: the creative
+    /// template's, or a member's own. Absent unless the Scene's Technique is a generated one.
+    /// </summary>
+    public string? Description { get; private set; }
+
+    /// <summary>
     /// The Scene as the next version has it, at this position and with this change
     /// made. A version never changes, so this is another Scene and not this one.
     /// </summary>
@@ -136,7 +143,8 @@ public sealed class Scene
             change.AssetId is { } asset ? [asset] : AssetIds,
             // Text a person wrote is no longer traceable to Facts.
             manuallyEdited ? [] : Facts.Select(fact => new SceneFact(fact.Position, fact.FactId, fact.Text)),
-            manuallyEdited);
+            // What the picture shows is not the Scene's text, so describing it leaves the Scene's Facts as they are.
+            manuallyEdited, change.Description?.Trim() ?? Description);
     }
 }
 
@@ -148,8 +156,10 @@ public sealed class Scene
 /// <param name="OnScreenText">The lines its layout sets in type.</param>
 /// <param name="AssetId">The photo it shows.</param>
 /// <param name="DurationMs">In milliseconds.</param>
+/// <param name="Description">What its generated picture is to show.</param>
 public sealed record SceneChange(
-    int Position, IReadOnlyList<string>? OnScreenText = null, string? NarrationText = null, Guid? AssetId = null, int? DurationMs = null);
+    int Position, IReadOnlyList<string>? OnScreenText = null, string? NarrationText = null, Guid? AssetId = null, int? DurationMs = null,
+    string? Description = null);
 
 /// <summary>An edit of a Storyboard version: its Scenes, each named once, in the order the next version plays them.</summary>
 public static class StoryboardEditing
@@ -172,7 +182,7 @@ public static class StoryboardEditing
     private static bool Same(Scene a, Scene b) =>
         a.Position == b.Position && a.Layout == b.Layout && a.Technique == b.Technique && a.DurationMs == b.DurationMs
         && a.OnScreenText.SequenceEqual(b.OnScreenText) && a.NarrationText == b.NarrationText
-        && a.AssetIds.SequenceEqual(b.AssetIds) && a.ManuallyEdited == b.ManuallyEdited
+        && a.AssetIds.SequenceEqual(b.AssetIds) && a.ManuallyEdited == b.ManuallyEdited && a.Description == b.Description
         && a.Facts.Select(fact => fact.FactId).SequenceEqual(b.Facts.Select(fact => fact.FactId));
 }
 
@@ -206,6 +216,9 @@ public static class StoryboardRules
 {
     /// <summary>The most characters a Scene's narration text has.</summary>
     public const int NarrationMaxLength = 500;
+
+    /// <summary>The most characters the description of a Scene's generated picture has.</summary>
+    public const int DescriptionMaxLength = 1000;
 
     /// <summary>
     /// Everything that makes these Scenes unacceptable as a Storyboard, in words for
@@ -244,6 +257,36 @@ public static class StoryboardRules
         if (total != targetDurationSeconds * 1000)
         {
             problems.Add($"The Scenes last {Seconds(total)} seconds in all, and the target duration is {targetDurationSeconds} seconds.");
+        }
+        return problems;
+    }
+
+    /// <summary>
+    /// Everything wrong with how these Scenes describe their generated pictures, in words for the
+    /// member: a generated Scene with nothing to generate from, a description too long, or one
+    /// on a Scene that has no generated picture. Empty when there is nothing.
+    /// </summary>
+    public static IReadOnlyList<string> DescriptionProblems(IReadOnlyList<Scene> scenes)
+    {
+        var problems = new List<string>();
+        foreach (var scene in scenes)
+        {
+            var name = $"Scene {scene.Position}";
+            if (!scene.Technique.IsGenerated())
+            {
+                if (scene.Description is not null)
+                {
+                    problems.Add($"{name} has no generated picture to describe: it shows the Product's photo as it is.");
+                }
+            }
+            else if (string.IsNullOrWhiteSpace(scene.Description))
+            {
+                problems.Add($"{name}'s picture is generated and has to be described. Say what it is to show.");
+            }
+            else if (scene.Description.Length > DescriptionMaxLength)
+            {
+                problems.Add($"{name}'s description has {scene.Description.Length} characters, and at most {DescriptionMaxLength} are sent to be generated from.");
+            }
         }
         return problems;
     }

@@ -39,6 +39,10 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
 
     public DbSet<Storyboard> Storyboards => Set<Storyboard>();
 
+    public DbSet<Still> Stills => Set<Still>();
+
+    public DbSet<GenerationCostRecord> GenerationCostRecords => Set<GenerationCostRecord>();
+
     public DbSet<RenderJob> RenderJobs => Set<RenderJob>();
 
     public DbSet<RenderedVideo> RenderedVideos => Set<RenderedVideo>();
@@ -75,6 +79,9 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
         builder.Entity<Organization>(organization =>
         {
             organization.Property(o => o.Name).HasMaxLength(Organization.NameMaxLength);
+            organization.Property(o => o.GenerationCeiling)
+                .HasPrecision(ProductionCosts.AmountPrecision, ProductionCosts.AmountDecimals)
+                .HasDefaultValue(Organization.DefaultGenerationCeiling);
             organization.HasQueryFilter(o => o.Id == CallerOrganizationId);
         });
 
@@ -165,6 +172,8 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
             variant.HasOne<Project>().WithMany().HasForeignKey(v => v.ProjectId).OnDelete(DeleteBehavior.Cascade);
             variant.Property(v => v.CreativeTemplate).HasConversion<string>().HasMaxLength(30);
             variant.Property(v => v.Hook).HasMaxLength(Variant.HookMaxLength);
+            // Every Variant made before there was a choice was made in Product Lock.
+            variant.Property(v => v.RenderMode).HasConversion<string>().HasMaxLength(20).HasDefaultValue(RenderMode.ProductLock);
             variant.HasIndex(v => new { v.ProjectId, v.CreatedAt });
         });
 
@@ -201,6 +210,7 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
                 scene.Property(s => s.Position).ValueGeneratedNever();
                 scene.Property(s => s.Layout).HasConversion<string>().HasMaxLength(30);
                 scene.Property(s => s.Technique).HasConversion<string>().HasMaxLength(20);
+                scene.Property(s => s.Description).HasMaxLength(StoryboardRules.DescriptionMaxLength);
 
                 scene.OwnsMany(s => s.Facts, fact =>
                 {
@@ -214,6 +224,58 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
                     fact.HasIndex(f => f.FactId);
                 });
             });
+        });
+
+        builder.Entity<Still>(still =>
+        {
+            still.HasOne<Organization>().WithMany().HasForeignKey(s => s.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            // A Still is kept so it can be used again: it outlives the Project it was made for.
+            still.HasOne<Project>().WithMany().HasForeignKey(s => s.ProjectId).OnDelete(DeleteBehavior.SetNull);
+            still.HasOne<Product>().WithMany().HasForeignKey(s => s.ProductId).OnDelete(DeleteBehavior.Restrict);
+            still.HasOne<Member>().WithMany().HasForeignKey(s => s.RequestedByMemberId).OnDelete(DeleteBehavior.Restrict);
+            still.HasOne<Member>().WithMany().HasForeignKey(s => s.ApprovedByMemberId).OnDelete(DeleteBehavior.Restrict);
+            still.Property(s => s.Technique).HasConversion<string>().HasMaxLength(20);
+            still.Property(s => s.Description).HasMaxLength(StoryboardRules.DescriptionMaxLength);
+            still.Property(s => s.Provider).HasConversion<string>().HasMaxLength(20);
+            still.Property(s => s.Model).HasMaxLength(Still.ModelMaxLength);
+            // As with a render job: a Still is only written by whoever still has it as it was read.
+            still.Property(s => s.State).HasConversion<string>().HasMaxLength(20).IsConcurrencyToken();
+            still.Property(s => s.LeaseId).IsConcurrencyToken();
+            still.Property(s => s.EstimatedAmount).HasPrecision(ProductionCosts.AmountPrecision, ProductionCosts.AmountDecimals);
+            still.Property(s => s.Currency).HasMaxLength(Product.CurrencyLength);
+            still.Property(s => s.RatesVersion).HasMaxLength(RenderRates.VersionMaxLength);
+            still.Property(s => s.IdempotencyKey).HasMaxLength(RenderJob.IdempotencyKeyMaxLength);
+            still.Property(s => s.FailureKind).HasConversion<string>().HasMaxLength(20);
+            still.Property(s => s.FailureMessage).HasMaxLength(RenderJob.FailureMessageMaxLength);
+            still.Property(s => s.FailureDetail).HasMaxLength(RenderJob.FailureDetailMaxLength);
+            still.Ignore(s => s.RetryAt);
+            still.Ignore(s => s.StorageKey);
+            still.Ignore(s => s.Fake);
+            still.Ignore(s => s.IsCurrent);
+            still.Ignore(s => s.HasPicture);
+            still.Ignore(s => s.CountsAsSpent);
+            // One Still for one click and one Scene, even when the click arrives twice at the same moment.
+            still.HasIndex(s => new { s.ProjectId, s.IdempotencyKey, s.Ordinal }).IsUnique();
+            // The queue: the worker takes the Still that has been queued longest.
+            still.HasIndex(s => new { s.State, s.CreatedAt });
+            still.HasIndex(s => new { s.ProjectId, s.CreatedAt });
+        });
+
+        builder.Entity<GenerationCostRecord>(cost =>
+        {
+            cost.HasOne<Organization>().WithMany().HasForeignKey(c => c.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            // What a Product has cost to generate for is kept with the Product, which is never deleted.
+            cost.HasOne<Product>().WithMany().HasForeignKey(c => c.ProductId).OnDelete(DeleteBehavior.Restrict);
+            // The record outlives what it is of.
+            cost.HasOne<Still>().WithMany().HasForeignKey(c => c.StillId).OnDelete(DeleteBehavior.SetNull);
+            cost.Property(c => c.Provider).HasMaxLength(GenerationCostRecord.ProviderMaxLength);
+            cost.Property(c => c.Model).HasMaxLength(Still.ModelMaxLength);
+            cost.Property(c => c.EstimatedAmount).HasPrecision(ProductionCosts.AmountPrecision, ProductionCosts.AmountDecimals);
+            cost.Property(c => c.Currency).HasMaxLength(Product.CurrencyLength);
+            cost.Property(c => c.RatesVersion).HasMaxLength(RenderRates.VersionMaxLength);
+            // A Still has one record, whoever comes to write it.
+            cost.HasIndex(c => c.StillId).IsUnique();
+            cost.HasIndex(c => c.ProductId);
         });
 
         builder.Entity<RenderJob>(job =>

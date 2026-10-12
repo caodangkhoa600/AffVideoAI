@@ -24,11 +24,11 @@ internal static class VariantEndpoints
 
         group.MapPost("", async Task<Results<Created<VariantResponse>, ValidationProblem, NotFound>> (
                 Guid projectId, VariantRequest request, IVariants variants, CancellationToken cancellationToken) =>
-                await variants.AddAsync(projectId, request.CreativeTemplate, request.Hook, cancellationToken) is { } added
+                await variants.AddAsync(projectId, request.CreativeTemplate, request.Hook, request.RenderMode, cancellationToken) is { } added
                     ? Created(added)
                     : TypedResults.NotFound())
             .WithName("AddVariant")
-            .WithSummary("Adds a Variant to the Project: a creative template and a Hook.");
+            .WithSummary("Adds a Variant to the Project: a creative template, a Hook and a Render Mode.");
 
         group.MapGet("/{variantId:guid}", async Task<Results<Ok<VariantResponse>, NotFound>> (
                 Guid projectId, Guid variantId, IVariants variants, CancellationToken cancellationToken) =>
@@ -60,5 +60,6 @@ internal static class VariantEndpoints
         variant.ProjectId,
         variant.CreativeTemplate,
         variant.Hook,
+        variant.RenderMode,
         variant.CreatedAt);
 }

@@ -11,13 +11,14 @@ namespace AffiVideo.Infrastructure.Projects;
 // Projects and Variants. A Variant is only ever added: nothing here changes one.
 internal sealed class ScopedVariants(AffiVideoDbContext database, Caller caller, TimeProvider clock) : IVariants
 {
-    public async Task<Variant?> AddAsync(Guid projectId, CreativeTemplate creativeTemplate, string hook, CancellationToken cancellationToken)
+    public async Task<Variant?> AddAsync(
+        Guid projectId, CreativeTemplate creativeTemplate, string hook, RenderMode renderMode, CancellationToken cancellationToken)
     {
         if (!await ProjectExistsAsync(projectId, cancellationToken)) return null;
         var organizationId = caller.OrganizationId
             ?? throw new InvalidOperationException("A Variant is added for the caller's Organization, and there is no caller.");
 
-        var variant = new Variant(Guid.CreateVersion7(), organizationId, projectId, creativeTemplate, hook, clock.GetUtcNow());
+        var variant = new Variant(Guid.CreateVersion7(), organizationId, projectId, creativeTemplate, hook, renderMode, clock.GetUtcNow());
         return await SaveAsync(variant, cancellationToken) ? variant : null;
     }
 

@@ -120,6 +120,19 @@ public sealed class ProductionCostOptions
     /// <summary>What a minute of rendering by the worker itself is taken to cost.</summary>
     public decimal LocalPerMinute { get; set; }
 
+    /// <summary>
+    /// What a Still by the fake image provider is taken to cost. The fake charges nobody: the amount
+    /// stands in for a real provider's, so that the estimate, the ceiling and the records can be seen working.
+    /// </summary>
+    public decimal FakeStill { get; set; } = 0.04m;
+
+    /// <summary>What one Still by this provider is taken to cost.</summary>
+    public decimal StillRateOf(ImageProvider provider) => provider switch
+    {
+        ImageProvider.Fake => FakeStill,
+        _ => throw new ArgumentOutOfRangeException(nameof(provider), provider, "No rate is configured for a Still by this provider."),
+    };
+
     /// <summary>The rates of rendering by this provider.</summary>
     public RenderRates RatesOf(RenderProvider provider) => provider switch
     {

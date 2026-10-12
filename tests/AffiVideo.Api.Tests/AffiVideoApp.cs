@@ -183,7 +183,8 @@ public sealed class AffiVideoApp : IAsyncLifetime
     /// its own in the same PostgreSQL, an API on it, and no worker but those the test
     /// starts. What is queued there is taken by nobody else.
     /// </summary>
-    public async Task<RenderStack> NewStackAsync()
+    /// <param name="apiSettings">Settings of that API, beyond where its database is.</param>
+    public async Task<RenderStack> NewStackAsync(Dictionary<string, string>? apiSettings = null)
     {
         var name = $"queue_{Guid.NewGuid():N}";
         await using (var connection = new NpgsqlConnection(_postgres.GetConnectionString()))
@@ -194,7 +195,7 @@ public sealed class AffiVideoApp : IAsyncLifetime
         }
 
         var database = new NpgsqlConnectionStringBuilder(_postgres.GetConnectionString()) { Database = name }.ConnectionString;
-        var api = With(new Dictionary<string, string> { ["ConnectionStrings:Database"] = database });
+        var api = With(new Dictionary<string, string>(apiSettings ?? []) { ["ConnectionStrings:Database"] = database });
         await api.Services.MigrateAsync(CancellationToken.None);
         return new RenderStack(api, settings => RunWorkerAsync(database, settings));
     }
