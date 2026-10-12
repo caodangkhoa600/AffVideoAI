@@ -4,7 +4,7 @@
 
 **Blocked by:** 02
 
-**Status:** ready-for-human
+**Status:** done
 
 - [x] The Storyboard version refers to the Still its Scene uses
 - [x] The rendered Scene shows the Still behind the Cut-out, with the Product's shadow on it; the Product's pixels are the photo's
