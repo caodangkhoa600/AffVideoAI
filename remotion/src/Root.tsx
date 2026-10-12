@@ -27,6 +27,7 @@ const placeholder: SceneInput = {
   product: { file: 'fonts/OFL.txt', width: 1, height: 1, productWidth: 1, productHeight: 1 },
   previous: null,
   backdrop: 'fonts/OFL.txt',
+  still: null,
   colours: { accent: '#22242a', tint: '#e2e2e4', ghost: '#e8e6e2', ink: '#141416' },
 };
 

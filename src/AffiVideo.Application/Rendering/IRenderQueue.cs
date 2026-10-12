@@ -62,11 +62,12 @@ public interface IRenderQueue
 /// <param name="LeaseId">The lease this claim holds the job under.</param>
 /// <param name="Storyboard">The version to render, with its Scenes.</param>
 /// <param name="Assets">Those of the assets the Scenes show that the Product still has.</param>
+/// <param name="Stills">The Stills the Scenes refer to: each was approved, and may have been replaced by another since.</param>
 /// <param name="Audio">The narration and music the Variant has as the job is claimed, to be mixed into the video.</param>
 /// <param name="ProductId">The Product the video is of, which the cost of rendering it is recorded against.</param>
 public sealed record RenderWork(
-    RenderJob Job, Guid LeaseId, Storyboard Storyboard, IReadOnlyList<ProductAsset> Assets, IReadOnlyList<VariantAudio> Audio,
-    Guid ProductId);
+    RenderJob Job, Guid LeaseId, Storyboard Storyboard, IReadOnlyList<ProductAsset> Assets, IReadOnlyList<Still> Stills,
+    IReadOnlyList<VariantAudio> Audio, Guid ProductId);
 
 /// <summary>
 /// The job is no longer this worker's: a member cancelled it, it was deleted with

@@ -78,7 +78,7 @@ public sealed class Scene
     public Scene(
         int position, SceneLayout layout, Technique technique, int durationMs,
         IEnumerable<string> onScreenText, string narrationText, IEnumerable<Guid> assetIds, IEnumerable<SceneFact> facts,
-        bool manuallyEdited = false, string? description = null)
+        bool manuallyEdited = false, string? description = null, Guid? stillId = null)
     {
         Position = position;
         Layout = layout;
@@ -90,6 +90,7 @@ public sealed class Scene
         _facts.AddRange(facts);
         ManuallyEdited = manuallyEdited;
         Description = description;
+        StillId = stillId;
     }
 
     /// <summary>Counted from 1 within the Storyboard.</summary>
@@ -129,6 +130,12 @@ public sealed class Scene
     public string? Description { get; private set; }
 
     /// <summary>
+    /// The Still the Scene's generated picture is: an approved Still of the picture it describes.
+    /// Absent until one is approved, and always for a Scene that is not generated.
+    /// </summary>
+    public Guid? StillId { get; private set; }
+
+    /// <summary>
     /// The Scene as the next version has it, at this position and with this change
     /// made. A version never changes, so this is another Scene and not this one.
     /// </summary>
@@ -138,13 +145,32 @@ public sealed class Scene
         var narrationText = change.NarrationText?.Trim() ?? NarrationText;
         var textChanged = !onScreenText.SequenceEqual(OnScreenText) || narrationText != NarrationText;
         var manuallyEdited = ManuallyEdited || textChanged;
+        var description = change.Description?.Trim() ?? Description;
         return new Scene(
             position, Layout, Technique, change.DurationMs ?? DurationMs, onScreenText, narrationText,
             change.AssetId is { } asset ? [asset] : AssetIds,
             // Text a person wrote is no longer traceable to Facts.
             manuallyEdited ? [] : Facts.Select(fact => new SceneFact(fact.Position, fact.FactId, fact.Text)),
             // What the picture shows is not the Scene's text, so describing it leaves the Scene's Facts as they are.
-            manuallyEdited, change.Description?.Trim() ?? Description);
+            manuallyEdited, description,
+            // A Still is of the picture it was described as, and of no other.
+            description == Description ? StillId : null);
+    }
+
+    /// <summary>
+    /// The Scene as the next version has it when its generated picture is the newest of these
+    /// approved Stills that shows what it describes. It refers to none when none does.
+    /// </summary>
+    public Scene Referring(IEnumerable<Still> approved)
+    {
+        var still = approved
+            .Where(still => still.State == StillState.Approved && still.Technique == Technique && still.Description == Description)
+            .OrderByDescending(still => still.CreatedAt).ThenByDescending(still => still.Id)
+            .FirstOrDefault();
+        return new Scene(
+            Position, Layout, Technique, DurationMs, OnScreenText, NarrationText, AssetIds,
+            Facts.Select(fact => new SceneFact(fact.Position, fact.FactId, fact.Text)), ManuallyEdited, Description,
+            Technique.IsGenerated() ? still?.Id : null);
     }
 }
 
@@ -183,6 +209,7 @@ public static class StoryboardEditing
         a.Position == b.Position && a.Layout == b.Layout && a.Technique == b.Technique && a.DurationMs == b.DurationMs
         && a.OnScreenText.SequenceEqual(b.OnScreenText) && a.NarrationText == b.NarrationText
         && a.AssetIds.SequenceEqual(b.AssetIds) && a.ManuallyEdited == b.ManuallyEdited && a.Description == b.Description
+        && a.StillId == b.StillId
         && a.Facts.Select(fact => fact.FactId).SequenceEqual(b.Facts.Select(fact => fact.FactId));
 }
 
@@ -384,16 +411,19 @@ public static class StoryboardRules
     /// can: a photo it shows may since have been removed. Empty when it can be rendered.
     /// </summary>
     /// <param name="assets">Those of the assets the Scenes show that the Product still has.</param>
-    public static IReadOnlyList<string> RenderProblems(Storyboard storyboard, IReadOnlyCollection<ProductAsset> assets)
+    /// <param name="approvedStillIds">Those of the Stills the Scenes refer to that a member approved, whatever was asked for in their place since.</param>
+    public static IReadOnlyList<string> RenderProblems(
+        Storyboard storyboard, IReadOnlyCollection<ProductAsset> assets, IReadOnlySet<Guid> approvedStillIds)
     {
-        if (CreativeTemplates.Find(storyboard.CreativeTemplate) is not { } template || storyboard.RenderMode != RenderMode.ProductLock)
+        if (CreativeTemplates.Find(storyboard.CreativeTemplate) is not { } template)
         {
-            return ["Only a Storyboard in Product Lock can be rendered so far."];
+            return ["This Storyboard's creative template can no longer be rendered."];
         }
         if (storyboard.Scenes.Count == 0) return ["The Storyboard has no Scenes."];
 
         var problems = new List<string>();
         var removed = false;
+        var unapproved = false;
         foreach (var scene in storyboard.Scenes)
         {
             var name = $"Scene {scene.Position}";
@@ -404,6 +434,16 @@ public static class StoryboardRules
             if (!storyboard.RenderMode.Allows(scene.Technique))
             {
                 problems.Add($"{name} is planned as {scene.Technique}, which {storyboard.RenderMode} does not allow.");
+            }
+            else if (scene.Technique == Technique.GeneratedFootage)
+            {
+                problems.Add($"{name} is generated footage, which cannot be rendered yet.");
+            }
+            // A render makes nothing that is paid for (ADR 0003): the Still has to be there already.
+            else if (scene.Technique == Technique.GeneratedBackdrop && !(scene.StillId is { } still && approvedStillIds.Contains(still)))
+            {
+                problems.Add($"{name} has a generated backdrop and no approved Still.");
+                unapproved = true;
             }
             if (template.Scenes.All(slot => slot.Layout != scene.Layout))
             {
@@ -425,6 +465,7 @@ public static class StoryboardRules
             }
         }
         if (removed) problems.Add("Generate the Storyboard again, then render that version.");
+        if (unapproved) problems.Add("Approve a Still for it at Storyboard review, then render the version that makes.");
         return problems;
     }
 

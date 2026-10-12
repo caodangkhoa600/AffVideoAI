@@ -3,8 +3,8 @@
 // rotated and faded (Product Lock).
 
 import type { CSSProperties } from 'react';
-import { Easing, Img, interpolate, staticFile, useCurrentFrame, useVideoConfig } from 'remotion';
-import type { Layer, Layout, SceneInput } from './scene';
+import { AbsoluteFill, Easing, Img, interpolate, staticFile, useCurrentFrame, useVideoConfig } from 'remotion';
+import { HEIGHT, WIDTH, type Layer, type Layout, type SceneInput } from './scene';
 import { FAMILY, WEIGHTS, type Weight } from './typeface';
 
 export const OUT = Easing.out(Easing.cubic);
@@ -106,6 +106,30 @@ export const Product = ({ layer, pose, opacity }: { layer: Layer; pose: Pose; op
     }}
   />
 );
+
+/**
+ * A Scene's generated backdrop: its Still, filling the frame behind whatever the
+ * layout draws. The Still is a picture and all its movement is from here: it is
+ * pushed in on slowly from the Scene's first frame to its last, however long the
+ * Scene is. In its last 0.3 seconds it fades away, so the Scene ends on its
+ * template's own ground, which is where the Scene after starts: a Hook's Scene
+ * may be as short as two seconds, and the picture was paid for.
+ */
+export const GeneratedBackdrop = ({ scene, veil }: { scene: SceneInput; veil: string }) => {
+  const t = useSeconds();
+  const duration = useDuration();
+  if (!scene.still) return null;
+  return (
+    <AbsoluteFill style={{ overflow: 'hidden', opacity: 1 - move(t, duration - 0.3, 0.3, INOUT) }}>
+      <Img
+        src={staticFile(scene.still)}
+        style={{ position: 'absolute', width: WIDTH, height: HEIGHT, objectFit: 'cover', transform: `scale(${1 + (0.08 * t) / duration})` }}
+      />
+      {/* A wash of the template's ground, so that its type reads on any picture. */}
+      <AbsoluteFill style={{ background: veil }} />
+    </AbsoluteFill>
+  );
+};
 
 /** Lines of type whose words rise into place one after another from behind a mask. */
 export const Type = ({

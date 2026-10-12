@@ -109,8 +109,9 @@ internal sealed class ScopedStoryboards(
         var texts = await WriteAsync(template, project, material.Product, variant, facts, cancellationToken);
         var written = Written(position, slot.Scene, replaced.DurationMs, from.RenderMode, texts[slot.Index], facts, material, project);
         // Every other Scene goes into the next version exactly as it is in this one.
+        var approved = await database.ApprovedStillsAsync(project.Id, cancellationToken);
         var scenes = from.Scenes
-            .Select(scene => scene.Position == position ? written : scene.Edited(scene.Position, new SceneChange(scene.Position)))
+            .Select(scene => scene.Position == position ? written.Referring(approved) : scene.Edited(scene.Position, new SceneChange(scene.Position)))
             .ToList();
         // The planner writes the same from the same: a version that repeats this one would tell the member nothing.
         var same = StoryboardEditing.Differ(from.Scenes, scenes)
@@ -290,19 +291,25 @@ internal sealed class ScopedStoryboards(
 
         for (var attempt = 1; ; attempt++)
         {
+            // An approval made at this moment makes versions of its own: one of the two waits for the other.
+            await using var holding = await database.HoldProjectAsync(project.Id, cancellationToken);
+            if (holding is null) return null;
+            // A generated Scene refers to the Project's approved Still of the picture it describes, when there is one.
+            var approved = await database.ApprovedStillsAsync(project.Id, cancellationToken);
             var latest = await database.Storyboards.Where(s => s.VariantId == variant.Id).MaxAsync(s => (int?)s.Version, cancellationToken);
             var storyboard = new Storyboard(
                 Guid.CreateVersion7(), organizationId, variant.Id, (latest ?? 0) + 1,
-                creativeTemplate, templateVersion, planner, renderMode, scenes, clock.GetUtcNow());
+                creativeTemplate, templateVersion, planner, renderMode, scenes.Select(scene => scene.Referring(approved)), clock.GetUtcNow());
             database.Storyboards.Add(storyboard);
             try
             {
                 await database.SaveChangesAsync(cancellationToken);
+                await holding.CommitAsync(cancellationToken);
                 return StoryboardGeneration.Made(storyboard);
             }
             catch (DbUpdateException exception) when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.ForeignKeyViolation })
             {
-                // The Project, and the Variant with it, was deleted after it was read.
+                // The Variant was deleted after it was read.
                 return null;
             }
             catch (DbUpdateException exception) when (

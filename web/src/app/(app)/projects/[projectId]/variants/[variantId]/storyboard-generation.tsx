@@ -29,7 +29,16 @@ const money = (amount: number, currency: string) =>
  * confirmation, and the Still of each generated Scene, to approve or to replace with another.
  * Nothing is generated before the member confirms (ADR 0003).
  */
-export function StoryboardGeneration({ variant, storyboard }: { variant: Variant; storyboard: Storyboard }) {
+export function StoryboardGeneration({
+  variant,
+  storyboard,
+  onAdded,
+}: {
+  variant: Variant;
+  storyboard: Storyboard;
+  /** A Storyboard version was added: approving a Still makes the version that refers to it. */
+  onAdded: () => Promise<void>;
+}) {
   const queryClient = useQueryClient();
   const path = { projectId: variant.projectId, variantId: variant.id, version: storyboard.version };
   const key = ["projects", "one", variant.projectId, "variants", variant.id, "storyboards", storyboard.version, "generation"];
@@ -79,6 +88,8 @@ export function StoryboardGeneration({ variant, storyboard }: { variant: Variant
   const approve = (still: Still) =>
     act(async () => {
       const { error, response } = await api.POST("/api/v1/stills/{stillId}/approve", { params: { path: { stillId: still.id } } });
+      // The version that uses the Still is the next one, and that is the one to read and render now.
+      if (response.ok) await onAdded();
       return { ok: response.ok, error };
     }, "The Still could not be approved.");
 
@@ -101,7 +112,8 @@ export function StoryboardGeneration({ variant, storyboard }: { variant: Variant
       <p className="text-sm text-muted-foreground">
         In Hybrid a Scene can have a generated backdrop behind the Product. The Product itself is always its photo.
         Each backdrop is a Still, made once for the Project and used by every Variant of it. Making one costs money,
-        so nothing is generated until you have seen the estimate and confirmed it.
+        so nothing is generated until you have seen the estimate and confirmed it. Approving a Still makes the next
+        Storyboard version, which uses it: that version is the one to render. A render generates nothing and no provider is paid for it.
       </p>
       {estimate.isError ? (
         <p role="alert" className="text-sm text-destructive">

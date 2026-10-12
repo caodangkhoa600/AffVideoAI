@@ -128,7 +128,8 @@ internal static class StoryboardEndpoints
             scene.AssetIds,
             scene.Facts.Select(fact => new SceneFactResponse(fact.FactId, fact.Text)).ToList(),
             scene.ManuallyEdited,
-            scene.Description)).ToList(),
+            scene.Description,
+            scene.StillId)).ToList(),
         storyboard.CreatedAt,
         (flags ?? []).Select(ToResponse).ToList());
 

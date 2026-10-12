@@ -6,7 +6,6 @@ using AffiVideo.Application.Storage;
 using AffiVideo.Domain;
 using AffiVideo.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Options;
 
 namespace AffiVideo.Infrastructure.Generation;
@@ -33,7 +32,7 @@ internal sealed class ScopedGeneration(
         var organizationId = caller.OrganizationId
             ?? throw new InvalidOperationException("A Still is queued for the caller's Organization, and there is no caller.");
         var member = caller.MemberId ?? throw new InvalidOperationException("Only a member can confirm a generation.");
-        await using var deciding = await DecideForProjectAsync(projectId, cancellationToken);
+        await using var deciding = await database.HoldProjectAsync(projectId, cancellationToken);
         if (deciding is null) return null;
         if (await FindByKeyAsync(projectId, idempotencyKey, cancellationToken) is { Count: > 0 } already)
         {
@@ -92,12 +91,21 @@ internal sealed class ScopedGeneration(
     public async Task<StillDecision?> ApproveStillAsync(Guid stillId, CancellationToken cancellationToken)
     {
         var member = caller.MemberId ?? throw new InvalidOperationException("Only a member can approve a Still.");
+        if (await database.Stills.AsNoTracking().SingleOrDefaultAsync(s => s.Id == stillId, cancellationToken) is not { } found) return null;
+        // The Still is read for the decision only once its Project's Storyboards are this request's to add to.
+        // A Still whose Project was deleted is kept: it is approved with no Storyboard to refer to it.
+        await using var deciding = found.ProjectId is { } projectId ? await database.HoldProjectAsync(projectId, cancellationToken) : null;
         var still = await database.Stills.SingleOrDefaultAsync(s => s.Id == stillId, cancellationToken);
         if (still is null) return null;
-        if (!still.Approve(member, clock.GetUtcNow())) return StillDecision.Refuse(NotToBeDecided(still, "approved"));
+        var now = clock.GetUtcNow();
+        if (!still.Approve(member, now)) return StillDecision.Refuse(NotToBeDecided(still, "approved"));
         try
         {
+            // The approval and the versions that refer to the Still are kept together, or neither is.
             await database.SaveChangesAsync(cancellationToken);
+            database.Storyboards.AddRange(await VersionsReferringToAsync(still, now, cancellationToken));
+            await database.SaveChangesAsync(cancellationToken);
+            if (deciding is not null) await deciding.CommitAsync(cancellationToken);
         }
         catch (DbUpdateConcurrencyException)
         {
@@ -116,7 +124,7 @@ internal sealed class ScopedGeneration(
             return StillDecision.Refuse("The Project this Still was made for has been deleted, so there is nothing to make another for.");
         }
         // The Still is read for the decision only once its Project's generation is this request's to decide.
-        await using var deciding = await DecideForProjectAsync(projectId, cancellationToken);
+        await using var deciding = await database.HoldProjectAsync(projectId, cancellationToken);
         var still = await database.Stills.SingleOrDefaultAsync(s => s.Id == stillId, cancellationToken);
         if (deciding is null || still is null) return null;
         if (await FindByKeyAsync(projectId, idempotencyKey, cancellationToken) is [var already, ..])
@@ -159,6 +167,27 @@ internal sealed class ScopedGeneration(
             return StillDecision.Refuse("Someone else decided about this Still at the same moment. Look at it again.");
         }
         return new StillDecision(new StillRecord(another, null), Queued: true, null);
+    }
+
+    // A version never changes, so a Still that is approved is used by the version after: the next
+    // version of each Variant of the Project whose newest version describes the picture the Still is of.
+    private async Task<IReadOnlyList<Storyboard>> VersionsReferringToAsync(Still approved, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        if (approved.ProjectId is not { } projectId) return [];
+        var newest = await database.Storyboards.AsNoTracking()
+            .Where(s => database.Variants.Any(v => v.Id == s.VariantId && v.ProjectId == projectId))
+            .Where(s => s.Version == database.Storyboards.Where(other => other.VariantId == s.VariantId).Max(other => other.Version))
+            .ToListAsync(cancellationToken);
+        var ofProject = await database.ApprovedStillsAsync(projectId, cancellationToken);
+        return
+        [
+            .. newest
+                .Select(from => (From: from, Scenes: from.Scenes.Select(scene => scene.Referring(ofProject)).ToList()))
+                .Where(next => StoryboardEditing.Differ(next.From.Scenes, next.Scenes))
+                .Select(next => new Storyboard(
+                    Guid.CreateVersion7(), next.From.OrganizationId, next.From.VariantId, next.From.Version + 1, next.From.CreativeTemplate,
+                    next.From.TemplateVersion, next.From.Planner, next.From.RenderMode, next.Scenes, now)),
+        ];
     }
 
     // Why a Still in this state cannot be approved or replaced.
@@ -220,23 +249,6 @@ internal sealed class ScopedGeneration(
             .ToList();
         return new GenerationEstimate(
             null, stills, stills.Sum(still => still.EstimatedAmount), currency, spent, ceiling, provider, sceneStills, AnotherStillAmount: rate);
-    }
-
-    // What a Project's generation may spend, and which of its Scenes have a Still, are read and then
-    // written. Two requests doing that at the same moment would each see what the other is about to
-    // change: the same Scene paid for twice, or the ceiling passed between them. So every request that
-    // may queue a Still for a Project holds the Project's row until it has: one decides at a time, and
-    // the same click arriving twice finds what its first arrival queued. Disposing without committing
-    // keeps nothing. Null when the Project was deleted after it was read.
-    private async Task<IDbContextTransaction?> DecideForProjectAsync(Guid projectId, CancellationToken cancellationToken)
-    {
-        var transaction = await database.Database.BeginTransactionAsync(cancellationToken);
-        var held = await database.Database
-            .SqlQuery<Guid>($"""SELECT "Id" AS "Value" FROM "Projects" WHERE "Id" = {projectId} FOR UPDATE""")
-            .ToListAsync(cancellationToken);
-        if (held.Count == 1) return transaction;
-        await transaction.DisposeAsync();
-        return null;
     }
 
     private const string RaiseTheCeiling = "An Owner can raise the Organization's ceiling.";

@@ -33,6 +33,8 @@ export type SceneInput = {
   previous: { layout: Layout; product: Layer } | null;
   /** The studio backdrop, in the render's public folder. */
   backdrop: string;
+  /** The Still that is the Scene's generated backdrop, in the render's public folder. Null when it has none. */
+  still: string | null;
   /** Taken from the Product's own colour. */
   colours: Colours;
 };

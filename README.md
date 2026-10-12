@@ -269,9 +269,9 @@ Posts (ticket 19), Performance Snapshots (ticket 20), Commission records
 (ticket 22), the corrections to them (ticket 27), and the Affiliate Lab
 dashboard (ticket 23). Every ticket of month one is done or set aside.
 
-Hybrid video (`.scratch/hybrid-video`): the provider test (ticket 01) and a
-Still for a generated backdrop (ticket 02) are done. A Hybrid Storyboard
-cannot be rendered until ticket 03.
+Hybrid video (`.scratch/hybrid-video`): the provider test (ticket 01), a
+Still for a generated backdrop (ticket 02) and a render with one (ticket 03)
+are done. Generated footage is ticket 04.
 
 Notes from the Affiliate Lab dashboard:
 
@@ -872,9 +872,21 @@ Notes from Stills for a generated backdrop (Hybrid video, ticket 02):
   `Generation__Fake__TechnicalFailures`, `Generation__Fake__BillsFailures`,
   `Generation__Fake__Refuses` and `Generation__Fake__DelaySeconds`, on the
   worker.
-- A Hybrid Storyboard cannot be rendered yet: a render of one fails validation
-  with "Only a Storyboard in Product Lock can be rendered so far." Drawing the
-  Still behind the Cut-out is ticket 03.
+- Approving a Still makes the next Storyboard version of each Variant of the
+  Project whose newest version describes that picture. That version refers to
+  the Still, and is the one to render. A version made afterwards refers to it
+  too, for as long as its Scene describes the same picture and the Still stays
+  approved.
+- A render draws the approved Still behind the Product's Cut-out, or behind its
+  Card, pushed in on slowly for the whole Scene. It calls no provider and
+  generates nothing (ADR 0003): a version whose generated backdrop refers to no
+  approved Still fails validation, with "Scene 1 has a generated backdrop and
+  no approved Still." A worker needs no image provider to render.
+- Asking for another Still leaves the versions that refer to the first as they
+  are: they still render with it. A version made from then on refers to none
+  until the new Still is approved.
+- Only the Scene that shows a Still is drawn again when another Still is
+  approved in its place.
 - On the Variant's page a Hybrid Storyboard version has "Generated pictures":
   the estimate, the confirmation, and each Still with its state, to approve or
   to replace with another.

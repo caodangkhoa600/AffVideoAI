@@ -167,7 +167,7 @@ export function StoryboardVersions({
               />
               {/* Paid generation comes before rendering, and only Hybrid has any. */}
               {shown.renderMode === "Hybrid" && (
-                <StoryboardGeneration key={`generation-${shown.id}`} variant={variant} storyboard={shown} />
+                <StoryboardGeneration key={`generation-${shown.id}`} variant={variant} storyboard={shown} onAdded={added} />
               )}
               {/* Keyed by the version, so a job being watched is never shown under another version. */}
               {render && <StoryboardRender key={`render-${shown.id}`} variant={variant} storyboard={shown} />}

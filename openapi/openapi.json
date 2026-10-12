@@ -7302,7 +7302,8 @@
           "assetIds",
           "facts",
           "manuallyEdited",
-          "description"
+          "description",
+          "stillId"
         ],
         "type": "object",
         "properties": {
@@ -7350,6 +7351,13 @@
               "null",
               "string"
             ]
+          },
+          "stillId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },

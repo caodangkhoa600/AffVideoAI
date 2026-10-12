@@ -7,7 +7,7 @@
 
 import type { CSSProperties, ReactNode } from 'react';
 import { AbsoluteFill } from 'remotion';
-import { IN, INOUT, Product, between, carried, fit, leftBehind, move, narrowed, useDuration, useSeconds, words, type Pose } from './motion';
+import { GeneratedBackdrop, IN, INOUT, Product, between, carried, fit, leftBehind, move, narrowed, useDuration, useSeconds, words, type Pose } from './motion';
 import { WIDTH, type Colours, type Layer, type Layout, type Layouts, type SceneInput } from './scene';
 import { FAMILY, WEIGHTS, type Weight } from './typeface';
 
@@ -52,6 +52,7 @@ const Stage = ({ scene, children }: { scene: SceneInput; children: ReactNode }) 
     <AbsoluteFill style={{ background: DARK }}>
       {previous && through < 1 && <AbsoluteFill style={{ background: ground(previous.layout, scene.colours) }} />}
       <AbsoluteFill style={{ background: ground(scene.layout, scene.colours), opacity: through }} />
+      <GeneratedBackdrop scene={scene} veil="rgba(8, 8, 10, 0.4)" />
       {leaving && <Product layer={previous!.product} pose={leaving} opacity={1 - move(t, 0, 0.6, IN)} />}
       {children}
     </AbsoluteFill>

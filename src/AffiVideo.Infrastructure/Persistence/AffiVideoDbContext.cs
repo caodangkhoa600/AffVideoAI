@@ -211,6 +211,8 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
                 scene.Property(s => s.Layout).HasConversion<string>().HasMaxLength(30);
                 scene.Property(s => s.Technique).HasConversion<string>().HasMaxLength(20);
                 scene.Property(s => s.Description).HasMaxLength(StoryboardRules.DescriptionMaxLength);
+                // A Still is kept for as long as a version refers to it.
+                scene.HasOne<Still>().WithMany().HasForeignKey(s => s.StillId).OnDelete(DeleteBehavior.Restrict);
 
                 scene.OwnsMany(s => s.Facts, fact =>
                 {

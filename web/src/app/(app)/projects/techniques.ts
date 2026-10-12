@@ -22,7 +22,7 @@ export const RENDER_MODES: { value: RenderMode; name: string; about: string }[] 
     value: "Hybrid",
     name: "Hybrid",
     about:
-      "The Hook Scene can have a generated backdrop behind the Product, which is still its photo. Generating costs money and is confirmed first. A Hybrid Storyboard cannot be rendered yet.",
+      "The Hook Scene can have a generated backdrop behind the Product, which is still its photo. Generating costs money and is confirmed first. A render generates nothing.",
   },
 ];
 

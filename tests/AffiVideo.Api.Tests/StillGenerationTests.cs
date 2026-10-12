@@ -226,6 +226,94 @@ public sealed class StillGenerationTests(AffiVideoApp app)
     }
 
     [Fact]
+    public async Task Approving_a_Still_makes_the_next_Storyboard_version_of_each_Variant_that_describes_its_picture_and_that_version_refers_to_it()
+    {
+        await using var stack = await app.NewStackAsync(FakeImages(Rate));
+        using var member = await stack.NewMemberAsync();
+        var hybrid = await HybridVariantAsync(member);
+        var first = await GeneratedAsync(member, hybrid);
+        // The same creative template for the same Product and audience: its Hook Scene describes the same picture.
+        var sibling = await VariantTests.AddAsync(
+            member, hybrid.ProjectId, new VariantRequest(CreativeTemplate.ProductShowcase, "Uống nước ấm cả ngày", RenderMode.Hybrid));
+        await GeneratedAsync(member, sibling);
+        // Another creative template describes another picture, and Product Lock has none.
+        var luxury = await VariantTests.AddAsync(
+            member, hybrid.ProjectId, new VariantRequest(CreativeTemplate.LuxuryCinematic, "Uống nước ấm cả ngày", RenderMode.Hybrid));
+        await GeneratedAsync(member, luxury);
+        var locked = await VariantTests.AddAsync(member, hybrid.ProjectId);
+        await GeneratedAsync(member, locked);
+        var worker = await stack.StartWorkerAsync(FakeImageWorker);
+        var still = await EndedAsync(member, await ConfirmedAsync(member, hybrid, 1), worker);
+        var beforeApproval = await ListAsync(member, hybrid);
+
+        (await member.PostAsync($"/api/v1/stills/{still.Id}/approve", new { })).EnsureSuccessStatusCode();
+
+        // A Still that is only made is nobody's choice yet: no version refers to it.
+        Assert.Equal(1, beforeApproval.Total);
+        Assert.Null(beforeApproval.Items[0].Scenes[0].StillId);
+        foreach (var variant in new[] { hybrid, sibling })
+        {
+            var versions = (await ListAsync(member, variant)).Items;
+            Assert.Equal([2, 1], versions.Select(version => version.Version));
+            // The version that was there stays as it was: a version never changes.
+            Assert.All(versions[1].Scenes, scene => Assert.Null(scene.StillId));
+            Assert.Equal(still.Id, versions[0].Scenes[0].StillId);
+            Assert.All(versions[0].Scenes.Skip(1), scene => Assert.Null(scene.StillId));
+            // Nothing else about the Scenes differs.
+            Assert.Equal(
+                versions[1].Scenes.Select(scene => scene with { StillId = null }), versions[0].Scenes.Select(scene => scene with { StillId = null }),
+                SameScene);
+        }
+        Assert.Equal(first.Scenes[0].Description, (await ListAsync(member, hybrid)).Items[0].Scenes[0].Description);
+        Assert.Equal(1, (await ListAsync(member, luxury)).Total);
+        Assert.Equal(1, (await ListAsync(member, locked)).Total);
+    }
+
+    [Fact]
+    public async Task A_version_made_once_a_Still_is_approved_refers_to_it_for_as_long_as_its_Scene_describes_that_picture_and_the_Still_stays_approved()
+    {
+        await using var stack = await app.NewStackAsync(FakeImages(Rate));
+        using var member = await stack.NewMemberAsync();
+        var hybrid = await HybridVariantAsync(member);
+        await GeneratedAsync(member, hybrid);
+        var worker = await stack.StartWorkerAsync(FakeImageWorker);
+        var still = await EndedAsync(member, await ConfirmedAsync(member, hybrid, 1), worker);
+        (await member.PostAsync($"/api/v1/stills/{still.Id}/approve", new { })).EnsureSuccessStatusCode();
+        var second = (await ListAsync(member, hybrid)).Items[0];
+
+        // Planned again, and planned for another Variant of the Project: the picture is there already.
+        var planned = await GeneratedAsync(member, hybrid);
+        var sibling = await VariantTests.AddAsync(
+            member, hybrid.ProjectId, new VariantRequest(CreativeTemplate.ProductShowcase, "Uống nước ấm cả ngày", RenderMode.Hybrid));
+        var ofSibling = await GeneratedAsync(member, sibling);
+        // An edit of anything but the description leaves the picture as it is.
+        var reworded = await StoryboardEditTests.EditedAsync(
+            member, hybrid, 2, StoryboardEditTests.Changing(second, new SceneEditRequest(2, OnScreenText: ["Lumo 500 mới về"])));
+        // Another picture is described: the Still is not of it.
+        var described = await StoryboardEditTests.EditedAsync(
+            member, hybrid, 2, StoryboardEditTests.Changing(second, new SceneEditRequest(1, Description: "Bàn gỗ sồi bên cửa sổ")));
+
+        Assert.Equal((2, 3, 1, 4, 5), (second.Version, planned.Version, ofSibling.Version, reworded.Version, described.Version));
+        Assert.All([second, planned, ofSibling, reworded], version => Assert.Equal(still.Id, version.Scenes[0].StillId));
+        Assert.Null(described.Scenes[0].StillId);
+        Assert.Empty((await member.GetAsync<GenerationEstimateResponse>(Generation(sibling, 1))).Stills);
+        // An edit that changes nothing still makes no version.
+        Assert.Equal(HttpStatusCode.Conflict, (await StoryboardEditTests.EditAsync(member, hybrid, 2, StoryboardEditTests.Unchanged(second))).StatusCode);
+
+        // Another is asked for in its place: the Still is no longer approved, so a version made now refers to none.
+        (await member.PostAsync($"/api/v1/stills/{still.Id}/another", new AnotherStillRequest(Rate), NewKey())).EnsureSuccessStatusCode();
+        var afterRejection = await StoryboardEditTests.EditedAsync(
+            member, hybrid, 2, StoryboardEditTests.Changing(second, new SceneEditRequest(2, OnScreenText: ["Lumo 500 đã về"])));
+
+        Assert.Null(afterRejection.Scenes[0].StillId);
+        // The versions that referred to it still do.
+        Assert.Equal(still.Id, (await member.GetAsync<StoryboardResponse>($"{Storyboards(hybrid)}/2")).Scenes[0].StillId);
+    }
+
+    private static readonly IEqualityComparer<SceneResponse> SameScene = EqualityComparer<SceneResponse>.Create(
+        (a, b) => System.Text.Json.JsonSerializer.Serialize(a, AffiVideoApp.Json) == System.Text.Json.JsonSerializer.Serialize(b, AffiVideoApp.Json));
+
+    [Fact]
     public async Task A_generation_that_would_take_the_Project_past_its_ceiling_is_refused_with_the_reason_and_nothing_is_generated()
     {
         // Two dollars a Still, under the ceiling of five: two can be paid for, and a third cannot.
@@ -451,7 +539,7 @@ public sealed class StillGenerationTests(AffiVideoApp app)
         }
     }
 
-    private static (string Name, string Value) NewKey() => ("Idempotency-Key", Guid.NewGuid().ToString());
+    internal static (string Name, string Value) NewKey() => ("Idempotency-Key", Guid.NewGuid().ToString());
 
     internal static Task<PagedResponse<StillResponse>> StillsAsync(Browser member, VariantResponse variant) =>
         member.GetAsync<PagedResponse<StillResponse>>($"{ProjectTests.Projects}/{variant.ProjectId}/stills");

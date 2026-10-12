@@ -7,7 +7,7 @@
 
 import type { ReactNode } from 'react';
 import { AbsoluteFill, Easing, Img, staticFile } from 'remotion';
-import { BACK, IN, INOUT, Product, Type, between, carried, fit, leftBehind, mix, move, narrowed, useDuration, useSeconds, words, type Pose } from './motion';
+import { BACK, GeneratedBackdrop, IN, INOUT, Product, Type, between, carried, fit, leftBehind, mix, move, narrowed, useDuration, useSeconds, words, type Pose } from './motion';
 import { HEIGHT, WIDTH, type Layer, type Layout, type Layouts, type SceneInput } from './scene';
 import { FAMILY } from './typeface';
 
@@ -41,6 +41,7 @@ const Stage = ({ scene, children }: { scene: SceneInput; children: ReactNode }) 
   return (
     <AbsoluteFill style={{ background: 'white' }}>
       <Img src={staticFile(scene.backdrop)} style={{ position: 'absolute', width: WIDTH, height: HEIGHT }} />
+      <GeneratedBackdrop scene={scene} veil="rgba(255, 255, 255, 0.18)" />
       {leaving && !fromFacts && <Product layer={previous!.product} pose={{ ...leaving, cx: mix(leaving.cx, -800, gone) }} />}
       {fromFacts && <Panel top={mix(EDGE, HEIGHT, gone)} colour={scene.colours.accent} />}
       {leaving && fromFacts && <Product layer={previous!.product} pose={{ ...leaving, cy: mix(leaving.cy, -700, gone) }} />}

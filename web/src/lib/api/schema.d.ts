@@ -2017,6 +2017,8 @@ export interface components {
             facts: components["schemas"]["SceneFactResponse"][];
             manuallyEdited: boolean;
             description: null | string;
+            /** Format: uuid */
+            stillId: null | string;
         };
         SceneStillResponse: {
             /** Format: int32 */

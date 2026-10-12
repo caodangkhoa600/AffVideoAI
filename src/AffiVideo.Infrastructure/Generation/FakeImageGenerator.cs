@@ -44,7 +44,8 @@ internal sealed class FakeImageGenerator(FakeGenerationOptions options) : IImage
                     new SKPoint(0, 0), new SKPoint(0, Height), [new SKColor(0xE8, 0xEE, 0xF4), new SKColor(0xB9, 0xC6, 0xD6)], SKShaderTileMode.Clamp),
             };
             canvas.DrawRect(0, 0, Width, Height, gradient);
-            using var stripe = new SKPaint { Color = new SKColor(0x5B, 0x6B, 0x80, 0x30), StrokeWidth = 60, IsAntialias = true };
+            // Dark enough to be told from the studio backdrop in a frame of a video, under a template's wash.
+            using var stripe = new SKPaint { Color = new SKColor(0x5B, 0x6B, 0x80, 0x60), StrokeWidth = 60, IsAntialias = true };
             for (var x = -Height; x < Width; x += 240)
             {
                 canvas.DrawLine(x, Height, x + Height, 0, stripe);

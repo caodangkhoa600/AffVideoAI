@@ -1700,6 +1700,9 @@ namespace AffiVideo.Infrastructure.Persistence.Migrations
                                 .IsRequired()
                                 .HasColumnType("text[]");
 
+                            b1.Property<Guid?>("StillId")
+                                .HasColumnType("uuid");
+
                             b1.Property<string>("Technique")
                                 .IsRequired()
                                 .HasMaxLength(20)
@@ -1707,7 +1710,14 @@ namespace AffiVideo.Infrastructure.Persistence.Migrations
 
                             b1.HasKey("StoryboardId", "Position");
 
+                            b1.HasIndex("StillId");
+
                             b1.ToTable("StoryboardScenes", (string)null);
+
+                            b1.HasOne("AffiVideo.Domain.Still", null)
+                                .WithMany()
+                                .HasForeignKey("StillId")
+                                .OnDelete(DeleteBehavior.Restrict);
 
                             b1.WithOwner()
                                 .HasForeignKey("StoryboardId");
