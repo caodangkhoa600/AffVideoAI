@@ -1,0 +1,19 @@
+{
+  "scenes": [
+    {
+      "name": "backdrop",
+      "still": "A bright modern kitchen counter in white marble, soft morning light from a window on the left, shallow depth of field, out-of-focus shelves and green plants behind. The centre foreground of the counter is empty. No products, no bottles, no people, no text, no logos. Vertical photograph, photorealistic, advertising quality.",
+      "motion": "Slow, steady push-in. Light shifts gently across the counter. Nothing else moves. No objects appear."
+    },
+    {
+      "name": "footage",
+      "still": "A Vietnamese woman in her thirties standing in a bright modern kitchen, smiling with relief at a stack of clean white plates on the counter. No products, no bottles, no text, no logos. Vertical photograph, photorealistic, advertising quality.",
+      "motion": "She looks down at the plates, then up toward the camera and smiles. Slow push-in. She does not speak."
+    }
+  ],
+  "narration": [
+    "Sáng nào cũng vội, bếp nào cũng bừa.",
+    "Chỉ một lần rửa, chén đĩa sạch bóng.",
+    "Xem chi tiết sản phẩm ngay hôm nay."
+  ]
+}

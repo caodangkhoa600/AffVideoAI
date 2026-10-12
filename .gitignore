@@ -3,6 +3,11 @@ prototypes/day-one-render/input/*
 !prototypes/day-one-render/input/product.example.json
 prototypes/day-one-render/output/
 
+# Provider test: the founder's test file and everything generated stay local
+prototypes/provider-test/input/*
+!prototypes/provider-test/input/test.example.json
+prototypes/provider-test/output/
+
 .env
 
 __pycache__/
