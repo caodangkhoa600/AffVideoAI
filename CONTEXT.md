@@ -43,7 +43,7 @@ A photo or the logo of a Product, kept as the image a member's upload decodes to
 _Avoid_: Media, attachment
 
 **Fact**:
-A single statement about a Product, written in one language, that a script may use only once it is Confirmed.
+A single statement about a Product, written in one language. Text or pictures may say something about the Product only by using a Fact that is Confirmed.
 _Avoid_: Claim, feature, verified fact
 
 **Proposed**:
@@ -78,23 +78,27 @@ _Avoid_: Shot plan, script, timeline
 
 **Scene**:
 One timed segment of a Storyboard, with its text, source assets and Technique.
-_Avoid_: Shot, clip, segment
+_Avoid_: Shot, segment
 
 **Narration**:
-A recording of a voice that a member uploads for a Variant, heard over every video rendered for it afterwards. A Scene's narration text is words; Narration is sound, and nothing makes one from the other.
-_Avoid_: Voiceover, voice track
+The voice heard over a Variant's videos: either one recording a member uploads, or speech made from each Scene's narration text. A Variant has one or the other, and an upload wins. A Scene's narration text is words; Narration is sound. The voice is a narrator's, never a person on screen speaking.
+_Avoid_: Voiceover, voice track, dialogue
 
 **Music**:
 A recording that a member uploads for a Variant, mixed under its videos at a volume the member chooses. A Variant has at most one Narration and one Music.
 _Avoid_: Soundtrack, background track, BGM
 
 **Rights confirmation**:
-A member's statement, made on uploading Narration or Music, that they hold the rights to use it. It records who and when; the Organization is responsible for its truth.
+A member's statement, made on uploading Narration or Music, that they hold the rights to use it. It records who and when; the Organization is responsible for its truth. Speech made from narration text needs none.
 _Avoid_: Licence check, clearance
 
 **Manually Edited**:
 A mark on a Scene whose text a person changed. Its text is no longer traceable to Facts and is the Organization's responsibility. The mark stays through later versions until the Scene is regenerated.
 _Avoid_: Overridden, custom
+
+**Generated Product**:
+A mark on a Scene whose picture of the Product was generated and is not the Product's photo. It is the Organization's responsibility, and a member accepts each such Scene by itself, beside the real photo. It never appears in Product Lock or Hybrid.
+_Avoid_: AI product, synthetic product
 
 **Flagged for Review**:
 A mark on a Storyboard version or Rendered Video that used a Fact which has since been Withdrawn. Flagged work is kept, never deleted. A member clears the mark after reviewing the work, one version or one video at a time.
@@ -119,8 +123,23 @@ _Avoid_: Gallery, media library
 ### Rendering
 
 **Technique**:
-How a single Scene is produced: static image, image motion, image-to-video, video asset, text animation or 3D render.
-_Avoid_: Rendering mode, scene type
+How a single Scene is produced: static image, image motion, generated backdrop, generated footage, video asset, text animation or 3D render.
+_Avoid_: Rendering mode, scene type, image-to-video
+
+**Generated backdrop**:
+The Technique that puts a Still behind the Product's Cut-out. The Product is still its photo, and any movement is the template's, not generated.
+
+**Generated footage**:
+The Technique that fills a whole Scene with a Clip in which the Product does not appear.
+_Avoid_: B-roll, lifestyle shot
+
+**Still**:
+A generated image that a member approves before it is used. It becomes a generated backdrop as it is, or the start of a Clip. Like a Clip, it is kept so it can be used again.
+_Avoid_: Storyboard image, keyframe, preview
+
+**Clip**:
+A generated video made from an approved Still, for generated footage. It is kept so it can be used again: by every Variant of its Project, and by another Project when a member picks it.
+_Avoid_: Shot, generation, take
 
 **Render Mode**:
 The per-video choice that limits which Techniques the planner may use: Product Lock or Hybrid.
@@ -130,7 +149,7 @@ _Avoid_: Mode A/B/C, AI Video mode, credit tier
 The Render Mode that allows no generative Techniques, so the Product's appearance is never altered.
 
 **Hybrid**:
-The Render Mode that allows generative Techniques within a budget, alongside non-generative ones.
+The Render Mode that allows generative Techniques within a budget, alongside non-generative ones. What is generated is never the Product: wherever the Product appears, it is its photo.
 _Avoid_: AI Video, Enhanced Hybrid, Premium Cinematic
 
 **Render job**:
@@ -146,7 +165,7 @@ A worker's time-limited hold on a Render job, which it renews while it works. A 
 _Avoid_: Lock, claim
 
 **Production cost**:
-What rendering is estimated to have cost the Organization, from rates it configures. One record is kept for each Attempt, failed ones included. It is always an estimate, never an amount anyone was billed.
+What making videos is estimated to have cost the Organization, from rates it configures. One record is kept for each Attempt, failed ones included, and one for each Still, Clip and piece of generated speech. A Clip's cost is recorded once and never split across the videos that use it. It is always an estimate, never an amount anyone was billed.
 _Avoid_: Bill, charge, spend, price
 
 **Cut-out**:
