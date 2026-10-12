@@ -77,15 +77,31 @@ A versioned, ordered list of Scenes for a Variant. Any edit produces a new Story
 _Avoid_: Shot plan, script, timeline
 
 **Scene**:
-One timed segment of a Storyboard, with its text, source assets and Technique.
+One timed segment of a Storyboard or of a Commercial, with its text, source assets and Technique.
 _Avoid_: Shot, segment
 
+**Commercial**:
+A 30-second video for one Product, written fresh from a brief and made of generated Scenes in which the same Characters and Setting recur. It stands beside Project: it has no creative template, no Variant and no Render Mode, and it is the only place a Generated Product may appear.
+_Avoid_: Studio video, Studio project, cinematic project, ad
+
+**Creative direction**:
+What is written for a Commercial before anything is generated, and approved by a member: the idea, its Characters and Setting in words, its Scenes in order and its narration. Writing it again produces a new version.
+_Avoid_: Script, treatment, concept, storyboard
+
+**Character**:
+An invented adult who appears in a Commercial, defined by a description and a reference picture that a member approves. Every Scene the Character is in is generated from that picture.
+_Avoid_: Actor, avatar, persona, cast member
+
+**Setting**:
+The one place a Commercial happens in, defined like a Character by a description and an approved reference picture.
+_Avoid_: Location, set, environment, background
+
 **Narration**:
-The voice heard over a Variant's videos: either one recording a member uploads, or speech made from each Scene's narration text. A Variant has one or the other, and an upload wins. A Scene's narration text is words; Narration is sound. The voice is a narrator's, never a person on screen speaking.
+The voice heard over a video: either one recording a member uploads, or speech made from narration text. A Variant's speech is made from each Scene's narration text; a Commercial's is made sentence by sentence, each sentence lying over one or more Scenes. There is an upload or speech, never both, and an upload wins. Narration text is words; Narration is sound. The voice is a narrator's, never a person on screen speaking.
 _Avoid_: Voiceover, voice track, dialogue
 
 **Music**:
-A recording that a member uploads for a Variant, mixed under its videos at a volume the member chooses. A Variant has at most one Narration and one Music.
+A recording mixed under a video at a volume the member chooses. For a Variant a member uploads it; for a Commercial it is uploaded or generated, and an upload wins. A Variant or a Commercial has at most one Narration and one Music.
 _Avoid_: Soundtrack, background track, BGM
 
 **Rights confirmation**:
@@ -97,7 +113,7 @@ A mark on a Scene whose text a person changed. Its text is no longer traceable t
 _Avoid_: Overridden, custom
 
 **Generated Product**:
-A mark on a Scene whose picture of the Product was generated and is not the Product's photo. It is the Organization's responsibility, and a member accepts each such Scene by itself, beside the real photo. It never appears in Product Lock or Hybrid.
+A mark on a Scene whose picture of the Product was generated and is not the Product's photo. It is the Organization's responsibility, and a member accepts each such Scene by itself, beside the real photo. It appears only in a Commercial, never in Product Lock or Hybrid.
 _Avoid_: AI product, synthetic product
 
 **Flagged for Review**:
@@ -105,7 +121,7 @@ A mark on a Storyboard version or Rendered Video that used a Fact which has sinc
 _Avoid_: Invalidated, stale, needs attention
 
 **Rendered Video**:
-The MP4 produced from one specific Storyboard version.
+The MP4 produced from one specific Storyboard version, or from one version of a Commercial.
 _Avoid_: Output, export, video file
 
 **Ready for review**:
@@ -138,7 +154,7 @@ A generated image that a member approves before it is used. It becomes a generat
 _Avoid_: Storyboard image, keyframe, preview
 
 **Clip**:
-A generated video made from an approved Still, for generated footage. It is kept so it can be used again: by every Variant of its Project, and by another Project when a member picks it.
+A generated video made from an approved Still, for generated footage or for a Scene of a Commercial. It is kept so it can be used again: by every Variant of its Project, and by another Project when a member picks it.
 _Avoid_: Shot, generation, take
 
 **Render Mode**:
@@ -165,7 +181,7 @@ A worker's time-limited hold on a Render job, which it renews while it works. A 
 _Avoid_: Lock, claim
 
 **Production cost**:
-What making videos is estimated to have cost the Organization, from rates it configures. One record is kept for each Attempt, failed ones included, and one for each Still, Clip and piece of generated speech. A Clip's cost is recorded once and never split across the videos that use it. It is always an estimate, never an amount anyone was billed.
+What making videos is estimated to have cost the Organization, from rates it configures. One record is kept for each Attempt, failed ones included, one for each Still, Clip and piece of generated speech, and one for each writing by a language model. A Clip's cost is recorded once and never split across the videos that use it. It is always an estimate, never an amount anyone was billed.
 _Avoid_: Bill, charge, spend, price
 
 **Cut-out**:

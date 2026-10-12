@@ -1,6 +1,6 @@
 # The Product is generated only in Studio
 
-In Product Lock and in Hybrid the Product is always its photo: generated pictures go behind it or into Scenes it does not appear in. Only Studio, the cinematic commercial that is still to be designed, may show a generated Product, and there each such Scene carries the Generated Product mark. The founder wants members to be able to make a commercial like the reference, in which a person holds the Product, and that cannot be composited from a photo. We kept the exception out of Hybrid because video generated from a single Product photo distorts labels and shapes, and "the Product is never wrong" is what sets Hybrid apart from other AI video tools.
+In Product Lock and in Hybrid the Product is always its photo: generated pictures go behind it or into Scenes it does not appear in. Only Studio, whose video is a Commercial (ADR 0005), may show a generated Product, and there each such Scene carries the Generated Product mark. The founder wants members to be able to make a commercial like the reference, in which a person holds the Product, and that cannot be composited from a photo. We kept the exception out of Hybrid because video generated from a single Product photo distorts labels and shapes, and "the Product is never wrong" is what sets Hybrid apart from other AI video tools.
 
 ## Consequences
 
