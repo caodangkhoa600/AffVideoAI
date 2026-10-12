@@ -72,6 +72,16 @@ internal sealed class Ffmpeg(IOptions<RenderingOptions> options)
         await Processes.RunAsync("ffmpeg", arguments, jobDirectory, jobDirectory, _options.ProcessTimeout, cancellationToken);
     }
 
+    /// <summary>
+    /// Copies a video a provider made without whatever sound it has, and without encoding the picture again.
+    /// Both files are ones the worker named itself.
+    /// </summary>
+    public Task WithoutSoundAsync(string directory, string input, string output, CancellationToken cancellationToken) =>
+        Processes.RunAsync(
+            "ffmpeg",
+            ["-hide_banner", "-loglevel", "error", "-y", "-i", input, "-map", "0:v:0", "-c:v", "copy", "-an", "-movflags", "+faststart", output],
+            directory, directory, _options.ProcessTimeout, cancellationToken);
+
     // How loud the part of a track that the video has room for is, in LUFS, as it will be mixed: measured, and nothing written.
     private async Task<double> MeasureAsync(string jobDirectory, string file, string seconds, CancellationToken cancellationToken)
     {

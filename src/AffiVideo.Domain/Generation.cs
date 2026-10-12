@@ -10,6 +10,16 @@ public enum ImageProvider
     Fake,
 }
 
+/// <summary>What makes Clips from Stills.</summary>
+public enum VideoProvider
+{
+    /// <summary>Nothing does.</summary>
+    None,
+
+    /// <summary>The fake: it returns a test pattern and calls nobody. What it made is labelled as fake.</summary>
+    Fake,
+}
+
 /// <summary>
 /// The Production cost record of one generated thing: what making it is estimated
 /// to have cost, by which provider and model. One is written as the thing is made
@@ -42,6 +52,22 @@ public sealed class GenerationCostRecord : IOwnedByOrganization
         RecordedAt = recordedAt;
     }
 
+    /// <summary>The record of a Clip as it stands now: made, or failed. It is the Clip's alone, and is never split across the videos that use it.</summary>
+    public GenerationCostRecord(Guid id, Clip clip, DateTimeOffset recordedAt)
+    {
+        Id = id;
+        OrganizationId = clip.OrganizationId;
+        ProductId = clip.ProductId;
+        ClipId = clip.Id;
+        Provider = clip.Provider.ToString();
+        Model = clip.Model;
+        // What the provider did not charge for cost nothing.
+        EstimatedAmount = clip.Billed ? clip.EstimatedAmount : 0m;
+        Currency = clip.Currency;
+        RatesVersion = clip.RatesVersion;
+        RecordedAt = recordedAt;
+    }
+
     public Guid Id { get; private set; }
 
     public Guid OrganizationId { get; private set; }
@@ -49,8 +75,11 @@ public sealed class GenerationCostRecord : IOwnedByOrganization
     /// <summary>The Product the thing was generated for. The record stays with it whatever becomes of the thing.</summary>
     public Guid ProductId { get; private set; }
 
-    /// <summary>The Still the record is of.</summary>
+    /// <summary>The Still the record is of, when it is of one.</summary>
     public Guid? StillId { get; private set; }
+
+    /// <summary>The Clip the record is of, when it is of one.</summary>
+    public Guid? ClipId { get; private set; }
 
     /// <summary>What generated it, by name.</summary>
     public string Provider { get; private set; } = "";

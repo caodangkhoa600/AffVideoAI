@@ -270,8 +270,9 @@ Posts (ticket 19), Performance Snapshots (ticket 20), Commission records
 dashboard (ticket 23). Every ticket of month one is done or set aside.
 
 Hybrid video (`.scratch/hybrid-video`): the provider test (ticket 01), a
-Still for a generated backdrop (ticket 02) and a render with one (ticket 03)
-are done. Generated footage is ticket 04.
+Still for a generated backdrop (ticket 02), a render with one (ticket 03) and
+generated footage (ticket 04) are done. Asking for a Clip again, and using
+Stills and Clips again, is ticket 05.
 
 Notes from the Affiliate Lab dashboard:
 
@@ -587,9 +588,9 @@ Notes from Storyboard generation:
   Vietnamese sentence patterns with the Hook, the Product's name and Confirmed
   Facts placed in them whole. No AI and no credentials are involved, the same
   inputs always give the same Scenes, and every Storyboard says `Mock` as its
-  planner. It is the only implementation of `ILanguageModel`; the video
-  generation, text-to-speech and image-processing interfaces beside it in
-  `AffiVideo.Application/Providers` have none.
+  planner. It is the only implementation of `ILanguageModel`; the
+  text-to-speech interface beside it in `AffiVideo.Application/Providers` has
+  none.
 - Product Showcase has four Scenes (Hook, Reveal, Facts, Closing) that share
   the target duration as 3 : 5 : 7 : 5, in tenths of a second, and always sum
   to it exactly. The definition is `CreativeTemplates` in the domain, and its
@@ -603,9 +604,9 @@ Notes from Storyboard generation:
   pixels on each side; the Facts Scene shows the newest, the others the oldest.
 - A Storyboard is planned in its Variant's Render Mode. In Product Lock the
   planning engine assigns only static image, image motion and text animation.
-  In Hybrid it may also give the Hook Scene a generated backdrop, when the
-  creative template allows it and an image provider is configured; see the
-  notes from Stills below.
+  In Hybrid it may also generate up to two Scenes, as the creative template
+  allows and the configured providers can make; see the notes from Stills and
+  from generated footage below.
 - When a Storyboard cannot be planned the answer is 409 with the reason: no
   Confirmed Fact in the language, no usable photo, a Fact with too many words
   to be read even alone, or a Hook, Fact or Product name too long for its
@@ -741,7 +742,7 @@ Notes from the Luxury Cinematic and Problem–Solution templates:
   call to action each closes on) and say nothing about the Product.
 - A creative template's version (`Version` in its definition) is recorded on
   each Storyboard as `templateVersion` and kept by every version edited or
-  regenerated from it. All three are at version 1. The components are not
+  regenerated from it. Each has gone up as its Scenes changed. The components are not
   kept by version: a Storyboard is drawn with the components the worker has.
 - A Scene's layout has to be one its creative template draws, or the render
   fails while validating, with the reason.
@@ -807,9 +808,10 @@ Notes from Stills for a generated backdrop (Hybrid video, ticket 02):
   video wizard still makes Product Lock Variants only; Hybrid is chosen on the
   Project's page.
 - The Technique list has generated backdrop and generated footage, and no
-  image-to-video (ADR 0004). Only generated backdrop is planned so far: for the
-  Hook Scene of Product Showcase and Luxury Cinematic, whose Hook shows the
-  Product. Problem–Solution's Hook is type alone, so it has none.
+  image-to-video (ADR 0004). A generated backdrop is planned for the Hook Scene
+  of Product Showcase and Luxury Cinematic, whose Hook shows the Product.
+  Problem–Solution's Hook is type alone, so it has none. Generated footage is
+  in the notes above.
 - What generates is a setting of the API and the worker, `Generation__ImageProvider`
   (`IMAGE_PROVIDER` in `.env`): `None` or `Fake`. With `None`, Hybrid plans
   exactly what Product Lock does and `GET .../storyboards/{version}/generation`
@@ -890,6 +892,84 @@ Notes from Stills for a generated backdrop (Hybrid video, ticket 02):
 - On the Variant's page a Hybrid Storyboard version has "Generated pictures":
   the estimate, the confirmation, and each Still with its state, to approve or
   to replace with another.
+
+Notes from generated footage (Hybrid video, ticket 04):
+
+- Generated footage is a Scene filled with a Clip in which the Product does not
+  appear. Each creative template says which of its Scenes may be generated and
+  how (`Techniques` of each `SceneSlot` in `CreativeTemplates`): Product
+  Showcase and Luxury Cinematic a backdrop for the Hook and footage for the
+  Facts; Problem–Solution footage for the Hook, which has no Product in it, and
+  for the Facts. That took Product Showcase and Luxury Cinematic to template
+  version 3 and Problem–Solution to 2.
+- The planning engine generates at most two Scenes of a video
+  (`PlanningEngine.MaxGeneratedScenes`), the Hook's before any other, and a
+  Storyboard with more is refused. A Scene is footage only when there is both
+  an image and a video provider: `Generation__VideoProvider` (`VIDEO_PROVIDER`
+  in `.env`), `None` or `Fake`, a setting of the API and the worker. With an
+  image provider alone, a Hybrid video is planned as before, with a backdrop
+  only. There is no real provider yet (ticket 09).
+- The fake video provider is the worker's (`FakeVideoGenerator`): FFmpeg's test
+  pattern with a tone under it, as long as it was asked for. It calls nobody,
+  and what it made is labelled as fake in the data (`fake`, `provider`,
+  `model`) and on the page. It can be made to misbehave like the fake image
+  provider, with `Generation__FakeVideo__Refuses` and the rest.
+- The descriptions of footage ask for one invented adult, no real or
+  recognisable person, no child, no brand mascot, and for no product,
+  packaging, text or logos. A member who edits a description replaces all of
+  it, that sentence included: what they write is the Organization's own.
+- The estimate lists the Stills and the Clips (`stills`, `clips`), and the one
+  confirmation of its total covers both (ADR 0003). A Clip is estimated at the
+  rate for a second, `ProductionCost__FakeClipPerSecond` (0.10), for as long
+  as its Scene lasts. It is made only from an approved Still: until then it is
+  `WaitingForStill` and no worker takes it, and approving the Still queues it,
+  with no second confirmation. What was confirmed counts against the Project's
+  ceiling from the confirmation on, a Clip that still waits included, for as
+  long as a Still is on its way for it. When that Still was not made the Clip
+  goes on waiting and is not counted; it is counted again, and checked against
+  the ceiling, when its Still is confirmed again. Of two Clips of one picture
+  that wait, as after a Scene was made longer, only the longer is made.
+- A Clip is a record of its own (`Clips`), owned by the Organization, kept at
+  `organizations/{id}/clips/{id}.mp4` and reachable only through
+  `GET /api/v1/clips/{id}/content`. It waits in a queue of its own, served by
+  the worker (`ClipWorker`) under the same lease, attempts and waits as a Still,
+  with the same rule for what is tried again: only a technical failure the
+  provider did not charge for. States: waiting for Still, queued, generating,
+  ready for review, approved, failed.
+- The provider is asked for a Clip as long as its Scene (`durationMs`). Whatever
+  sound a provider puts in a Clip is removed by the worker before it is kept:
+  the stored file has a video track and nothing else.
+- A member watches a Clip on the Variant's page and approves it:
+  `POST /api/v1/clips/{id}/approve`. As with a Still, that makes the next
+  Storyboard version of each Variant of the Project whose Scene describes that
+  footage, and that version refers to the Clip (`clipId`) and to the Still it
+  was made from. A Clip cannot be asked for again yet (ticket 05). Another
+  Still is refused once a Clip was made from the first, since it would be paid
+  for and shown nowhere; describing another picture in the Scene asks for both
+  again.
+- Every Clip that is made or fails for good leaves one production cost record,
+  on the Clip (`cost`). It is never divided between the Rendered Videos that use
+  the Clip. It is not yet part of a Product's production cost total (ticket 07).
+- A render draws the approved Clip from edge to edge, scaled to the frame,
+  under a wash and the Scene's type, with no Product. The Scene is cut to and
+  cut away from: the Scene after it starts as a video's first Scene does. A
+  version whose generated footage refers to no approved Clip fails validation,
+  with "Scene 3 is generated footage and has no approved Clip." The Clip is part
+  of its Scene's cache key.
+- A generated Scene whose picture is read as showing what the Product does has
+  to cite a Confirmed Fact. Which Scenes those are is the creative template's
+  to say (`ShowsWhatTheProductDoes`): the Facts Scenes, whose footage is seen
+  under the Facts. So an edit that replaces such a Scene's text with a person's
+  own words, which cite no Fact, is refused with 409. A backdrop, and
+  Problem–Solution's problem, say nothing of the Product and need none. Nothing
+  reads a description for what it says.
+- A Still or a Clip rests on the Facts its Scene cited when it was asked for
+  (`FactIds`), and a Scene has the Project's Still or Clip of the picture it
+  describes only when it cites the same Facts, and for a Clip only when the Clip
+  is at least as long as the Scene. So every Storyboard version that refers to
+  a Clip cites the Facts the Clip rests on, and withdrawing one of them flags
+  those versions and the Rendered Videos made from them, as it does for text.
+  A version planned afterwards cites other Facts, and needs footage of its own.
 
 Notes from production cost records:
 

@@ -7,7 +7,7 @@
 
 import type { ReactNode } from 'react';
 import { AbsoluteFill, Easing, Img, staticFile } from 'remotion';
-import { BACK, GeneratedBackdrop, IN, INOUT, Product, Type, between, carried, fit, leftBehind, mix, move, narrowed, useDuration, useSeconds, words, type Pose } from './motion';
+import { BACK, GeneratedBackdrop, GeneratedFootage, IN, INOUT, Product, Type, between, carried, fit, leftBehind, mix, move, narrowed, useDuration, useSeconds, words, type Pose } from './motion';
 import { HEIGHT, WIDTH, type Layer, type Layout, type Layouts, type SceneInput } from './scene';
 import { FAMILY } from './typeface';
 
@@ -126,12 +126,39 @@ const Reveal = ({ scene }: { scene: SceneInput }) => {
 // 3. Facts: one at a time in white on a panel in the Product's own colour, with
 //    a large counter top left. The Product stands on the panel's edge and nudges
 //    at each new Fact. The timing is FactPacing in the domain, which decides how
-//    many Facts a Storyboard shows.
+//    many Facts a Storyboard shows. Over generated footage there is no panel and
+//    no Product: the same type, all in white, at the same times.
 const Facts = ({ scene }: { scene: SceneInput }) => {
   const t = useSeconds();
   const duration = useDuration();
   const facts = scene.lines;
   const each = (duration - 0.7) / Math.max(1, facts.length);
+  const type = (onFootage: boolean) => (
+    <>
+      <div style={{ position: 'absolute', left: LEFT + 6, top: 420, fontFamily: FAMILY, fontWeight: 600, fontSize: 64, color: onFootage ? 'white' : scene.colours.accent, opacity: move(t, 0.45, 0.3) }}>
+        / {String(facts.length).padStart(2, '0')}
+      </div>
+      {facts.map((fact, i) => {
+        const start = 0.45 + i * each;
+        const end = i === facts.length - 1 ? undefined : start + each;
+        const { size, lines } = fit(fact, 'Bold', { width: 900, height: 540, maxSize: 140, minSize: 40 });
+        return (
+          <div key={i}>
+            <Type lines={[String(i + 1).padStart(2, '0')]} weight="ExtraBold" size={200} colour={onFootage ? 'white' : scene.colours.ink} at={start} out={end} style={{ left: LEFT, top: 215 }} />
+            <Type lines={lines} weight="Bold" size={size} colour="white" at={start + 0.1} step={0.06} out={end} style={{ left: LEFT, top: EDGE + 90 }} />
+          </div>
+        );
+      })}
+    </>
+  );
+  if (scene.clip) {
+    return (
+      <AbsoluteFill>
+        <GeneratedFootage scene={scene} veil="linear-gradient(180deg, rgba(10, 12, 16, 0.38), rgba(10, 12, 16, 0.62))" />
+        {type(true)}
+      </AbsoluteFill>
+    );
+  }
 
   const to = rest('Facts', scene.product);
   const from = carried(scene, rest);
@@ -145,20 +172,7 @@ const Facts = ({ scene }: { scene: SceneInput }) => {
     <Stage scene={scene}>
       <Panel top={stays ? EDGE : mix(HEIGHT, EDGE, move(t, 0, 0.5))} colour={scene.colours.accent} />
       <Product layer={scene.product} pose={pose} />
-      <div style={{ position: 'absolute', left: LEFT + 6, top: 420, fontFamily: FAMILY, fontWeight: 600, fontSize: 64, color: scene.colours.accent, opacity: move(t, 0.45, 0.3) }}>
-        / {String(facts.length).padStart(2, '0')}
-      </div>
-      {facts.map((fact, i) => {
-        const start = 0.45 + i * each;
-        const end = i === facts.length - 1 ? undefined : start + each;
-        const { size, lines } = fit(fact, 'Bold', { width: 900, height: 540, maxSize: 140, minSize: 40 });
-        return (
-          <div key={i}>
-            <Type lines={[String(i + 1).padStart(2, '0')]} weight="ExtraBold" size={200} colour={scene.colours.ink} at={start} out={end} style={{ left: LEFT, top: 215 }} />
-            <Type lines={lines} weight="Bold" size={size} colour="white" at={start + 0.1} step={0.06} out={end} style={{ left: LEFT, top: EDGE + 90 }} />
-          </div>
-        );
-      })}
+      {type(false)}
     </Stage>
   );
 };

@@ -309,7 +309,7 @@ public sealed class HybridRenderTests(AffiVideoApp app)
     internal sealed record Video(RenderJobResponse Job, RenderedVideoResponse Rendered, byte[] Mp4);
 
     // Renders the version and waits for its Rendered Video and the MP4 the API serves for it.
-    private static async Task<Video> VideoAsync(Browser member, IContainer worker, VariantResponse variant, int version)
+    internal static async Task<Video> VideoAsync(Browser member, IContainer worker, VariantResponse variant, int version)
     {
         var job = await RenderTests.EndedAsync(member, await RenderTests.SubmittedAsync(member, variant, version));
         Assert.True(job.State == RenderJobState.Completed, $"The render ended {job.State}: {job.Failure?.Message}\n{await RenderStack.LogAsync(worker)}");
@@ -326,7 +326,7 @@ public sealed class HybridRenderTests(AffiVideoApp app)
     }
 
     // One frame of the video as a picture, taken out by FFmpeg in the worker's container.
-    private static async Task<SKBitmap> FrameAsync(IContainer worker, byte[] mp4, double seconds)
+    internal static async Task<SKBitmap> FrameAsync(IContainer worker, byte[] mp4, double seconds)
     {
         var name = $"frame-{Guid.NewGuid():N}";
         await worker.CopyAsync(mp4, $"/tmp/probe/{name}.mp4", ct: Cancellation);
@@ -341,10 +341,10 @@ public sealed class HybridRenderTests(AffiVideoApp app)
     }
 
     // Whether the two frames show the same picture within the box. A stray pixel in a thousand is the encoder's doing.
-    private static bool Same(SKBitmap a, SKBitmap b, SKRectI box) => Changed(a, b, box) < 0.001;
+    internal static bool Same(SKBitmap a, SKBitmap b, SKRectI box) => Changed(a, b, box) < 0.001;
 
     // The share of pixels, within the box, that are not the same in the two frames beyond what encoding does to them.
-    private static double Changed(SKBitmap a, SKBitmap b, SKRectI box)
+    internal static double Changed(SKBitmap a, SKBitmap b, SKRectI box)
     {
         var changed = 0;
         for (var y = box.Top; y < box.Bottom; y++)

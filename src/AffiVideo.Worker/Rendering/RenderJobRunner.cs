@@ -77,7 +77,8 @@ internal sealed class RenderJobRunner(
     private async Task RenderAsync(RenderWork work, string jobDirectory, CancellationToken cancellationToken)
     {
         var storyboard = work.Storyboard;
-        var problems = StoryboardRules.RenderProblems(storyboard, work.Assets, work.Stills.Select(still => still.Id).ToHashSet());
+        var problems = StoryboardRules.RenderProblems(
+            storyboard, work.Assets, work.Stills.Select(still => still.Id).ToHashSet(), work.Clips.Select(clip => clip.Id).ToHashSet());
         if (problems.Count > 0) throw new RenderFailedException(string.Join(" ", problems));
 
         // What each Scene is drawn from: its photo, and the Scene before it, whose Product it carries on from.
@@ -103,7 +104,7 @@ internal sealed class RenderJobRunner(
         }
 
         // A generated backdrop is its approved Still, as it was made: the render only fetches it (ADR 0003).
-        var stillOf = new Dictionary<Guid, StillInput>();
+        var stillOf = new Dictionary<Guid, GeneratedInput>();
         foreach (var still in work.Stills)
         {
             await using var kept = await storage.OpenAsync(still.StorageKey, cancellationToken)
@@ -113,11 +114,31 @@ internal sealed class RenderJobRunner(
             var png = read.ToArray();
             var file = $"still-{still.Id:N}.png";
             await File.WriteAllBytesAsync(Path.Combine(images, file), png, cancellationToken);
-            stillOf[still.Id] = new StillInput($"{Remotion.ImagesFolder}/{file}", png);
+            stillOf[still.Id] = new GeneratedInput($"{Remotion.ImagesFolder}/{file}", png);
         }
         var stillBehind = scenes
             .Select(scene => scene is { Technique: Technique.GeneratedBackdrop, StillId: { } id } ? stillOf[id] : null)
             .ToList();
+
+        // Generated footage is its approved Clip, as it was made: fetched like a Still, and no provider is asked for anything.
+        var footageOf = new Dictionary<Guid, GeneratedInput>();
+        foreach (var clip in work.Clips)
+        {
+            await using var kept = await storage.OpenAsync(clip.StorageKey, cancellationToken)
+                ?? throw new RenderFailedException("A Clip the Storyboard uses is no longer stored. Describe the Scene's footage again, generate it, then render the version that makes.");
+            using var read = new MemoryStream();
+            await kept.CopyToAsync(read, cancellationToken);
+            var content = read.ToArray();
+            var file = $"clip-{clip.Id:N}.mp4";
+            await File.WriteAllBytesAsync(Path.Combine(images, file), content, cancellationToken);
+            footageOf[clip.Id] = new GeneratedInput($"{Remotion.ImagesFolder}/{file}", content);
+        }
+        var footage = scenes
+            .Select(scene => scene is { Technique: Technique.GeneratedFootage, ClipId: { } id } ? footageOf[id] : null)
+            .ToList();
+        // A Scene of generated footage has no Product in it. It carries nothing on from the Scene before, and
+        // leaves nothing on screen for the Scene after, which starts as the video's first Scene does.
+        var carriesOn = scenes.Select((_, index) => index > 0 && footage[index] is null && footage[index - 1] is null).ToList();
 
         await queue.MoveAsync(work, RenderJobState.Rendering, cancellationToken);
         // One palette for the whole video, from the photo it opens on.
@@ -130,9 +151,10 @@ internal sealed class RenderJobRunner(
                 scene.DurationMs * RenderedVideo.FramesPerSecond / 1000,
                 scene.OnScreenText,
                 layerOf[photos[index].Id].Input,
-                index == 0 ? null : new PreviousSceneInput(scenes[index - 1].Layout, layerOf[photos[index - 1].Id].Input),
+                carriesOn[index] ? new PreviousSceneInput(scenes[index - 1].Layout, layerOf[photos[index - 1].Id].Input) : null,
                 $"{Remotion.ImagesFolder}/{BackdropFile}",
                 stillBehind[index]?.File,
+                footage[index]?.File,
                 colours)))
             .ToList();
         // Everything that decides a Scene's frames: what its template is handed, and the images that names.
@@ -141,9 +163,10 @@ internal sealed class RenderJobRunner(
                 remotion.Look, inputs[index],
                 [
                     backdrop, layerOf[photos[index].Id].Png,
-                    .. index == 0 ? [] : new[] { layerOf[photos[index - 1].Id].Png },
-                    // Last, and only for the Scene that shows it: with another Still that Scene is drawn again, and no other is.
-                    .. stillBehind[index] is { } still ? [still.Png] : Array.Empty<byte[]>(),
+                    .. carriesOn[index] ? [layerOf[photos[index - 1].Id].Png] : Array.Empty<byte[]>(),
+                    // Last, and only for the Scene that shows it: with another Still or Clip that Scene is drawn again, and no other is.
+                    .. stillBehind[index] is { } still ? [still.Content] : Array.Empty<byte[]>(),
+                    .. footage[index] is { } filling ? [filling.Content] : Array.Empty<byte[]>(),
                 ]))
             .ToList();
         var clips = scenes.Select(scene => Path.Combine(jobDirectory, $"scene-{scene.Position}.mp4")).ToList();
@@ -201,8 +224,9 @@ internal sealed class RenderJobRunner(
         await queue.CompleteAsync(work, mp4, uncut, [.. drawn.Select(index => scenes[index].Position).Order()], cancellationToken);
     }
 
+    /// <summary>A Still or a Clip as a Scene is handed it.</summary>
     /// <param name="File">Within the bundle's public folder.</param>
-    private sealed record StillInput(string File, byte[] Png);
+    private sealed record GeneratedInput(string File, byte[] Content);
 
     private static string Doing(RenderJobState state) => state switch
     {

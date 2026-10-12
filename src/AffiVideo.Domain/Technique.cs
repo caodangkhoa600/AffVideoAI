@@ -59,40 +59,59 @@ public static class PlanningEngine
     /// <summary>The shortest Scene in which a move of the Product can be seen as one.</summary>
     public const int MinImageMotionMilliseconds = 1500;
 
+    /// <summary>The most Scenes of a Hybrid video that are generated, so that what it costs is bounded.</summary>
+    public const int MaxGeneratedScenes = 2;
+
     /// <summary>
     /// One Technique for each Scene of the template, in order: the first of the
     /// Scene's own preferences that the Render Mode allows and that can be made
-    /// from what there is.
+    /// from what there is. At most <see cref="MaxGeneratedScenes"/> are generated,
+    /// the Hook's Scene before any other: the rest are made another way.
     /// </summary>
     /// <param name="canGenerateStills">Whether an image provider exists to make a Still with.</param>
+    /// <param name="canGenerateClips">Whether a video provider exists to make a Clip from a Still with.</param>
     public static IReadOnlyList<Technique> AssignTechniques(
         int usablePhotos, CreativeTemplateDefinition template, int targetDurationSeconds, RenderMode renderMode,
-        bool canGenerateStills = false)
+        bool canGenerateStills = false, bool canGenerateClips = false)
     {
         var durations = template.SceneDurations(targetDurationSeconds);
-        return template.Scenes
-            .Select((scene, index) => TechniqueFor(scene, usablePhotos, durations[index], renderMode, canGenerateStills))
-            .ToArray();
+        var techniques = new Technique[template.Scenes.Count];
+        var generated = 0;
+        // The Hook's Scene is decided first, so that it is among the generated ones when not every Scene can be.
+        foreach (var index in Enumerable.Range(0, techniques.Length).OrderBy(index => template.Scenes[index].Layout == SceneLayout.Hook ? 0 : 1))
+        {
+            techniques[index] = TechniqueFor(
+                template.Scenes[index], usablePhotos, durations[index], renderMode, canGenerateStills, canGenerateClips,
+                mayBeGenerated: generated < MaxGeneratedScenes);
+            if (techniques[index].IsGenerated()) generated++;
+        }
+        return techniques;
     }
 
     /// <summary>The Technique for one Scene of a template that lasts this long, chosen the same way.</summary>
+    /// <param name="mayBeGenerated">False when the video already has as many generated Scenes as it may.</param>
     public static Technique TechniqueFor(
-        SceneSlot scene, int usablePhotos, int sceneMilliseconds, RenderMode renderMode, bool canGenerateStills = false) =>
+        SceneSlot scene, int usablePhotos, int sceneMilliseconds, RenderMode renderMode,
+        bool canGenerateStills = false, bool canGenerateClips = false, bool mayBeGenerated = true) =>
         scene.Techniques
-            .Where(technique => renderMode.Allows(technique) && CanBeMade(technique, usablePhotos, sceneMilliseconds, canGenerateStills))
+            .Where(technique => renderMode.Allows(technique) && (mayBeGenerated || !technique.IsGenerated())
+                && CanBeMade(technique, usablePhotos, sceneMilliseconds, canGenerateStills, canGenerateClips))
             // Type needs nothing but the text, so it is what is left when nothing else can be made.
             .DefaultIfEmpty(Technique.TextAnimation)
             .First();
 
-    private static bool CanBeMade(Technique technique, int usablePhotos, int sceneMilliseconds, bool canGenerateStills) => technique switch
+    private static bool CanBeMade(
+        Technique technique, int usablePhotos, int sceneMilliseconds, bool canGenerateStills, bool canGenerateClips) => technique switch
     {
         // The backdrop goes behind the Product's photo, so there has to be one.
         Technique.GeneratedBackdrop => canGenerateStills && usablePhotos > 0,
+        // A Clip is made from a Still, so both have to be possible.
+        Technique.GeneratedFootage => canGenerateStills && canGenerateClips,
         Technique.StaticImage => usablePhotos > 0,
         Technique.ImageMotion => usablePhotos > 0 && sceneMilliseconds >= MinImageMotionMilliseconds,
         Technique.TextAnimation => true,
-        // No provider generates video or renders 3D yet, and nothing stores a video
-        // asset, so these are never chosen in either Render Mode.
+        // Nothing renders 3D yet, and nothing stores a video asset, so these are
+        // never chosen in either Render Mode.
         _ => false,
     };
 }

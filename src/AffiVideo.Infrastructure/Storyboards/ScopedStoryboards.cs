@@ -52,8 +52,11 @@ internal sealed class ScopedStoryboards(
         var texts = await WriteAsync(template, project, material.Product, variant, facts, cancellationToken);
         var renderMode = variant.RenderMode;
         var durations = template.SceneDurations(project.TargetDurationSeconds);
+        var techniques = PlanningEngine.AssignTechniques(
+            material.Photos.Count, template, project.TargetDurationSeconds, renderMode,
+            generation.Value.CanGenerateStills, generation.Value.CanGenerateClips);
         var scenes = template.Scenes
-            .Select((slot, index) => Written(index + 1, slot, durations[index], renderMode, texts[index], facts, material, project))
+            .Select((slot, index) => Written(index + 1, slot, techniques[index], durations[index], texts[index], facts, material, project))
             .ToList();
 
         return await CheckedAndSavedAsync(
@@ -107,11 +110,17 @@ internal sealed class ScopedStoryboards(
         }
 
         var texts = await WriteAsync(template, project, material.Product, variant, facts, cancellationToken);
-        var written = Written(position, slot.Scene, replaced.DurationMs, from.RenderMode, texts[slot.Index], facts, material, project);
+        // The Scene is generated only while the video has room for one more generated Scene beside the others.
+        var technique = PlanningEngine.TechniqueFor(
+            slot.Scene, material.Photos.Count, replaced.DurationMs, from.RenderMode,
+            generation.Value.CanGenerateStills, generation.Value.CanGenerateClips,
+            mayBeGenerated: from.Scenes.Count(scene => scene.Position != position && scene.Technique.IsGenerated()) < PlanningEngine.MaxGeneratedScenes);
+        var written = Written(position, slot.Scene, technique, replaced.DurationMs, texts[slot.Index], facts, material, project);
         // Every other Scene goes into the next version exactly as it is in this one.
-        var approved = await database.ApprovedStillsAsync(project.Id, cancellationToken);
+        var stills = await database.ApprovedStillsAsync(project.Id, cancellationToken);
+        var clips = await database.ApprovedClipsAsync(project.Id, cancellationToken);
         var scenes = from.Scenes
-            .Select(scene => scene.Position == position ? written.Referring(approved) : scene.Edited(scene.Position, new SceneChange(scene.Position)))
+            .Select(scene => scene.Position == position ? written.Referring(stills, clips) : scene.Edited(scene.Position, new SceneChange(scene.Position)))
             .ToList();
         // The planner writes the same from the same: a version that repeats this one would tell the member nothing.
         var same = StoryboardEditing.Differ(from.Scenes, scenes)
@@ -242,12 +251,11 @@ internal sealed class ScopedStoryboards(
     }
 
     // One Scene as the planner wrote it and the planning engine produces it.
-    private Scene Written(
-        int position, SceneSlot slot, int durationMs, RenderMode renderMode, SceneText text,
+    private static Scene Written(
+        int position, SceneSlot slot, Technique technique, int durationMs, SceneText text,
         IReadOnlyList<Fact> facts, Material material, Project project)
     {
         var photos = material.Photos;
-        var technique = PlanningEngine.TechniqueFor(slot, photos.Count, durationMs, renderMode, generation.Value.CanGenerateStills);
         return new(
             position, slot.Layout, technique, durationMs,
             text.OnScreenText, text.NarrationText,
@@ -284,7 +292,7 @@ internal sealed class ScopedStoryboards(
                 $"Scene {scene.Position} shows an image that cannot be shown in a video: " +
                 $"a Scene shows a photo, not the logo, of at least {ProductAsset.MinVideoPhotoSide} pixels on each side."));
         problems.AddRange(StoryboardRules.LayoutProblems(scenes, template));
-        problems.AddRange(StoryboardRules.DescriptionProblems(scenes));
+        problems.AddRange(StoryboardRules.DescriptionProblems(scenes, template));
         if (problems.Count > 0) return StoryboardGeneration.Refuse(string.Join(" ", problems));
         // Scenes with nothing wrong with them that are still not to be kept: the caller's own reason.
         if (refusedOnceChecked is not null) return StoryboardGeneration.Refuse(refusedOnceChecked);
@@ -294,12 +302,13 @@ internal sealed class ScopedStoryboards(
             // An approval made at this moment makes versions of its own: one of the two waits for the other.
             await using var holding = await database.HoldProjectAsync(project.Id, cancellationToken);
             if (holding is null) return null;
-            // A generated Scene refers to the Project's approved Still of the picture it describes, when there is one.
-            var approved = await database.ApprovedStillsAsync(project.Id, cancellationToken);
+            // A generated Scene refers to the Project's approved Still or Clip of the picture it describes, when there is one.
+            var stills = await database.ApprovedStillsAsync(project.Id, cancellationToken);
+            var clips = await database.ApprovedClipsAsync(project.Id, cancellationToken);
             var latest = await database.Storyboards.Where(s => s.VariantId == variant.Id).MaxAsync(s => (int?)s.Version, cancellationToken);
             var storyboard = new Storyboard(
                 Guid.CreateVersion7(), organizationId, variant.Id, (latest ?? 0) + 1,
-                creativeTemplate, templateVersion, planner, renderMode, scenes.Select(scene => scene.Referring(approved)), clock.GetUtcNow());
+                creativeTemplate, templateVersion, planner, renderMode, scenes.Select(scene => scene.Referring(stills, clips)), clock.GetUtcNow());
             database.Storyboards.Add(storyboard);
             try
             {

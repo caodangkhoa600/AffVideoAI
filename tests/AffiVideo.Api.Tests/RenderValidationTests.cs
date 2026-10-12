@@ -14,7 +14,7 @@ public sealed class RenderValidationTests
     {
         var photo = Asset();
 
-        var problems = StoryboardRules.RenderProblems(Storyboard([NewScene(1, photo.Id), NewScene(2, photo.Id)]), [photo], Approved());
+        var problems = StoryboardRules.RenderProblems(Storyboard([NewScene(1, photo.Id), NewScene(2, photo.Id)]), [photo], Approved(), NoClips);
 
         Assert.Empty(problems);
     }
@@ -24,7 +24,7 @@ public sealed class RenderValidationTests
     {
         var photo = Asset();
 
-        var problems = StoryboardRules.RenderProblems(Storyboard([NewScene(1, photo.Id), NewScene(2, Guid.NewGuid())]), [photo], Approved());
+        var problems = StoryboardRules.RenderProblems(Storyboard([NewScene(1, photo.Id), NewScene(2, Guid.NewGuid())]), [photo], Approved(), NoClips);
 
         Assert.Equal(
             ["Scene 2 shows a photo that has since been removed from the Product.", "Generate the Storyboard again, then render that version."],
@@ -37,7 +37,7 @@ public sealed class RenderValidationTests
         var logo = Asset(ProductAssetKind.Logo);
         var small = Asset(width: ProductAsset.MinVideoPhotoSide - 1);
 
-        var problems = StoryboardRules.RenderProblems(Storyboard([NewScene(1, logo.Id), NewScene(2, small.Id)]), [logo, small], Approved());
+        var problems = StoryboardRules.RenderProblems(Storyboard([NewScene(1, logo.Id), NewScene(2, small.Id)]), [logo, small], Approved(), NoClips);
 
         Assert.Equal(2, problems.Count);
         Assert.StartsWith("Scene 1 shows an image", problems[0]);
@@ -50,7 +50,7 @@ public sealed class RenderValidationTests
         var photo = Asset();
 
         var problems = StoryboardRules.RenderProblems(
-            Storyboard([NewScene(1, photo.Id, photo.Id), NewScene(2)]), [photo], Approved());
+            Storyboard([NewScene(1, photo.Id, photo.Id), NewScene(2)]), [photo], Approved(), NoClips);
 
         Assert.Equal(2, problems.Count);
         Assert.StartsWith("Scene 1 shows 2 photos", problems[0]);
@@ -65,8 +65,8 @@ public sealed class RenderValidationTests
     {
         var photo = Asset();
 
-        var locked = StoryboardRules.RenderProblems(Storyboard([NewScene(1, photo.Id)], template), [photo], Approved());
-        var hybrid = StoryboardRules.RenderProblems(Storyboard([NewScene(1, photo.Id)], template, RenderMode.Hybrid), [photo], Approved());
+        var locked = StoryboardRules.RenderProblems(Storyboard([NewScene(1, photo.Id)], template), [photo], Approved(), NoClips);
+        var hybrid = StoryboardRules.RenderProblems(Storyboard([NewScene(1, photo.Id)], template, RenderMode.Hybrid), [photo], Approved(), NoClips);
 
         Assert.Empty(locked);
         Assert.Empty(hybrid);
@@ -79,7 +79,7 @@ public sealed class RenderValidationTests
         var still = Guid.NewGuid();
 
         var problems = StoryboardRules.RenderProblems(
-            Storyboard([Backdrop(1, photo.Id, still), NewScene(2, photo.Id)], renderMode: RenderMode.Hybrid), [photo], Approved(still));
+            Storyboard([Backdrop(1, photo.Id, still), NewScene(2, photo.Id)], renderMode: RenderMode.Hybrid), [photo], Approved(still), NoClips);
 
         Assert.Empty(problems);
     }
@@ -91,7 +91,7 @@ public sealed class RenderValidationTests
         // The first refers to no Still. The second refers to one that is not approved: not yet, or no longer.
         var scenes = new[] { Backdrop(1, photo.Id, still: null), Backdrop(2, photo.Id, Guid.NewGuid()), NewScene(3, photo.Id) };
 
-        var problems = StoryboardRules.RenderProblems(Storyboard(scenes, renderMode: RenderMode.Hybrid), [photo], Approved(Guid.NewGuid()));
+        var problems = StoryboardRules.RenderProblems(Storyboard(scenes, renderMode: RenderMode.Hybrid), [photo], Approved(Guid.NewGuid()), NoClips);
 
         Assert.Equal(
             [
@@ -103,23 +103,12 @@ public sealed class RenderValidationTests
     }
 
     [Fact]
-    public void Generated_footage_is_not_rendered_yet()
-    {
-        var photo = Asset();
-        var footage = new Scene(1, SceneLayout.Hook, Technique.GeneratedFootage, 5000, ["Lumo 500"], "", [photo.Id], [], description: "Phố đêm");
-
-        var problems = StoryboardRules.RenderProblems(Storyboard([footage], renderMode: RenderMode.Hybrid), [photo], Approved());
-
-        Assert.Equal(["Scene 1 is generated footage, which cannot be rendered yet."], problems);
-    }
-
-    [Fact]
     public void A_Scene_whose_layout_its_creative_template_does_not_draw_is_not_rendered()
     {
         var photo = Asset();
         var solution = new Scene(1, SceneLayout.Solution, Technique.ImageMotion, 5000, ["Giải pháp", "Lumo 500"], "", [photo.Id], []);
 
-        var problems = StoryboardRules.RenderProblems(Storyboard([solution], CreativeTemplate.LuxuryCinematic), [photo], Approved());
+        var problems = StoryboardRules.RenderProblems(Storyboard([solution], CreativeTemplate.LuxuryCinematic), [photo], Approved(), NoClips);
 
         Assert.Contains("Solution", Assert.Single(problems));
     }
@@ -130,7 +119,7 @@ public sealed class RenderValidationTests
         var photo = Asset();
         var generative = new Scene(1, SceneLayout.Reveal, Technique.GeneratedFootage, 5000, ["Lumo 500"], "", [photo.Id], []);
 
-        var problems = StoryboardRules.RenderProblems(Storyboard([generative]), [photo], Approved());
+        var problems = StoryboardRules.RenderProblems(Storyboard([generative]), [photo], Approved(), NoClips);
 
         Assert.Contains("GeneratedFootage", Assert.Single(problems));
     }
@@ -142,6 +131,8 @@ public sealed class RenderValidationTests
     private static Scene Backdrop(int position, Guid asset, Guid? still) =>
         new(position, SceneLayout.Hook, Technique.GeneratedBackdrop, 5000, ["Bạn vẫn dùng bình nhựa?"], "", [asset], [],
             description: "Bàn gỗ sồi bên cửa sổ", stillId: still);
+
+    private static readonly HashSet<Guid> NoClips = [];
 
     /// <summary>The Stills the Scenes refer to that a member has approved.</summary>
     private static HashSet<Guid> Approved(params Guid[] stills) => [.. stills];

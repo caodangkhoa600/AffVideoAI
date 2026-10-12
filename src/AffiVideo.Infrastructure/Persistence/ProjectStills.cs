@@ -32,4 +32,10 @@ internal static class ProjectStills
         database.Stills.AsNoTracking()
             .Where(still => still.ProjectId == projectId && still.State == StillState.Approved)
             .ToListAsync(cancellationToken);
+
+    /// <summary>The Project's Clips that a new Storyboard version may refer to.</summary>
+    public static Task<List<Clip>> ApprovedClipsAsync(this AffiVideoDbContext database, Guid projectId, CancellationToken cancellationToken) =>
+        database.Clips.AsNoTracking()
+            .Where(clip => clip.ProjectId == projectId && clip.State == ClipState.Approved)
+            .ToListAsync(cancellationToken);
 }

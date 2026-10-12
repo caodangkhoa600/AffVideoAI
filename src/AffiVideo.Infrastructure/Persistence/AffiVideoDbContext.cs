@@ -41,6 +41,8 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
 
     public DbSet<Still> Stills => Set<Still>();
 
+    public DbSet<Clip> Clips => Set<Clip>();
+
     public DbSet<GenerationCostRecord> GenerationCostRecords => Set<GenerationCostRecord>();
 
     public DbSet<RenderJob> RenderJobs => Set<RenderJob>();
@@ -213,6 +215,9 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
                 scene.Property(s => s.Description).HasMaxLength(StoryboardRules.DescriptionMaxLength);
                 // A Still is kept for as long as a version refers to it.
                 scene.HasOne<Still>().WithMany().HasForeignKey(s => s.StillId).OnDelete(DeleteBehavior.Restrict);
+                // And so is a Clip.
+                scene.HasOne<Clip>().WithMany().HasForeignKey(s => s.ClipId).OnDelete(DeleteBehavior.Restrict);
+                scene.Ignore(s => s.CitedFactIds);
 
                 scene.OwnsMany(s => s.Facts, fact =>
                 {
@@ -263,6 +268,42 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
             still.HasIndex(s => new { s.ProjectId, s.CreatedAt });
         });
 
+        builder.Entity<Clip>(clip =>
+        {
+            clip.HasOne<Organization>().WithMany().HasForeignKey(c => c.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            // A Clip is kept so it can be used again: it outlives the Project it was made for.
+            clip.HasOne<Project>().WithMany().HasForeignKey(c => c.ProjectId).OnDelete(DeleteBehavior.SetNull);
+            clip.HasOne<Product>().WithMany().HasForeignKey(c => c.ProductId).OnDelete(DeleteBehavior.Restrict);
+            // The Still a Clip was made from is kept for as long as the Clip is.
+            clip.HasOne<Still>().WithMany().HasForeignKey(c => c.StillId).OnDelete(DeleteBehavior.Restrict);
+            clip.HasOne<Member>().WithMany().HasForeignKey(c => c.RequestedByMemberId).OnDelete(DeleteBehavior.Restrict);
+            clip.HasOne<Member>().WithMany().HasForeignKey(c => c.ApprovedByMemberId).OnDelete(DeleteBehavior.Restrict);
+            clip.Property(c => c.Description).HasMaxLength(StoryboardRules.DescriptionMaxLength);
+            clip.Property(c => c.Provider).HasConversion<string>().HasMaxLength(20);
+            clip.Property(c => c.Model).HasMaxLength(Still.ModelMaxLength);
+            // As with a Still: a Clip is only written by whoever still has it as it was read.
+            clip.Property(c => c.State).HasConversion<string>().HasMaxLength(20).IsConcurrencyToken();
+            clip.Property(c => c.LeaseId).IsConcurrencyToken();
+            clip.Property(c => c.EstimatedAmount).HasPrecision(ProductionCosts.AmountPrecision, ProductionCosts.AmountDecimals);
+            clip.Property(c => c.Currency).HasMaxLength(Product.CurrencyLength);
+            clip.Property(c => c.RatesVersion).HasMaxLength(RenderRates.VersionMaxLength);
+            clip.Property(c => c.IdempotencyKey).HasMaxLength(RenderJob.IdempotencyKeyMaxLength);
+            clip.Property(c => c.FailureKind).HasConversion<string>().HasMaxLength(20);
+            clip.Property(c => c.FailureMessage).HasMaxLength(RenderJob.FailureMessageMaxLength);
+            clip.Property(c => c.FailureDetail).HasMaxLength(RenderJob.FailureDetailMaxLength);
+            clip.Ignore(c => c.RetryAt);
+            clip.Ignore(c => c.StorageKey);
+            clip.Ignore(c => c.Fake);
+            clip.Ignore(c => c.IsCurrent);
+            clip.Ignore(c => c.HasFootage);
+            clip.Ignore(c => c.CountsAsSpent);
+            // One Clip for one click and one Scene, even when the click arrives twice at the same moment.
+            clip.HasIndex(c => new { c.ProjectId, c.IdempotencyKey, c.Ordinal }).IsUnique();
+            // The queue: the worker takes the Clip that has been queued longest.
+            clip.HasIndex(c => new { c.State, c.CreatedAt });
+            clip.HasIndex(c => new { c.ProjectId, c.CreatedAt });
+        });
+
         builder.Entity<GenerationCostRecord>(cost =>
         {
             cost.HasOne<Organization>().WithMany().HasForeignKey(c => c.OrganizationId).OnDelete(DeleteBehavior.Restrict);
@@ -270,6 +311,7 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
             cost.HasOne<Product>().WithMany().HasForeignKey(c => c.ProductId).OnDelete(DeleteBehavior.Restrict);
             // The record outlives what it is of.
             cost.HasOne<Still>().WithMany().HasForeignKey(c => c.StillId).OnDelete(DeleteBehavior.SetNull);
+            cost.HasOne<Clip>().WithMany().HasForeignKey(c => c.ClipId).OnDelete(DeleteBehavior.SetNull);
             cost.Property(c => c.Provider).HasMaxLength(GenerationCostRecord.ProviderMaxLength);
             cost.Property(c => c.Model).HasMaxLength(Still.ModelMaxLength);
             cost.Property(c => c.EstimatedAmount).HasPrecision(ProductionCosts.AmountPrecision, ProductionCosts.AmountDecimals);
@@ -277,6 +319,8 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
             cost.Property(c => c.RatesVersion).HasMaxLength(RenderRates.VersionMaxLength);
             // A Still has one record, whoever comes to write it.
             cost.HasIndex(c => c.StillId).IsUnique();
+            // And a Clip has one: what it cost is recorded once, however many videos use it.
+            cost.HasIndex(c => c.ClipId).IsUnique();
             cost.HasIndex(c => c.ProductId);
         });
 

@@ -7,7 +7,7 @@
 
 import type { CSSProperties, ReactNode } from 'react';
 import { AbsoluteFill } from 'remotion';
-import { GeneratedBackdrop, IN, INOUT, Product, between, carried, fit, leftBehind, move, narrowed, useDuration, useSeconds, words, type Pose } from './motion';
+import { GeneratedBackdrop, GeneratedFootage, IN, INOUT, Product, between, carried, fit, leftBehind, move, narrowed, useDuration, useSeconds, words, type Pose } from './motion';
 import { WIDTH, type Colours, type Layer, type Layout, type Layouts, type SceneInput } from './scene';
 import { FAMILY, WEIGHTS, type Weight } from './typeface';
 
@@ -153,7 +153,8 @@ const Hook = ({ scene }: { scene: SceneInput }) => {
 
 // 2. Facts: the Product close and off centre on its own deep colour, drifting,
 //    and one Fact at a time under it. The timing is FactPacing in the domain,
-//    which decides how many Facts a Storyboard shows.
+//    which decides how many Facts a Storyboard shows. Over generated footage the
+//    Facts are set the same way, and there is no Product.
 const Facts = ({ scene }: { scene: SceneInput }) => {
   const t = useSeconds();
   const duration = useDuration();
@@ -163,22 +164,31 @@ const Facts = ({ scene }: { scene: SceneInput }) => {
 
   const { pose, opacity, settled } = useArrival(scene);
   pose.cx += 36 * (t / duration - 1) * settled;
+  const type = facts.map((fact, i) => {
+    const start = 0.8 + i * each;
+    const end = i === facts.length - 1 ? undefined : start + each;
+    const { size, lines } = fit(fact, 'Light', { width: 880, height: 300, maxSize: 84, minSize: 36, leading: 1.3 });
+    return (
+      <div key={i}>
+        {facts.length > 1 && (
+          <Soft lines={[`${numbered(i + 1)} / ${numbered(facts.length)}`]} weight="SemiBold" size={30} colour={scene.colours.tint} at={start} step={0} out={end} tracking={0.3} style={{ left: LEFT, top: 1150 }} />
+        )}
+        <Soft lines={lines} weight="Light" size={size} colour="white" at={start} step={0.15} out={end} style={{ left: LEFT, top: 1220 }} />
+      </div>
+    );
+  });
+  if (scene.clip) {
+    return (
+      <AbsoluteFill style={{ background: DARK }}>
+        <GeneratedFootage scene={scene} veil="linear-gradient(180deg, rgba(8, 8, 10, 0.2), rgba(8, 8, 10, 0.72) 60%)" />
+        {type}
+      </AbsoluteFill>
+    );
+  }
   return (
     <Stage scene={scene}>
       <Product layer={scene.product} pose={pose} opacity={opacity} />
-      {facts.map((fact, i) => {
-        const start = 0.8 + i * each;
-        const end = i === facts.length - 1 ? undefined : start + each;
-        const { size, lines } = fit(fact, 'Light', { width: 880, height: 300, maxSize: 84, minSize: 36, leading: 1.3 });
-        return (
-          <div key={i}>
-            {facts.length > 1 && (
-              <Soft lines={[`${numbered(i + 1)} / ${numbered(facts.length)}`]} weight="SemiBold" size={30} colour={scene.colours.tint} at={start} step={0} out={end} tracking={0.3} style={{ left: LEFT, top: 1150 }} />
-            )}
-            <Soft lines={lines} weight="Light" size={size} colour="white" at={start} step={0.15} out={end} style={{ left: LEFT, top: 1220 }} />
-          </div>
-        );
-      })}
+      {type}
     </Stage>
   );
 };

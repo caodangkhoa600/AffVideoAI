@@ -200,7 +200,7 @@
         "tags": [
           "Generation"
         ],
-        "summary": "Records that the member accepts a Still that is ready for review, in the member's name. Answers 409 with the reason for a Still in any other state.",
+        "summary": "Records that the member accepts a Still that is ready for review, in the member's name. A Clip that was confirmed with it is then queued, to be made from it. Answers 409 with the reason for a Still in any other state.",
         "operationId": "ApproveStill",
         "parameters": [
           {
@@ -245,7 +245,7 @@
         "tags": [
           "Generation"
         ],
-        "summary": "Rejects a Still that has been made and queues another of the same picture in its place. This is a new paid generation, made only for the amount the member confirms, and it counts against the Project's ceiling. The rejected Still is kept, with what it cost. Answers 409 with the reason for a Still that has not been made, when the confirmed amount is not what another is estimated at now, or when it would take the Project past its ceiling. A request repeated with the same Idempotency-Key is answered 200 with the Still the first one queued.",
+        "summary": "Rejects a Still that has been made and queues another of the same picture in its place. This is a new paid generation, made only for the amount the member confirms, and it counts against the Project's ceiling. The rejected Still is kept, with what it cost. Answers 409 with the reason for a Still that has not been made, when the confirmed amount is not what another is estimated at now, when a Clip has been made from it, or when it would take the Project past its ceiling. A request repeated with the same Idempotency-Key is answered 200 with the Still the first one queued.",
         "operationId": "AskForAnotherStill",
         "parameters": [
           {
@@ -343,6 +343,165 @@
         "responses": {
           "404": {
             "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/clips": {
+      "get": {
+        "tags": [
+          "Generation"
+        ],
+        "summary": "The Clips made for the Project, newest first, failed ones and those that wait for their Still included.",
+        "operationId": "ListClips",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResponseOfClipResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/clips/{clipId}": {
+      "get": {
+        "tags": [
+          "Generation"
+        ],
+        "summary": "One Clip and the state it is in.",
+        "operationId": "GetClip",
+        "parameters": [
+          {
+            "name": "clipId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClipResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/clips/{clipId}/approve": {
+      "post": {
+        "tags": [
+          "Generation"
+        ],
+        "summary": "Records that the member accepts a Clip that is ready for review, having watched it, in the member's name. It makes the next Storyboard version of each Variant of the Project whose Scene describes that footage, and that version refers to the Clip. Answers 409 with the reason for a Clip in any other state.",
+        "operationId": "ApproveClip",
+        "parameters": [
+          {
+            "name": "clipId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClipResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clips/{clipId}/content": {
+      "get": {
+        "tags": [
+          "Generation"
+        ],
+        "summary": "The video of a Clip that has been made, as an MP4 with no sound, to watch before rendering. Answers 404 until it is made.",
+        "operationId": "GetClipContent",
+        "parameters": [
+          {
+            "name": "clipId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "404": {
+            "description": "Not Found"
+          },
+          "200": {
+            "description": "OK"
           }
         }
       }
@@ -2591,7 +2750,7 @@
         "tags": [
           "Generation"
         ],
-        "summary": "What generation for this Storyboard version would make, what that is estimated to cost, and what the Project has spent against its ceiling. It spends nothing. With no image provider configured, it says generation is unavailable.",
+        "summary": "What generation for this Storyboard version would make, Stills and Clips, what that is estimated to cost, and what the Project has spent against its ceiling. It spends nothing. With no image provider configured, it says generation is unavailable.",
         "operationId": "EstimateGeneration",
         "parameters": [
           {
@@ -2642,7 +2801,7 @@
         "tags": [
           "Generation"
         ],
-        "summary": "Confirms the estimate the member saw and queues its Stills for the worker. Nothing paid is generated without it. Answers 409 with the reason when the confirmed total is not the estimate's, when there is nothing to generate, when generation is unavailable, or when it would take the Project past its ceiling. A request repeated with the same Idempotency-Key is answered 200 with the Stills the first one queued.",
+        "summary": "Confirms the estimate the member saw and queues its Stills for the worker. The one confirmation covers the Clips of the estimate too: each is made from its Still once a member has approved that. Nothing paid is generated without it. Answers 409 with the reason when the confirmed total is not the estimate's, when there is nothing to generate, when generation is unavailable, or when it would take the Project past its ceiling. A request repeated with the same Idempotency-Key is answered 200 with what the first one queued.",
         "operationId": "ConfirmGeneration",
         "parameters": [
           {
@@ -4594,6 +4753,204 @@
           }
         }
       },
+      "ClipCostResponse": {
+        "required": [
+          "estimatedAmount",
+          "currency",
+          "provider",
+          "model",
+          "ratesVersion",
+          "recordedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "estimatedAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/VideoProvider"
+          },
+          "model": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ratesVersion": {
+            "type": "string"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ClipFailureKind": {
+        "enum": [
+          "Refused",
+          "Technical",
+          "WorkerLost"
+        ]
+      },
+      "ClipFailureResponse": {
+        "required": [
+          "kind",
+          "message",
+          "billed"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/ClipFailureKind"
+          },
+          "message": {
+            "type": "string"
+          },
+          "billed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ClipResponse": {
+        "required": [
+          "id",
+          "projectId",
+          "stillId",
+          "description",
+          "durationMs",
+          "state",
+          "provider",
+          "model",
+          "fake",
+          "estimatedAmount",
+          "currency",
+          "attempt",
+          "retryAt",
+          "failure",
+          "cost",
+          "approvedByMemberId",
+          "approvedAt",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "projectId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "stillId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "description": {
+            "type": "string"
+          },
+          "durationMs": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ClipState"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/VideoProvider"
+          },
+          "model": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "fake": {
+            "type": "boolean"
+          },
+          "estimatedAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "attempt": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "retryAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "failure": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ClipFailureResponse"
+              }
+            ]
+          },
+          "cost": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ClipCostResponse"
+              }
+            ]
+          },
+          "approvedByMemberId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "approvedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ClipState": {
+        "enum": [
+          "WaitingForStill",
+          "Queued",
+          "Generating",
+          "ReadyForReview",
+          "Approved",
+          "Failed"
+        ]
+      },
       "CommissionRecordRequest": {
         "required": [
           "periodStart",
@@ -4845,7 +5202,8 @@
       },
       "ConfirmedGenerationResponse": {
         "required": [
-          "stills"
+          "stills",
+          "clips"
         ],
         "type": "object",
         "properties": {
@@ -4853,6 +5211,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/StillResponse"
+            }
+          },
+          "clips": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClipResponse"
             }
           }
         }
@@ -4977,6 +5341,32 @@
           },
           "currency": {
             "type": "string"
+          }
+        }
+      },
+      "EstimatedClipResponse": {
+        "required": [
+          "scenePosition",
+          "description",
+          "durationMs",
+          "estimatedAmount"
+        ],
+        "type": "object",
+        "properties": {
+          "scenePosition": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "description": {
+            "type": "string"
+          },
+          "durationMs": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "estimatedAmount": {
+            "type": "number",
+            "format": "double"
           }
         }
       },
@@ -5110,12 +5500,15 @@
           "available",
           "unavailable",
           "stills",
+          "clips",
           "total",
           "currency",
           "spent",
           "ceiling",
           "imageProvider",
+          "videoProvider",
           "sceneStills",
+          "sceneClips",
           "anotherStillAmount"
         ],
         "type": "object",
@@ -5133,6 +5526,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/EstimatedStillResponse"
+            }
+          },
+          "clips": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EstimatedClipResponse"
             }
           },
           "total": {
@@ -5153,10 +5552,19 @@
           "imageProvider": {
             "$ref": "#/components/schemas/ImageProvider"
           },
+          "videoProvider": {
+            "$ref": "#/components/schemas/VideoProvider"
+          },
           "sceneStills": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/SceneStillResponse"
+            }
+          },
+          "sceneClips": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SceneClipResponse"
             }
           },
           "anotherStillAmount": {
@@ -5672,6 +6080,35 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/CampaignVariantResponse"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PagedResponseOfClipResponse": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClipResponse"
             }
           },
           "page": {
@@ -7219,6 +7656,22 @@
           }
         }
       },
+      "SceneClipResponse": {
+        "required": [
+          "scenePosition",
+          "clip"
+        ],
+        "type": "object",
+        "properties": {
+          "scenePosition": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "clip": {
+            "$ref": "#/components/schemas/ClipResponse"
+          }
+        }
+      },
       "SceneEditRequest": {
         "required": [
           "position"
@@ -7303,7 +7756,8 @@
           "facts",
           "manuallyEdited",
           "description",
-          "stillId"
+          "stillId",
+          "clipId"
         ],
         "type": "object",
         "properties": {
@@ -7353,6 +7807,13 @@
             ]
           },
           "stillId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "clipId": {
             "type": [
               "null",
               "string"
@@ -7900,6 +8361,12 @@
             "format": "date-time"
           }
         }
+      },
+      "VideoProvider": {
+        "enum": [
+          "None",
+          "Fake"
+        ]
       }
     }
   },

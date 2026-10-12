@@ -32,7 +32,7 @@ public sealed class StoryboardTests(AffiVideoApp app)
         Assert.Equal(variant.Id, storyboard.VariantId);
         Assert.Equal(1, storyboard.Version);
         Assert.Equal(CreativeTemplate.ProductShowcase, storyboard.CreativeTemplate);
-        Assert.Equal(2, storyboard.TemplateVersion);
+        Assert.Equal(3, storyboard.TemplateVersion);
         Assert.Equal(RenderMode.ProductLock, storyboard.RenderMode);
         Assert.InRange(storyboard.CreatedAt, before.AddSeconds(-1), DateTimeOffset.UtcNow.AddSeconds(1));
 

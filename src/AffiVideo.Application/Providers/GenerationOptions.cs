@@ -3,7 +3,7 @@ using AffiVideo.Domain;
 namespace AffiVideo.Application.Providers;
 
 /// <summary>
-/// What generates pictures for Hybrid. With nothing configured, nothing is
+/// What generates pictures and footage for Hybrid. With nothing configured, nothing is
 /// generated: Hybrid plans what Product Lock does, and generation says it is unavailable.
 /// </summary>
 public sealed class GenerationOptions
@@ -13,14 +13,23 @@ public sealed class GenerationOptions
     /// <summary>What makes Stills.</summary>
     public ImageProvider ImageProvider { get; set; } = ImageProvider.None;
 
+    /// <summary>What makes Clips from Stills.</summary>
+    public VideoProvider VideoProvider { get; set; } = VideoProvider.None;
+
     /// <summary>Whether there is anything to make a Still with.</summary>
     public bool CanGenerateStills => ImageProvider != ImageProvider.None;
 
-    /// <summary>How the fake providers misbehave, for seeing what a member is shown when a real one does.</summary>
+    /// <summary>Whether there is anything to make a Clip with. A Clip starts from a Still, so that takes both.</summary>
+    public bool CanGenerateClips => CanGenerateStills && VideoProvider != VideoProvider.None;
+
+    /// <summary>How the fake image provider misbehaves, for seeing what a member is shown when a real one does.</summary>
     public FakeGenerationOptions Fake { get; set; } = new();
+
+    /// <summary>The same, for the fake video provider.</summary>
+    public FakeGenerationOptions FakeVideo { get; set; } = new();
 }
 
-/// <summary>How the fake providers misbehave. With nothing set, they make what they are asked for every time.</summary>
+/// <summary>How a fake provider misbehaves. With nothing set, it makes what it is asked for every time.</summary>
 public sealed class FakeGenerationOptions
 {
     /// <summary>How many times the fake fails for a technical reason before it starts making what it is asked for.</summary>

@@ -63,11 +63,12 @@ public interface IRenderQueue
 /// <param name="Storyboard">The version to render, with its Scenes.</param>
 /// <param name="Assets">Those of the assets the Scenes show that the Product still has.</param>
 /// <param name="Stills">The Stills the Scenes refer to: each was approved, and may have been replaced by another since.</param>
+/// <param name="Clips">The Clips the Scenes refer to: each was approved.</param>
 /// <param name="Audio">The narration and music the Variant has as the job is claimed, to be mixed into the video.</param>
 /// <param name="ProductId">The Product the video is of, which the cost of rendering it is recorded against.</param>
 public sealed record RenderWork(
     RenderJob Job, Guid LeaseId, Storyboard Storyboard, IReadOnlyList<ProductAsset> Assets, IReadOnlyList<Still> Stills,
-    IReadOnlyList<VariantAudio> Audio, Guid ProductId);
+    IReadOnlyList<Clip> Clips, IReadOnlyList<VariantAudio> Audio, Guid ProductId);
 
 /// <summary>
 /// The job is no longer this worker's: a member cancelled it, it was deleted with
@@ -126,6 +127,19 @@ public sealed class ProductionCostOptions
     /// stands in for a real provider's, so that the estimate, the ceiling and the records can be seen working.
     /// </summary>
     public decimal FakeStill { get; set; } = 0.04m;
+
+    /// <summary>
+    /// What a second of a Clip by the fake video provider is taken to cost. Like the fake Still's, the amount
+    /// stands in for a real provider's, which charges for a Clip by its length.
+    /// </summary>
+    public decimal FakeClipPerSecond { get; set; } = 0.10m;
+
+    /// <summary>What a second of a Clip by this provider is taken to cost.</summary>
+    public decimal ClipRatePerSecondOf(VideoProvider provider) => provider switch
+    {
+        VideoProvider.Fake => FakeClipPerSecond,
+        _ => throw new ArgumentOutOfRangeException(nameof(provider), provider, "No rate is configured for a Clip by this provider."),
+    };
 
     /// <summary>What one Still by this provider is taken to cost.</summary>
     public decimal StillRateOf(ImageProvider provider) => provider switch

@@ -28,6 +28,7 @@ const placeholder: SceneInput = {
   previous: null,
   backdrop: 'fonts/OFL.txt',
   still: null,
+  clip: null,
   colours: { accent: '#22242a', tint: '#e2e2e4', ghost: '#e8e6e2', ink: '#141416' },
 };
 

@@ -107,6 +107,7 @@ internal sealed class Remotion(IOptions<RenderingOptions> options)
 /// <param name="Lines">The Scene's on-screen text. It is data: a template sets it in type and does nothing else with it.</param>
 /// <param name="Previous">What the Scene before left on screen, which this Scene carries on from.</param>
 /// <param name="Still">The Still that is the Scene's generated backdrop, within the bundle's public folder. Null when it has none.</param>
+/// <param name="Clip">The Clip that is the Scene's generated footage, within the bundle's public folder. Null when it has none.</param>
 internal sealed record SceneInput(
     CreativeTemplate Template,
     SceneLayout Layout,
@@ -116,6 +117,7 @@ internal sealed record SceneInput(
     PreviousSceneInput? Previous,
     string Backdrop,
     string? Still,
+    string? Clip,
     Palette Colours);
 
 internal sealed record PreviousSceneInput(SceneLayout Layout, LayerInput Product);

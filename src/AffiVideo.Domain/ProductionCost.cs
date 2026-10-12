@@ -141,6 +141,10 @@ public static class ProductionCosts
         return Math.Round(rates.PerAttempt + rates.PerMinute * minutes, AmountDecimals, MidpointRounding.AwayFromZero);
     }
 
+    /// <summary>What a Clip is estimated to cost: the rate for a second, for as long as the Scene it is asked for lasts.</summary>
+    public static decimal ClipEstimate(decimal perSecond, int durationMs) =>
+        Math.Round(perSecond * Math.Max(0, durationMs) / 1000m, AmountDecimals, MidpointRounding.AwayFromZero);
+
     /// <summary>
     /// The records added up, one total for each currency they are in, by currency
     /// code. Amounts in different currencies are never added to each other, and no

@@ -35,7 +35,8 @@ public sealed record ReviewFlagResponse(Guid FactId, string Text, DateTimeOffset
 /// <param name="Facts">The Facts the Scene's text was written from, in the order it uses them. None when a person wrote the text.</param>
 /// <param name="ManuallyEdited">Whether a person changed the Scene's text. Such text is the Organization's own and is not checked against Facts.</param>
 /// <param name="Description">What the Scene's generated picture is to show, in words for the provider. Null unless the Technique is a generated one.</param>
-/// <param name="StillId">The approved Still the Scene's generated picture is. Null until one is approved, and for a Scene that is not generated.</param>
+/// <param name="StillId">The approved Still the Scene's generated picture is, or for generated footage the Still its Clip was made from. Null until there is one, and for a Scene that is not generated.</param>
+/// <param name="ClipId">The approved Clip that fills the Scene. Null until one is approved, and for a Scene that is not generated footage.</param>
 public sealed record SceneResponse(
     int Position,
     SceneLayout Layout,
@@ -47,7 +48,8 @@ public sealed record SceneResponse(
     IReadOnlyList<SceneFactResponse> Facts,
     bool ManuallyEdited,
     string? Description,
-    Guid? StillId);
+    Guid? StillId,
+    Guid? ClipId);
 
 /// <param name="Text">The Fact's text as the Scene used it, kept with the Scene.</param>
 public sealed record SceneFactResponse(Guid FactId, string Text);

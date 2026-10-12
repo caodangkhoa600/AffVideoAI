@@ -78,7 +78,7 @@ public sealed class Scene
     public Scene(
         int position, SceneLayout layout, Technique technique, int durationMs,
         IEnumerable<string> onScreenText, string narrationText, IEnumerable<Guid> assetIds, IEnumerable<SceneFact> facts,
-        bool manuallyEdited = false, string? description = null, Guid? stillId = null)
+        bool manuallyEdited = false, string? description = null, Guid? stillId = null, Guid? clipId = null)
     {
         Position = position;
         Layout = layout;
@@ -91,6 +91,7 @@ public sealed class Scene
         ManuallyEdited = manuallyEdited;
         Description = description;
         StillId = stillId;
+        ClipId = clipId;
     }
 
     /// <summary>Counted from 1 within the Storyboard.</summary>
@@ -130,10 +131,20 @@ public sealed class Scene
     public string? Description { get; private set; }
 
     /// <summary>
-    /// The Still the Scene's generated picture is: an approved Still of the picture it describes.
-    /// Absent until one is approved, and always for a Scene that is not generated.
+    /// The Still the Scene's generated picture is: an approved Still of the picture it describes, or for
+    /// generated footage the Still its Clip was made from. Absent until there is one, and always for a
+    /// Scene that is not generated.
     /// </summary>
     public Guid? StillId { get; private set; }
+
+    /// <summary>
+    /// The Clip that fills the Scene: an approved Clip of the picture it describes. Absent until one is
+    /// approved, and always for a Scene that is not generated footage.
+    /// </summary>
+    public Guid? ClipId { get; private set; }
+
+    /// <summary>The Facts the Scene cites, each once, in a fixed order: what a Still or Clip made for it rests on.</summary>
+    public Guid[] CitedFactIds => [.. _facts.Select(fact => fact.FactId).Distinct().Order()];
 
     /// <summary>
     /// The Scene as the next version has it, at this position and with this change
@@ -146,6 +157,8 @@ public sealed class Scene
         var textChanged = !onScreenText.SequenceEqual(OnScreenText) || narrationText != NarrationText;
         var manuallyEdited = ManuallyEdited || textChanged;
         var description = change.Description?.Trim() ?? Description;
+        // A Still or a Clip is of the picture it was described as, resting on the Facts the Scene cited, and of no other.
+        var samePicture = description == Description && manuallyEdited == ManuallyEdited;
         return new Scene(
             position, Layout, Technique, change.DurationMs ?? DurationMs, onScreenText, narrationText,
             change.AssetId is { } asset ? [asset] : AssetIds,
@@ -153,24 +166,32 @@ public sealed class Scene
             manuallyEdited ? [] : Facts.Select(fact => new SceneFact(fact.Position, fact.FactId, fact.Text)),
             // What the picture shows is not the Scene's text, so describing it leaves the Scene's Facts as they are.
             manuallyEdited, description,
-            // A Still is of the picture it was described as, and of no other.
-            description == Description ? StillId : null);
+            samePicture ? StillId : null, samePicture ? ClipId : null);
     }
 
     /// <summary>
-    /// The Scene as the next version has it when its generated picture is the newest of these
-    /// approved Stills that shows what it describes. It refers to none when none does.
+    /// The Scene as the next version has it when its generated picture is the newest of these approved
+    /// Stills, or for generated footage the newest of these approved Clips, that shows what it describes.
+    /// It refers to none when none does. A Scene of generated footage refers to the Still its Clip was made from.
     /// </summary>
-    public Scene Referring(IEnumerable<Still> approved)
+    public Scene Referring(IEnumerable<Still> approvedStills, IEnumerable<Clip> approvedClips)
     {
-        var still = approved
-            .Where(still => still.State == StillState.Approved && still.Technique == Technique && still.Description == Description)
-            .OrderByDescending(still => still.CreatedAt).ThenByDescending(still => still.Id)
-            .FirstOrDefault();
+        var still = Technique != Technique.GeneratedBackdrop
+            ? null
+            : approvedStills
+                .Where(still => still.State == StillState.Approved && still.Shows(this))
+                .OrderByDescending(still => still.CreatedAt).ThenByDescending(still => still.Id)
+                .FirstOrDefault();
+        var clip = Technique != Technique.GeneratedFootage
+            ? null
+            : approvedClips
+                .Where(clip => clip.State == ClipState.Approved && clip.Shows(this))
+                .OrderByDescending(clip => clip.CreatedAt).ThenByDescending(clip => clip.Id)
+                .FirstOrDefault();
         return new Scene(
             Position, Layout, Technique, DurationMs, OnScreenText, NarrationText, AssetIds,
             Facts.Select(fact => new SceneFact(fact.Position, fact.FactId, fact.Text)), ManuallyEdited, Description,
-            Technique.IsGenerated() ? still?.Id : null);
+            still?.Id ?? clip?.StillId, clip?.Id);
     }
 }
 
@@ -209,7 +230,7 @@ public static class StoryboardEditing
         a.Position == b.Position && a.Layout == b.Layout && a.Technique == b.Technique && a.DurationMs == b.DurationMs
         && a.OnScreenText.SequenceEqual(b.OnScreenText) && a.NarrationText == b.NarrationText
         && a.AssetIds.SequenceEqual(b.AssetIds) && a.ManuallyEdited == b.ManuallyEdited && a.Description == b.Description
-        && a.StillId == b.StillId
+        && a.StillId == b.StillId && a.ClipId == b.ClipId
         && a.Facts.Select(fact => fact.FactId).SequenceEqual(b.Facts.Select(fact => fact.FactId));
 }
 
@@ -280,6 +301,12 @@ public static class StoryboardRules
                 .Select(fact => $"{name} uses a Fact that is not Confirmed: \"{fact.Text}\"."));
         }
 
+        var generated = scenes.Count(scene => scene.Technique.IsGenerated());
+        if (generated > PlanningEngine.MaxGeneratedScenes)
+        {
+            problems.Add($"{generated} Scenes are generated, and a Hybrid video has at most {PlanningEngine.MaxGeneratedScenes}.");
+        }
+
         var total = scenes.Sum(scene => scene.DurationMs);
         if (total != targetDurationSeconds * 1000)
         {
@@ -290,10 +317,12 @@ public static class StoryboardRules
 
     /// <summary>
     /// Everything wrong with how these Scenes describe their generated pictures, in words for the
-    /// member: a generated Scene with nothing to generate from, a description too long, or one
-    /// on a Scene that has no generated picture. Empty when there is nothing.
+    /// member: a generated Scene with nothing to generate from, a description too long, one
+    /// on a Scene that has no generated picture, or a picture that shows what the Product does
+    /// in a Scene that cites no Fact. Empty when there is nothing.
     /// </summary>
-    public static IReadOnlyList<string> DescriptionProblems(IReadOnlyList<Scene> scenes)
+    /// <param name="template">Which says, of each of its Scenes, whether its generated picture shows what the Product does.</param>
+    public static IReadOnlyList<string> DescriptionProblems(IReadOnlyList<Scene> scenes, CreativeTemplateDefinition template)
     {
         var problems = new List<string>();
         foreach (var scene in scenes)
@@ -313,6 +342,15 @@ public static class StoryboardRules
             else if (scene.Description.Length > DescriptionMaxLength)
             {
                 problems.Add($"{name}'s description has {scene.Description.Length} characters, and at most {DescriptionMaxLength} are sent to be generated from.");
+            }
+            // A picture may say something about the Product only by resting on a Fact, as text may. Which Facts
+            // are Confirmed is checked with the rest of the Scene: here it only has to cite one.
+            else if (scene.Facts.Count == 0
+                && template.Scenes.FirstOrDefault(slot => slot.Layout == scene.Layout) is { ShowsWhatTheProductDoes: true })
+            {
+                problems.Add(
+                    $"{name}'s generated picture shows what the Product does, so the Scene has to rest on a Confirmed Fact, and it cites none. " +
+                    "Regenerate the Scene, so that it is written from the Product's Confirmed Facts again.");
             }
         }
         return problems;
@@ -412,8 +450,9 @@ public static class StoryboardRules
     /// </summary>
     /// <param name="assets">Those of the assets the Scenes show that the Product still has.</param>
     /// <param name="approvedStillIds">Those of the Stills the Scenes refer to that a member approved, whatever was asked for in their place since.</param>
+    /// <param name="approvedClipIds">Those of the Clips the Scenes refer to that a member approved.</param>
     public static IReadOnlyList<string> RenderProblems(
-        Storyboard storyboard, IReadOnlyCollection<ProductAsset> assets, IReadOnlySet<Guid> approvedStillIds)
+        Storyboard storyboard, IReadOnlyCollection<ProductAsset> assets, IReadOnlySet<Guid> approvedStillIds, IReadOnlySet<Guid> approvedClipIds)
     {
         if (CreativeTemplates.Find(storyboard.CreativeTemplate) is not { } template)
         {
@@ -424,6 +463,7 @@ public static class StoryboardRules
         var problems = new List<string>();
         var removed = false;
         var unapproved = false;
+        var noClip = false;
         foreach (var scene in storyboard.Scenes)
         {
             var name = $"Scene {scene.Position}";
@@ -435,11 +475,12 @@ public static class StoryboardRules
             {
                 problems.Add($"{name} is planned as {scene.Technique}, which {storyboard.RenderMode} does not allow.");
             }
-            else if (scene.Technique == Technique.GeneratedFootage)
+            // A render makes nothing that is paid for (ADR 0003): the Clip or the Still has to be there already.
+            else if (scene.Technique == Technique.GeneratedFootage && !(scene.ClipId is { } clip && approvedClipIds.Contains(clip)))
             {
-                problems.Add($"{name} is generated footage, which cannot be rendered yet.");
+                problems.Add($"{name} is generated footage and has no approved Clip.");
+                noClip = true;
             }
-            // A render makes nothing that is paid for (ADR 0003): the Still has to be there already.
             else if (scene.Technique == Technique.GeneratedBackdrop && !(scene.StillId is { } still && approvedStillIds.Contains(still)))
             {
                 problems.Add($"{name} has a generated backdrop and no approved Still.");
@@ -466,6 +507,7 @@ public static class StoryboardRules
         }
         if (removed) problems.Add("Generate the Storyboard again, then render that version.");
         if (unapproved) problems.Add("Approve a Still for it at Storyboard review, then render the version that makes.");
+        if (noClip) problems.Add("Approve a Clip for it at Storyboard review, then render the version that makes.");
         return problems;
     }
 

@@ -3,7 +3,7 @@
 // rotated and faded (Product Lock).
 
 import type { CSSProperties } from 'react';
-import { AbsoluteFill, Easing, Img, interpolate, staticFile, useCurrentFrame, useVideoConfig } from 'remotion';
+import { AbsoluteFill, Easing, Img, OffthreadVideo, interpolate, staticFile, useCurrentFrame, useVideoConfig } from 'remotion';
 import { HEIGHT, WIDTH, type Layer, type Layout, type SceneInput } from './scene';
 import { FAMILY, WEIGHTS, type Weight } from './typeface';
 
@@ -130,6 +130,21 @@ export const GeneratedBackdrop = ({ scene, veil }: { scene: SceneInput; veil: st
     </AbsoluteFill>
   );
 };
+
+/**
+ * A Scene's generated footage: its Clip, filling the frame from the Scene's first
+ * frame to its last, with nothing of the Product in it. The Clip was asked for at
+ * the Scene's length and is scaled to cover the frame; whatever sound it had was
+ * removed before it was kept. The Scene's type is set over it by the layout, on a
+ * wash that lets it be read on any footage. The Scene is cut to and cut away from.
+ */
+export const GeneratedFootage = ({ scene, veil }: { scene: SceneInput; veil: string }) =>
+  scene.clip ? (
+    <AbsoluteFill style={{ overflow: 'hidden', background: 'black' }}>
+      <OffthreadVideo muted src={staticFile(scene.clip)} style={{ position: 'absolute', width: WIDTH, height: HEIGHT, objectFit: 'cover' }} />
+      <AbsoluteFill style={{ background: veil }} />
+    </AbsoluteFill>
+  ) : null;
 
 /** Lines of type whose words rise into place one after another from behind a mask. */
 export const Type = ({

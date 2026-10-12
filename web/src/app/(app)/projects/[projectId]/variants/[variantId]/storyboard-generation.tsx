@@ -3,7 +3,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { api, problemDetail, type Still, type StillState, type Storyboard, type Variant } from "@/lib/api/client";
+import { api, problemDetail, type Clip, type ClipState, type Still, type StillState, type Storyboard, type Variant } from "@/lib/api/client";
 
 /** Where a Still is (StillState in the domain), as a member reads it. There is no percentage to show. */
 const STATES: Record<StillState, string> = {
@@ -17,7 +17,23 @@ const STATES: Record<StillState, string> = {
 
 const WAITING: StillState[] = ["Queued", "Generating"];
 
-// How often the estimate is asked for while a Still is on its way. The worker has it made; this page only asks.
+/** Where a Clip is (ClipState in the domain), as a member reads it. */
+const CLIP_STATES: Record<ClipState, string> = {
+  WaitingForStill: "Waiting for its Still to be approved",
+  Queued: "Queued",
+  Generating: "Being made",
+  ReadyForReview: "Ready for review",
+  Approved: "Approved",
+  Failed: "Failed",
+};
+
+// A Clip that waits for its Still is not on its way: it starts when a member approves the Still.
+const CLIP_WAITING: ClipState[] = ["Queued", "Generating"];
+
+/** A length in seconds, to the tenth a Scene is timed to. */
+const seconds = (durationMs: number) => `${(durationMs / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })} s`;
+
+// How often the estimate is asked for while a Still or a Clip is on its way. The worker has it made; this page only asks.
 const POLL_MS = 2000;
 
 /** An estimated amount: cents, and finer only when there is something finer. Never an amount anyone was billed. */
@@ -26,7 +42,8 @@ const money = (amount: number, currency: string) =>
 
 /**
  * Paid generation for one Hybrid Storyboard version: what it would make and cost, the member's
- * confirmation, and the Still of each generated Scene, to approve or to replace with another.
+ * one confirmation, the Still of each generated Scene, to approve or to replace with another, and
+ * the Clip of each Scene of generated footage, to watch and approve.
  * Nothing is generated before the member confirms (ADR 0003).
  */
 export function StoryboardGeneration({
@@ -36,7 +53,7 @@ export function StoryboardGeneration({
 }: {
   variant: Variant;
   storyboard: Storyboard;
-  /** A Storyboard version was added: approving a Still makes the version that refers to it. */
+  /** A Storyboard version was added: approving a Still or a Clip makes the version that refers to it. */
   onAdded: () => Promise<void>;
 }) {
   const queryClient = useQueryClient();
@@ -53,7 +70,10 @@ export function StoryboardGeneration({
       return data;
     },
     refetchInterval: (query) =>
-      query.state.data?.sceneStills.some((has) => WAITING.includes(has.still.state)) ? POLL_MS : false,
+      query.state.data?.sceneStills.some((has) => WAITING.includes(has.still.state)) ||
+      query.state.data?.sceneClips.some((has) => CLIP_WAITING.includes(has.clip.state))
+        ? POLL_MS
+        : false,
   });
   const [working, setWorking] = useState(false);
   const [refused, setRefused] = useState<string>();
@@ -93,6 +113,14 @@ export function StoryboardGeneration({
       return { ok: response.ok, error };
     }, "The Still could not be approved.");
 
+  const approveClip = (clip: Clip) =>
+    act(async () => {
+      const { error, response } = await api.POST("/api/v1/clips/{clipId}/approve", { params: { path: { clipId: clip.id } } });
+      // As for a Still: the version that uses the Clip is the next one.
+      if (response.ok) await onAdded();
+      return { ok: response.ok, error };
+    }, "The Clip could not be approved.");
+
   // The button names what another costs now, and that amount is what is confirmed.
   const another = (still: Still, confirmedAmount: number) =>
     act(async (idempotency) => {
@@ -110,10 +138,12 @@ export function StoryboardGeneration({
     <section className="flex flex-col gap-3" data-testid="generation">
       <h3 className="text-lg font-semibold tracking-tight">Generated pictures</h3>
       <p className="text-sm text-muted-foreground">
-        In Hybrid a Scene can have a generated backdrop behind the Product. The Product itself is always its photo.
-        Each backdrop is a Still, made once for the Project and used by every Variant of it. Making one costs money,
-        so nothing is generated until you have seen the estimate and confirmed it. Approving a Still makes the next
-        Storyboard version, which uses it: that version is the one to render. A render generates nothing and no provider is paid for it.
+        In Hybrid up to two Scenes are generated: a backdrop behind the Product, or footage with no Product in it. The
+        Product itself is always its photo. A backdrop is a Still. Footage is a Clip, made from its Still once you
+        have approved that. Both are made once for the Project and used by every Variant of it. Making them costs
+        money, so nothing is generated until you have seen the estimate and confirmed it, once, for the Stills and
+        the Clips together. Approving a backdrop&apos;s Still, or a Clip, makes the next Storyboard version, which uses
+        it: that version is the one to render. A render generates nothing and no provider is paid for it.
       </p>
       {estimate.isError ? (
         <p role="alert" className="text-sm text-destructive">
@@ -134,6 +164,12 @@ export function StoryboardGeneration({
               provider is called and nobody is charged; the amounts stand in for a real provider&apos;s.
             </p>
           )}
+          {data.available && data.videoProvider === "Fake" && (
+            <p className="w-fit rounded-md border bg-muted px-2 py-1 text-sm" data-testid="generation-fake-video">
+              Clips here come from the fake video provider: a test pattern, not footage of anything. No provider is
+              called and nobody is charged; the amounts stand in for a real provider&apos;s.
+            </p>
+          )}
           {data.available && generated.length === 0 && (
             <p className="text-sm text-muted-foreground" data-testid="generation-nothing">
               No Scene of this version is generated.
@@ -148,13 +184,20 @@ export function StoryboardGeneration({
               count.
             </span>
           </p>
-          {data.stills.length > 0 && (
+          {(data.stills.length > 0 || data.clips.length > 0) && (
             <div className="flex flex-col gap-2 rounded-lg border p-4" data-testid="generation-estimate">
               <p className="text-sm font-medium">Confirming will generate:</p>
               <ul className="list-disc pl-5 text-sm">
                 {data.stills.map((still) => (
                   <li key={still.scenePosition}>
                     A Still for Scene {still.scenePosition}, estimated at {money(still.estimatedAmount, data.currency)}
+                  </li>
+                ))}
+                {data.clips.map((clip) => (
+                  <li key={`clip-${clip.scenePosition}`}>
+                    A Clip of {seconds(clip.durationMs)} for Scene {clip.scenePosition}, estimated at{" "}
+                    {money(clip.estimatedAmount, data.currency)}. It is made from the Scene&apos;s Still once you have
+                    approved that, with no further confirmation.
                   </li>
                 ))}
               </ul>
@@ -178,11 +221,23 @@ export function StoryboardGeneration({
                   key={still.id}
                   scenePosition={scenePosition}
                   still={still}
-                  anotherFor={data.anotherStillAmount === null ? undefined : money(data.anotherStillAmount, data.currency)}
+                  // A Clip starts from one Still. Once it has, another Still would change nothing in the video.
+                  anotherFor={
+                    data.anotherStillAmount === null || data.sceneClips.some((has) => has.clip.stillId === still.id)
+                      ? undefined
+                      : money(data.anotherStillAmount, data.currency)
+                  }
                   disabled={working}
                   onApprove={() => approve(still)}
                   onAnother={() => data.anotherStillAmount !== null && another(still, data.anotherStillAmount)}
                 />
+              ))}
+            </ul>
+          )}
+          {data.sceneClips.length > 0 && (
+            <ul className="flex flex-col divide-y rounded-lg border">
+              {data.sceneClips.map(({ scenePosition, clip }) => (
+                <ClipRow key={clip.id} scenePosition={scenePosition} clip={clip} disabled={working} onApprove={() => approveClip(clip)} />
               ))}
             </ul>
           )}
@@ -194,6 +249,10 @@ export function StoryboardGeneration({
         </p>
       )}
       <FailedStills variant={variant} descriptions={generated.map((scene) => scene.description!)} />
+      <FailedClips
+        variant={variant}
+        descriptions={generated.filter((scene) => scene.technique === "GeneratedFootage").map((scene) => scene.description!)}
+      />
     </section>
   );
 }
@@ -222,7 +281,11 @@ function StillRow({
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={`/api/v1/stills/${still.id}/content`}
-          alt={`The generated backdrop of Scene ${scenePosition}`}
+          alt={
+            still.technique === "GeneratedFootage"
+              ? `The Still the footage of Scene ${scenePosition} starts from`
+              : `The generated backdrop of Scene ${scenePosition}`
+          }
           loading="lazy"
           className="aspect-[9/16] w-28 shrink-0 rounded-lg border bg-muted object-cover"
         />
@@ -276,6 +339,114 @@ function StillRow({
         )}
       </div>
     </li>
+  );
+}
+
+/** The Clip of a Scene of generated footage: where it is, and once it is made the video itself, to watch before approving. */
+function ClipRow({
+  scenePosition,
+  clip,
+  disabled,
+  onApprove,
+}: {
+  scenePosition: number;
+  clip: Clip;
+  disabled: boolean;
+  onApprove: () => void;
+}) {
+  const made = clip.state === "ReadyForReview" || clip.state === "Approved";
+  return (
+    <li className="flex gap-4 p-4" data-testid="clip">
+      {made && (
+        // The file comes from the API, which only serves it to a signed-in member of the Organization. It has no sound.
+        <video
+          src={`/api/v1/clips/${clip.id}/content`}
+          controls
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          aria-label={`The generated footage of Scene ${scenePosition}`}
+          className="aspect-[9/16] w-28 shrink-0 rounded-lg border bg-muted object-cover"
+        />
+      )}
+      <div className="flex min-w-0 flex-col gap-2">
+        <p className="text-sm" aria-live="polite">
+          <span className="text-muted-foreground">
+            Clip for Scene {scenePosition} · {seconds(clip.durationMs)} ·{" "}
+          </span>
+          <span className="font-medium" data-testid="clip-state">
+            {CLIP_STATES[clip.state]}
+          </span>
+        </p>
+        {clip.fake && (
+          <p className="w-fit rounded-md border bg-muted px-2 py-1 text-sm" data-testid="clip-fake">
+            Fake: made by the fake video provider. It is a test pattern and shows nothing of the description.
+          </p>
+        )}
+        {clip.state === "WaitingForStill" && (
+          <p className="text-sm text-muted-foreground">
+            It was confirmed at {money(clip.estimatedAmount, clip.currency)} and is made from the Scene&apos;s Still.
+            Approve that Still to start it.
+          </p>
+        )}
+        {clip.state === "Queued" && clip.retryAt && (
+          <p className="text-sm text-muted-foreground" data-testid="clip-retry">
+            Attempt {clip.attempt} failed without being charged for. It will be tried again after{" "}
+            {new Date(clip.retryAt).toLocaleTimeString()}.
+          </p>
+        )}
+        {clip.cost && (
+          <p className="text-sm text-muted-foreground" data-testid="clip-cost">
+            Estimated cost: {money(clip.cost.estimatedAmount, clip.cost.currency)}
+            {clip.cost.model ? ` · ${clip.cost.provider} · ${clip.cost.model}` : ""}. It is the Clip&apos;s, once, however
+            many videos use it.
+          </p>
+        )}
+        {clip.state === "ReadyForReview" && (
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={onApprove} disabled={disabled} data-testid="clip-approve">
+              Approve
+            </Button>
+          </div>
+        )}
+      </div>
+    </li>
+  );
+}
+
+/**
+ * Why the newest Clip of footage this version describes was not made, when it was not: the
+ * Scene then has no Clip, and the estimate above offers it again.
+ */
+function FailedClips({ variant, descriptions }: { variant: Variant; descriptions: string[] }) {
+  const clips = useQuery({
+    queryKey: ["projects", "one", variant.projectId, "clips"],
+    queryFn: async () => {
+      const { data, response } = await api.GET("/api/v1/projects/{projectId}/clips", {
+        params: { path: { projectId: variant.projectId }, query: { pageSize: 50 } },
+      });
+      if (!data) throw new Error(`The API answered ${response.status}`);
+      return data;
+    },
+    enabled: descriptions.length > 0,
+    refetchInterval: POLL_MS * 5,
+  });
+  // Newest first: only the latest Clip of each piece of footage says where it stands.
+  const failed = descriptions
+    .map((description) => clips.data?.items.find((clip) => clip.description === description))
+    .filter((clip): clip is Clip => clip?.state === "Failed");
+  if (failed.length === 0) return null;
+
+  return (
+    <ul className="flex flex-col gap-2">
+      {failed.map((clip) => (
+        <li key={clip.id} role="alert" className="text-sm text-destructive" data-testid="clip-failure">
+          {clip.failure?.message ?? "The Clip could not be made."}
+          {clip.failure?.billed ? " The provider charged for the attempt all the same." : ""}
+        </li>
+      ))}
+    </ul>
   );
 }
 

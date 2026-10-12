@@ -89,8 +89,9 @@ public static class InfrastructureSetup
     }
 
     /// <summary>
-    /// The render queue and the queue of Stills as the worker sees them, across Organizations, and the
+    /// The render queue and the queues of Stills and Clips as the worker sees them, across Organizations, and the
     /// image provider. Only the worker asks for this: nothing in the API can claim a job or call a provider.
+    /// The video provider is the worker's own to register: its fake needs FFmpeg, which only the worker has.
     /// </summary>
     public static IServiceCollection AddRenderQueue(this IServiceCollection services, IConfiguration configuration)
     {
@@ -105,6 +106,7 @@ public static class InfrastructureSetup
             .ValidateOnStart();
         // The Stills a member confirmed wait in a queue of their own, served under the same leases.
         services.AddScoped<IStillQueue, StillQueue>();
+        services.AddScoped<IClipQueue, ClipQueue>();
         // Whatever is configured to make them. A real provider is registered in the fake's place, never beside it.
         services.AddSingleton<IImageGenerator>(provider =>
             provider.GetRequiredService<IOptions<GenerationOptions>>().Value switch

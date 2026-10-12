@@ -22,7 +22,7 @@ export const RENDER_MODES: { value: RenderMode; name: string; about: string }[] 
     value: "Hybrid",
     name: "Hybrid",
     about:
-      "The Hook Scene can have a generated backdrop behind the Product, which is still its photo. Generating costs money and is confirmed first. A render generates nothing.",
+      "Up to two Scenes are generated: a backdrop behind the Product, which is still its photo, or footage with no Product in it. Generating costs money and is confirmed first. A render generates nothing.",
   },
 ];
 

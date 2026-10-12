@@ -84,13 +84,18 @@ public sealed record FactPacing(int LeadInMs, int AroundEachFactMs, int WordStep
 /// What the picture of the Scene is to show when it is generated, in words for the image provider, with
 /// <see cref="CategoryPlaceholder"/> and <see cref="AudiencePlaceholder"/> where those are placed. Null for a Scene that is never generated.
 /// </param>
+/// <param name="ShowsWhatTheProductDoes">
+/// Whether the Scene's generated picture is read as showing what the Product does: it is seen with the Product's
+/// Facts set over it. Such a Scene has to rest on a Confirmed Fact. A setting, or a problem the Product is not in, says nothing of it.
+/// </param>
 public sealed record SceneSlot(
     SceneLayout Layout,
     int Share,
     IReadOnlyList<Technique> Techniques,
     int MinDurationMs,
     ScenePhoto Photo = ScenePhoto.First,
-    string? Description = null)
+    string? Description = null,
+    bool ShowsWhatTheProductDoes = false)
 {
     public const string CategoryPlaceholder = "{category}";
     public const string AudiencePlaceholder = "{audience}";
@@ -170,14 +175,20 @@ public sealed record TextLimit(int MaxCharacters, int MaxWordCharacters, int? Ma
 
 public static class CreativeTemplates
 {
+    // What every description of generated footage ends on. The Product is never generated (ADR 0004),
+    // and nobody a viewer could take for a real person, a child or a mascot is shown.
+    private const string InventedAdultsAndNoProduct =
+        " Anyone in the frame is an invented adult: no real or recognisable person, no child, no brand mascot. " +
+        "No product, no packaging, no text, no logos.";
+
     /// <summary>
     /// The look the founder approved in ticket 26: the Hook, the reveal, the Facts
     /// and the closing, as 3, 5, 7 and 5 seconds of a 20-second video.
     /// </summary>
     private static readonly CreativeTemplateDefinition ProductShowcase = new(
         CreativeTemplate.ProductShowcase,
-        // 2: the Hook may have a generated backdrop.
-        Version: 2,
+        // 2: the Hook may have a generated backdrop. 3: the Facts may be set over generated footage.
+        Version: 3,
         Scenes:
         [
             // The shortest each can be made: the thirteenth word of a Hook is in place at 1.92 seconds, the
@@ -190,7 +201,13 @@ public static class CreativeTemplates
                     ", photographed as the backdrop of an advertisement: an empty surface in the lower middle of the frame for a product " +
                     "to stand on, soft daylight, shallow depth of field, vertical 9:16. No product, no people, no text, no logos."),
             new SceneSlot(SceneLayout.Reveal, Share: 5, [Technique.ImageMotion, Technique.StaticImage], MinDurationMs: 2000),
-            new SceneSlot(SceneLayout.Facts, Share: 7, [Technique.TextAnimation], MinDurationMs: 2000, ScenePhoto.Last),
+            new SceneSlot(
+                SceneLayout.Facts, Share: 7, [Technique.GeneratedFootage, Technique.TextAnimation], MinDurationMs: 2000, ScenePhoto.Last,
+                Description:
+                    "Footage for an advertisement of " + SceneSlot.CategoryPlaceholder + ": one adult, such as " + SceneSlot.AudiencePlaceholder +
+                    ", at ease and plainly pleased in a bright everyday place where it would be used. Natural daylight, a slow steady " +
+                    "camera, vertical 9:16, the lower half of the frame calm enough to set text on." + InventedAdultsAndNoProduct,
+                ShowsWhatTheProductDoes: true),
             new SceneSlot(SceneLayout.Closing, Share: 5, [Technique.ImageMotion, Technique.StaticImage], MinDurationMs: 2500),
         ],
         MaxFacts: 3,
@@ -214,8 +231,8 @@ public static class CreativeTemplates
     /// </summary>
     private static readonly CreativeTemplateDefinition LuxuryCinematic = new(
         CreativeTemplate.LuxuryCinematic,
-        // 2: the Hook may have a generated backdrop.
-        Version: 2,
+        // 2: the Hook may have a generated backdrop. 3: the Facts may be set over generated footage.
+        Version: 3,
         Scenes:
         [
             // The shortest each can be made: the Hook's last word has faded in by 1.9 seconds whatever
@@ -226,7 +243,13 @@ public static class CreativeTemplates
                     "A dark, elegant studio set for a luxury advertisement of " + SceneSlot.CategoryPlaceholder + " aimed at " +
                     SceneSlot.AudiencePlaceholder + ": a polished stone surface in the lower middle of the frame for a product to stand on, " +
                     "a single soft light from one side, deep shadows, vertical 9:16. No product, no people, no text, no logos."),
-            new SceneSlot(SceneLayout.Facts, Share: 8, [Technique.TextAnimation], MinDurationMs: 2000, ScenePhoto.Last),
+            new SceneSlot(
+                SceneLayout.Facts, Share: 8, [Technique.GeneratedFootage, Technique.TextAnimation], MinDurationMs: 2000, ScenePhoto.Last,
+                Description:
+                    "Footage for a luxury advertisement of " + SceneSlot.CategoryPlaceholder + " aimed at " + SceneSlot.AudiencePlaceholder +
+                    ": one adult, unhurried and content, in a dark, elegant interior. A single soft light from one side, deep shadows, " +
+                    "a slow steady camera, vertical 9:16, the lower half of the frame dark enough to set text on." + InventedAdultsAndNoProduct,
+                ShowsWhatTheProductDoes: true),
             new SceneSlot(SceneLayout.Closing, Share: 6, [Technique.ImageMotion, Technique.StaticImage], MinDurationMs: 3000),
         ],
         MaxFacts: 2,
@@ -248,15 +271,28 @@ public static class CreativeTemplates
     /// </summary>
     private static readonly CreativeTemplateDefinition ProblemSolution = new(
         CreativeTemplate.ProblemSolution,
-        Version: 1,
+        // 2: the problem and the Facts may be set over generated footage.
+        Version: 2,
         Scenes:
         [
             // The problem is type alone, timed as Product Showcase's Hook is: the thirteenth word is in
             // place at 1.92 seconds. It fades over the Scene's last 0.2 seconds, so the Scene is longer than
             // that by enough to read it. The solution's name is in by about 1.5, and the call to action at 1.85.
-            new SceneSlot(SceneLayout.Hook, Share: 4, [Technique.TextAnimation], MinDurationMs: 2500),
+            // Generated, the problem is seen as well as read. The Product is not in it, and it shows nothing the Product does.
+            new SceneSlot(
+                SceneLayout.Hook, Share: 4, [Technique.GeneratedFootage, Technique.TextAnimation], MinDurationMs: 2500,
+                Description:
+                    "Footage for an advertisement: one adult, such as " + SceneSlot.AudiencePlaceholder + ", plainly bothered by an everyday " +
+                    "annoyance, in a dim, ordinary place where " + SceneSlot.CategoryPlaceholder + " would be used. A slow steady camera, " +
+                    "vertical 9:16, dark and calm enough to set large text on." + InventedAdultsAndNoProduct),
             new SceneSlot(SceneLayout.Solution, Share: 4, [Technique.ImageMotion, Technique.StaticImage], MinDurationMs: 2000),
-            new SceneSlot(SceneLayout.Facts, Share: 7, [Technique.TextAnimation], MinDurationMs: 2000, ScenePhoto.Last),
+            new SceneSlot(
+                SceneLayout.Facts, Share: 7, [Technique.GeneratedFootage, Technique.TextAnimation], MinDurationMs: 2000, ScenePhoto.Last,
+                Description:
+                    "Footage for an advertisement of " + SceneSlot.CategoryPlaceholder + ": one adult, such as " + SceneSlot.AudiencePlaceholder +
+                    ", relieved and at ease in a bright, ordinary place, the trouble gone. A slow steady camera, vertical 9:16, " +
+                    "the lower half of the frame calm enough to set text on." + InventedAdultsAndNoProduct,
+                ShowsWhatTheProductDoes: true),
             new SceneSlot(SceneLayout.Closing, Share: 5, [Technique.ImageMotion, Technique.StaticImage], MinDurationMs: 2500),
         ],
         MaxFacts: 3,

@@ -35,6 +35,11 @@ export type SceneInput = {
   backdrop: string;
   /** The Still that is the Scene's generated backdrop, in the render's public folder. Null when it has none. */
   still: string | null;
+  /**
+   * The Clip that is the Scene's generated footage, in the render's public folder. Null when it has none.
+   * It fills the frame under the Scene's type, and the Product is not drawn in such a Scene.
+   */
+  clip: string | null;
   /** Taken from the Product's own colour. */
   colours: Colours;
 };

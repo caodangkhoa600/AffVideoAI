@@ -175,9 +175,9 @@ internal sealed class StillQueue(
             await database.Database.ExecuteSqlAsync(
                 $"""
                 INSERT INTO "GenerationCostRecords" (
-                    "Id", "OrganizationId", "ProductId", "StillId", "Provider", "Model", "EstimatedAmount", "Currency", "RatesVersion", "RecordedAt")
+                    "Id", "OrganizationId", "ProductId", "StillId", "ClipId", "Provider", "Model", "EstimatedAmount", "Currency", "RatesVersion", "RecordedAt")
                 VALUES (
-                    {id}, {still.OrganizationId}, {still.ProductId}, {still.StillId}, {still.Provider}, NULL, {still.EstimatedAmount},
+                    {id}, {still.OrganizationId}, {still.ProductId}, {still.StillId}, NULL, {still.Provider}, NULL, {still.EstimatedAmount},
                     {still.Currency}, {still.RatesVersion}, {now})
                 """,
                 cancellationToken);

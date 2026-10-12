@@ -569,4 +569,35 @@ public sealed class OrganizationIsolationTests(AffiVideoApp app)
         Assert.Equal(HttpStatusCode.OK, (await them.GetAsync($"/api/v1/stills/{still.Id}/content")).StatusCode);
         Assert.Equal(1, (await StillGenerationTests.StillsAsync(them, variant)).Total);
     }
+
+    [Fact]
+    public async Task A_member_of_one_Organization_is_refused_a_Clip_of_another_and_its_video_and_can_decide_nothing_about_it()
+    {
+        await using var stack = await app.NewStackAsync(GeneratedFootageTests.FakeFootage(stillRate: 0.04m, clipPerSecond: 0.10m));
+        using var them = await stack.NewMemberAsync();
+        using var me = await stack.NewMemberAsync();
+        var variant = await HybridStoryboardTests.HybridVariantAsync(them);
+        await StoryboardTests.GeneratedAsync(them, variant);
+        var worker = await stack.StartWorkerAsync(GeneratedFootageTests.FakeFootageWorker);
+        var confirmed = await GeneratedFootageTests.ConfirmedAsync(them, variant, 1);
+        var still = await StillGenerationTests.EndedAsync(
+            them, confirmed.Stills.Single(still => still.Technique == AffiVideo.Domain.Technique.GeneratedFootage), worker);
+        (await them.PostAsync($"/api/v1/stills/{still.Id}/approve", new { })).EnsureSuccessStatusCode();
+        var clip = await GeneratedFootageTests.ClipEndedAsync(them, confirmed.Clips[0], worker);
+        Assert.True(clip.State == AffiVideo.Domain.ClipState.ReadyForReview, $"The Clip ended {clip.State}: {clip.Failure?.Message}");
+
+        HttpResponseMessage[] refused =
+        [
+            await me.GetAsync($"/api/v1/clips/{clip.Id}"),
+            await me.GetAsync($"/api/v1/clips/{clip.Id}/content"),
+            await me.PostAsync($"/api/v1/clips/{clip.Id}/approve", new { }),
+            await me.GetAsync($"{ProjectTests.Projects}/{variant.ProjectId}/clips"),
+        ];
+
+        Assert.All(refused, response => Assert.Equal(HttpStatusCode.NotFound, response.StatusCode));
+        // It is theirs as it was: ready for review, with its video, and the only one.
+        Assert.Equal(AffiVideo.Domain.ClipState.ReadyForReview, (await them.GetAsync<ClipResponse>($"/api/v1/clips/{clip.Id}")).State);
+        Assert.Equal(HttpStatusCode.OK, (await them.GetAsync($"/api/v1/clips/{clip.Id}/content")).StatusCode);
+        Assert.Equal(1, (await GeneratedFootageTests.ClipsAsync(them, variant)).Total);
+    }
 }

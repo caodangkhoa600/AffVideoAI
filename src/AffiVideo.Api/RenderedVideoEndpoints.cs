@@ -140,7 +140,7 @@ internal static class RenderedVideoEndpoints
 
     // A browser may keep the file, but asks before using it again, so every
     // reading is authorised. A Rendered Video's content never changes.
-    private static void AuthoriseEveryReading(HttpContext context)
+    internal static void AuthoriseEveryReading(HttpContext context)
     {
         context.Response.Headers.CacheControl = "private, no-cache";
         context.Response.Headers.XContentTypeOptions = "nosniff";

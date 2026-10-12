@@ -72,10 +72,17 @@ internal sealed class RenderQueue(
         var storyboard = await database.Storyboards.AsNoTracking().SingleAsync(s => s.Id == job.StoryboardId, cancellationToken);
         var shown = storyboard.Scenes.SelectMany(scene => scene.AssetIds).Distinct().ToList();
         var assets = await database.ProductAssets.AsNoTracking().Where(a => shown.Contains(a.Id)).ToListAsync(cancellationToken);
-        var referred = storyboard.Scenes.Where(scene => scene.StillId is not null).Select(scene => scene.StillId!.Value).Distinct().ToList();
+        // Only a backdrop is drawn from its Still. Generated footage refers to the Still its Clip was made from, and draws the Clip.
+        var referred = storyboard.Scenes
+            .Where(scene => scene is { Technique: Technique.GeneratedBackdrop, StillId: not null })
+            .Select(scene => scene.StillId!.Value).Distinct().ToList();
         var stills = await database.Stills.AsNoTracking()
             // A version keeps the Still it was made with, though another has been asked for in its place since.
             .Where(s => referred.Contains(s.Id) && s.ApprovedAt != null)
+            .ToListAsync(cancellationToken);
+        var shownClips = storyboard.Scenes.Where(scene => scene.ClipId is not null).Select(scene => scene.ClipId!.Value).Distinct().ToList();
+        var clips = await database.Clips.AsNoTracking()
+            .Where(c => shownClips.Contains(c.Id) && c.State == ClipState.Approved)
             .ToListAsync(cancellationToken);
         var audio = await database.VariantAudio.AsNoTracking().Where(a => a.VariantId == storyboard.VariantId).ToListAsync(cancellationToken);
         var productId = await (
@@ -83,7 +90,7 @@ internal sealed class RenderQueue(
             join project in database.Projects on variant.ProjectId equals project.Id
             where variant.Id == storyboard.VariantId
             select project.ProductId).SingleAsync(cancellationToken);
-        return new RenderWork(job, leaseId, storyboard, assets, stills, [.. audio.OrderBy(a => a.Kind)], productId);
+        return new RenderWork(job, leaseId, storyboard, assets, stills, clips, [.. audio.OrderBy(a => a.Kind)], productId);
     }
 
     public async Task<bool> RenewAsync(RenderWork work, CancellationToken cancellationToken)

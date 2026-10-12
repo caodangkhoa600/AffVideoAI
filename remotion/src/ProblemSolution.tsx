@@ -7,7 +7,7 @@
 
 import type { ReactNode } from 'react';
 import { AbsoluteFill, Easing, Img, staticFile } from 'remotion';
-import { BACK, IN, INOUT, Product, Type, between, carried, fit, leftBehind, mix, move, narrowed, useDuration, useSeconds, type Pose } from './motion';
+import { BACK, GeneratedFootage, IN, INOUT, Product, Type, between, carried, fit, leftBehind, mix, move, narrowed, useDuration, useSeconds, type Pose } from './motion';
 import { HEIGHT, WIDTH, type Layer, type Layout, type Layouts, type SceneInput } from './scene';
 import { FAMILY } from './typeface';
 
@@ -84,6 +84,7 @@ const useArrival = (scene: SceneInput, from: 'below' | 'above' = 'below'): Pose 
 // 1. Hook: the problem in capitals that fill the dark frame, and nothing else.
 //    The words arrive 0.12 seconds apart, so the thirteen a Hook may have are
 //    all in place before two seconds. A bar is drawn under them as they come.
+//    Generated, the problem is footage under the same capitals, in place of the dark.
 const Hook = ({ scene }: { scene: SceneInput }) => {
   const t = useSeconds();
   const duration = useDuration();
@@ -92,8 +93,8 @@ const Hook = ({ scene }: { scene: SceneInput }) => {
   const top = 190;
   // The problem leaves before the Scene ends: the next one opens on an empty dark frame and pushes it away.
   const leaving = 1 - move(t, duration - 0.2, 0.2, IN);
-  return (
-    <Stage scene={scene}>
+  const type = (
+    <>
       <Type lines={lines} weight="ExtraBold" size={size} colour="white" at={0.08} leading={leading} out={duration} style={{ left: LEFT, top }} />
       <div
         style={{
@@ -106,7 +107,15 @@ const Hook = ({ scene }: { scene: SceneInput }) => {
           opacity: leaving,
         }}
       />
-    </Stage>
+    </>
+  );
+  return scene.clip ? (
+    <AbsoluteFill>
+      <GeneratedFootage scene={scene} veil="rgba(8, 8, 10, 0.5)" />
+      {type}
+    </AbsoluteFill>
+  ) : (
+    <Stage scene={scene}>{type}</Stage>
   );
 };
 
@@ -189,7 +198,8 @@ const Tick = ({ at, top, colour }: { at: number; top: number; colour: string }) 
 // 3. Facts: the Product in a band of its own pale colour, and under it the
 //    Facts, each ticked in turn and left standing. The Product nudges at every
 //    tick. The timing is FactPacing in the domain, which decides how many Facts
-//    a Storyboard shows.
+//    a Storyboard shows. Over generated footage the list is set the same way, in
+//    white, and there is no band and no Product.
 const Facts = ({ scene }: { scene: SceneInput }) => {
   const t = useSeconds();
   const duration = useDuration();
@@ -204,20 +214,30 @@ const Facts = ({ scene }: { scene: SceneInput }) => {
   for (let i = 0; i < facts.length; i++) {
     pose.height += 30 * (move(t, 0.6 + i * each, 0.14) - move(t, 0.74 + i * each, 0.3, INOUT));
   }
+  const list = (colour: string) =>
+    facts.map((fact, i) => {
+      const start = 0.6 + i * each;
+      const { lines } = fit(fact, 'Bold', { ...box, maxSize: size, minSize: size });
+      return (
+        <div key={i}>
+          <Tick at={start} top={LIST + i * row + Math.max(0, (size * 1.16 - 76) / 2)} colour={scene.colours.accent} />
+          <Type lines={lines} weight="Bold" size={size} colour={colour} at={start + 0.1} step={0.06} style={{ left: LEFT + 112, top: LIST + i * row }} />
+        </div>
+      );
+    });
+  if (scene.clip) {
+    return (
+      <AbsoluteFill>
+        <GeneratedFootage scene={scene} veil="linear-gradient(180deg, rgba(8, 8, 10, 0.15) 30%, rgba(8, 8, 10, 0.7) 52%)" />
+        {list('white')}
+      </AbsoluteFill>
+    );
+  }
   return (
     <Stage scene={scene}>
       <div style={{ position: 'absolute', left: 0, width: WIDTH, top: mix(-BAND, 0, move(t, 0, 0.5)), height: BAND, background: scene.colours.tint }} />
       <Product layer={scene.product} pose={pose} />
-      {facts.map((fact, i) => {
-        const start = 0.6 + i * each;
-        const { lines } = fit(fact, 'Bold', { ...box, maxSize: size, minSize: size });
-        return (
-          <div key={i}>
-            <Tick at={start} top={LIST + i * row + Math.max(0, (size * 1.16 - 76) / 2)} colour={scene.colours.accent} />
-            <Type lines={lines} weight="Bold" size={size} colour={scene.colours.ink} at={start + 0.1} step={0.06} style={{ left: LEFT + 112, top: LIST + i * row }} />
-          </div>
-        );
-      })}
+      {list(scene.colours.ink)}
     </Stage>
   );
 };

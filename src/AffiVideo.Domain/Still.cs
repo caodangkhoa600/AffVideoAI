@@ -19,8 +19,9 @@ public sealed class Still : IOwnedByOrganization
     /// <summary>A Still is queued as soon as it is asked for, and may be taken at once.</summary>
     /// <param name="amount">What making it is estimated to cost, from the rates in force as it is asked for.</param>
     /// <param name="ordinal">Which of the Stills asked for with this idempotency key it is, counted from one.</param>
+    /// <param name="factIds">The Facts the Scene it was asked for cites.</param>
     public Still(
-        Guid id, Guid organizationId, Guid projectId, Guid productId, Technique technique, string description,
+        Guid id, Guid organizationId, Guid projectId, Guid productId, Technique technique, string description, IEnumerable<Guid> factIds,
         ImageProvider provider, EstimatedAmount amount, string ratesVersion, string idempotencyKey, int ordinal,
         Guid requestedByMemberId, DateTimeOffset createdAt)
     {
@@ -30,6 +31,7 @@ public sealed class Still : IOwnedByOrganization
         ProductId = productId;
         Technique = technique;
         Description = description;
+        FactIds = [.. factIds.Distinct().Order()];
         Provider = provider;
         EstimatedAmount = amount.Amount;
         Currency = amount.Currency;
@@ -58,6 +60,12 @@ public sealed class Still : IOwnedByOrganization
 
     /// <summary>What it is to show, as the provider is told.</summary>
     public string Description { get; private set; } = "";
+
+    /// <summary>
+    /// The Facts the picture rests on: those its Scene cited as it was asked for, in a fixed order. A Scene
+    /// that cites other Facts has another picture, so that withdrawing a Fact flags every use of what was made from it.
+    /// </summary>
+    public Guid[] FactIds { get; private set; } = [];
 
     /// <summary>What makes it, fixed as it is asked for.</summary>
     public ImageProvider Provider { get; private set; }
@@ -138,6 +146,13 @@ public sealed class Still : IOwnedByOrganization
 
     /// <summary>Whether its amount counts toward what the Project has spent: everything but a failure the provider did not charge for.</summary>
     public bool CountsAsSpent => State != StillState.Failed || Billed;
+
+    /// <summary>
+    /// Whether this is the picture the Scene asks for: of the same Technique, showing what the Scene
+    /// describes, and resting on the Facts the Scene cites.
+    /// </summary>
+    public bool Shows(Scene scene) =>
+        Technique == scene.Technique && Description == scene.Description && FactIds.SequenceEqual(scene.CitedFactIds);
 
     /// <summary>The image is made and stored: it is the member's to approve.</summary>
     /// <returns>False, with nothing changed, unless a worker was making it.</returns>

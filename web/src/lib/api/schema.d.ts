@@ -100,7 +100,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Records that the member accepts a Still that is ready for review, in the member's name. Answers 409 with the reason for a Still in any other state. */
+        /** Records that the member accepts a Still that is ready for review, in the member's name. A Clip that was confirmed with it is then queued, to be made from it. Answers 409 with the reason for a Still in any other state. */
         post: operations["ApproveStill"];
         delete?: never;
         options?: never;
@@ -117,7 +117,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Rejects a Still that has been made and queues another of the same picture in its place. This is a new paid generation, made only for the amount the member confirms, and it counts against the Project's ceiling. The rejected Still is kept, with what it cost. Answers 409 with the reason for a Still that has not been made, when the confirmed amount is not what another is estimated at now, or when it would take the Project past its ceiling. A request repeated with the same Idempotency-Key is answered 200 with the Still the first one queued. */
+        /** Rejects a Still that has been made and queues another of the same picture in its place. This is a new paid generation, made only for the amount the member confirms, and it counts against the Project's ceiling. The rejected Still is kept, with what it cost. Answers 409 with the reason for a Still that has not been made, when the confirmed amount is not what another is estimated at now, when a Clip has been made from it, or when it would take the Project past its ceiling. A request repeated with the same Idempotency-Key is answered 200 with the Still the first one queued. */
         post: operations["AskForAnotherStill"];
         delete?: never;
         options?: never;
@@ -134,6 +134,74 @@ export interface paths {
         };
         /** The picture of a Still that has been made, as a PNG. Answers 404 until it is made. */
         get: operations["GetStillContent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/clips": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The Clips made for the Project, newest first, failed ones and those that wait for their Still included. */
+        get: operations["ListClips"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clips/{clipId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One Clip and the state it is in. */
+        get: operations["GetClip"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clips/{clipId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Records that the member accepts a Clip that is ready for review, having watched it, in the member's name. It makes the next Storyboard version of each Variant of the Project whose Scene describes that footage, and that version refers to the Clip. Answers 409 with the reason for a Clip in any other state. */
+        post: operations["ApproveClip"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clips/{clipId}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The video of a Clip that has been made, as an MP4 with no sound, to watch before rendering. Answers 404 until it is made. */
+        get: operations["GetClipContent"];
         put?: never;
         post?: never;
         delete?: never;
@@ -721,10 +789,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** What generation for this Storyboard version would make, what that is estimated to cost, and what the Project has spent against its ceiling. It spends nothing. With no image provider configured, it says generation is unavailable. */
+        /** What generation for this Storyboard version would make, Stills and Clips, what that is estimated to cost, and what the Project has spent against its ceiling. It spends nothing. With no image provider configured, it says generation is unavailable. */
         get: operations["EstimateGeneration"];
         put?: never;
-        /** Confirms the estimate the member saw and queues its Stills for the worker. Nothing paid is generated without it. Answers 409 with the reason when the confirmed total is not the estimate's, when there is nothing to generate, when generation is unavailable, or when it would take the Project past its ceiling. A request repeated with the same Idempotency-Key is answered 200 with the Stills the first one queued. */
+        /** Confirms the estimate the member saw and queues its Stills for the worker. The one confirmation covers the Clips of the estimate too: each is made from its Still once a member has approved that. Nothing paid is generated without it. Answers 409 with the reason when the confirmed total is not the estimate's, when there is nothing to generate, when generation is unavailable, or when it would take the Project past its ceiling. A request repeated with the same Idempotency-Key is answered 200 with what the first one queued. */
         post: operations["ConfirmGeneration"];
         delete?: never;
         options?: never;
@@ -1231,6 +1299,57 @@ export interface components {
         ClearFlagRequest: {
             factIds: string[];
         };
+        ClipCostResponse: {
+            /** Format: double */
+            estimatedAmount: number;
+            currency: string;
+            provider: components["schemas"]["VideoProvider"];
+            model: null | string;
+            ratesVersion: string;
+            /** Format: date-time */
+            recordedAt: string;
+        };
+        /** @enum {unknown} */
+        ClipFailureKind: "Refused" | "Technical" | "WorkerLost";
+        ClipFailureResponse: {
+            kind: components["schemas"]["ClipFailureKind"];
+            message: string;
+            billed: boolean;
+        };
+        ClipResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            projectId: null | string;
+            /** Format: uuid */
+            stillId: null | string;
+            description: string;
+            /** Format: int32 */
+            durationMs: number;
+            state: components["schemas"]["ClipState"];
+            provider: components["schemas"]["VideoProvider"];
+            model: null | string;
+            fake: boolean;
+            /** Format: double */
+            estimatedAmount: number;
+            currency: string;
+            /** Format: int32 */
+            attempt: number;
+            /** Format: date-time */
+            retryAt: null | string;
+            failure: null | components["schemas"]["ClipFailureResponse"];
+            cost: null | components["schemas"]["ClipCostResponse"];
+            /** Format: uuid */
+            approvedByMemberId: null | string;
+            /** Format: date-time */
+            approvedAt: null | string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        /** @enum {unknown} */
+        ClipState: "WaitingForStill" | "Queued" | "Generating" | "ReadyForReview" | "Approved" | "Failed";
         CommissionRecordRequest: {
             /** Format: date */
             periodStart: string;
@@ -1318,6 +1437,7 @@ export interface components {
         };
         ConfirmedGenerationResponse: {
             stills: components["schemas"]["StillResponse"][];
+            clips: components["schemas"]["ClipResponse"][];
         };
         ConfirmGenerationRequest: {
             /** Format: double */
@@ -1354,6 +1474,15 @@ export interface components {
             /** Format: double */
             amount: number;
             currency: string;
+        };
+        EstimatedClipResponse: {
+            /** Format: int32 */
+            scenePosition: number;
+            description: string;
+            /** Format: int32 */
+            durationMs: number;
+            /** Format: double */
+            estimatedAmount: number;
         };
         EstimatedStillResponse: {
             /** Format: int32 */
@@ -1393,6 +1522,7 @@ export interface components {
             available: boolean;
             unavailable: null | string;
             stills: components["schemas"]["EstimatedStillResponse"][];
+            clips: components["schemas"]["EstimatedClipResponse"][];
             /** Format: double */
             total: number;
             currency: string;
@@ -1401,7 +1531,9 @@ export interface components {
             /** Format: double */
             ceiling: number;
             imageProvider: components["schemas"]["ImageProvider"];
+            videoProvider: components["schemas"]["VideoProvider"];
             sceneStills: components["schemas"]["SceneStillResponse"][];
+            sceneClips: components["schemas"]["SceneClipResponse"][];
             /** Format: double */
             anotherStillAmount: null | number;
         };
@@ -1538,6 +1670,15 @@ export interface components {
         };
         PagedResponseOfCampaignVariantResponse: {
             items: components["schemas"]["CampaignVariantResponse"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+            /** Format: int32 */
+            total: number;
+        };
+        PagedResponseOfClipResponse: {
+            items: components["schemas"]["ClipResponse"][];
             /** Format: int32 */
             page: number;
             /** Format: int32 */
@@ -1986,6 +2127,11 @@ export interface components {
             /** Format: date-time */
             withdrawnAt: string;
         };
+        SceneClipResponse: {
+            /** Format: int32 */
+            scenePosition: number;
+            clip: components["schemas"]["ClipResponse"];
+        };
         SceneEditRequest: {
             /** Format: int32 */
             position: number;
@@ -2019,6 +2165,8 @@ export interface components {
             description: null | string;
             /** Format: uuid */
             stillId: null | string;
+            /** Format: uuid */
+            clipId: null | string;
         };
         SceneStillResponse: {
             /** Format: int32 */
@@ -2173,6 +2321,8 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
         };
+        /** @enum {unknown} */
+        VideoProvider: "None" | "Fake";
     };
     responses: never;
     parameters: never;
@@ -2456,6 +2606,132 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ListClips: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagedResponseOfClipResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GetClip: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                clipId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClipResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ApproveClip: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                clipId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClipResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetClipContent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                clipId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Not Found */
             404: {
                 headers: {
