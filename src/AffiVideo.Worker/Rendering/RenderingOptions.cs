@@ -26,6 +26,16 @@ public sealed class RenderingOptions
     /// <summary>How many Scenes of one job Remotion draws at the same time.</summary>
     public int ScenesAtOnce { get; set; } = 2;
 
+    /// <summary>
+    /// How many pages one Remotion render opens to draw frames on. Left to itself Remotion opens half
+    /// as many as the machine has cores, for every render: with several renders at once that is several
+    /// times too many, and a page that gets no answer from its render's server fails the render. So the
+    /// renders this worker runs at once share that half between them, and each has at least one.
+    /// </summary>
+    /// <param name="cores">How many cores the machine has.</param>
+    public int PagesForEachRender(int cores) =>
+        Math.Max(1, cores / 2 / (Math.Max(1, JobsAtOnce) * Math.Max(1, ScenesAtOnce)));
+
     /// <summary>The longest one run of Remotion or FFmpeg may take before it is stopped.</summary>
     public TimeSpan ProcessTimeout { get; set; } = TimeSpan.FromMinutes(10);
 }

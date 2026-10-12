@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -75,6 +76,8 @@ internal sealed class Remotion(IOptions<RenderingOptions> options)
                 "--props", props,
                 "--codec", "h264", "--crf", "16", "--color-space", "bt709",
                 "--image-format", "png", "--muted", "--log", "error",
+                // How many pages draw the frames changes how fast a clip is drawn and nothing of what is in it.
+                "--concurrency", _options.PagesForEachRender(Environment.ProcessorCount).ToString(CultureInfo.InvariantCulture),
             ],
             _options.RemotionDirectory, jobDirectory, _options.ProcessTimeout, cancellationToken);
     }
