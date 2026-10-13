@@ -176,6 +176,34 @@ internal static class GenerationEndpoints
             .WithTags("Generation")
             .WithName("GetClipContent")
             .WithSummary("The video of a Clip that has been made, as an MP4 with no sound, to watch before rendering. Answers 404 until it is made.");
+
+        routes.MapGet("/projects/{projectId:guid}/speech", async Task<Results<Ok<PagedResponse<SpeechResponse>>, NotFound>> (
+                Guid projectId, int? page, int? pageSize, IGeneration generation, CancellationToken cancellationToken) =>
+                await generation.ListSpeechAsync(projectId, new PageRequest(page, pageSize), cancellationToken) is { } found
+                    ? TypedResults.Ok(found.ToResponse(ToResponse))
+                    : TypedResults.NotFound())
+            .WithTags("Generation")
+            .WithName("ListSpeech")
+            .WithSummary("The speech made for the Project, newest first, failed pieces included.");
+
+        routes.MapGet("/speech/{speechId:guid}", async Task<Results<Ok<SpeechResponse>, NotFound>> (
+                Guid speechId, IGeneration generation, CancellationToken cancellationToken) =>
+                await generation.FindSpeechAsync(speechId, cancellationToken) is { } speech
+                    ? TypedResults.Ok(ToResponse(speech))
+                    : TypedResults.NotFound())
+            .WithTags("Generation")
+            .WithName("GetSpeech")
+            .WithSummary("One piece of speech and the state it is in.");
+
+        routes.MapGet("/speech/{speechId:guid}/content", async Task<Results<FileStreamHttpResult, NotFound>> (
+                Guid speechId, IGeneration generation, CancellationToken cancellationToken) =>
+                await generation.OpenSpeechAsync(speechId, cancellationToken) is { } sound
+                    ? TypedResults.Stream(sound, Speech.ContentType)
+                    : TypedResults.NotFound())
+            .Produces(StatusCodes.Status200OK, contentType: Speech.ContentType)
+            .WithTags("Generation")
+            .WithName("GetSpeechContent")
+            .WithSummary("The sound of speech that has been made, as a WAV, to listen to before rendering. Answers 404 until it is made.");
     }
 
     // Null when the request has a key that can be kept.
@@ -195,18 +223,52 @@ internal static class GenerationEndpoints
         estimate.Unavailable,
         estimate.Stills.Select(still => new EstimatedStillResponse(still.ScenePosition, still.Technique, still.Description, still.EstimatedAmount)).ToList(),
         estimate.Clips.Select(clip => new EstimatedClipResponse(clip.ScenePosition, clip.Description, clip.DurationMs, clip.EstimatedAmount)).ToList(),
+        estimate.Speech.Select(speech => new EstimatedSpeechResponse(
+            speech.ScenePosition, speech.NarrationText, speech.EstimatedAmount, speech.EstimatedDurationMs, speech.Warning)).ToList(),
         estimate.Total,
         estimate.Currency,
         estimate.Spent,
         estimate.Ceiling,
         estimate.ImageProvider,
         estimate.VideoProvider,
+        estimate.SpeechProvider,
+        estimate.Voice,
         estimate.SceneStills.Select(has => new SceneStillResponse(has.ScenePosition, ToResponse(has.Still))).ToList(),
         estimate.SceneClips.Select(has => new SceneClipResponse(has.ScenePosition, ToResponse(has.Clip))).ToList(),
+        estimate.SceneSpeech.Select(has => new SceneSpeechResponse(has.ScenePosition, ToResponse(has.Speech))).ToList(),
         estimate.AnotherStillAmount);
 
-    private static ConfirmedGenerationResponse ToResponse(GenerationConfirmation confirmation) =>
-        new(confirmation.Stills.Select(ToResponse).ToList(), confirmation.Clips.Select(ToResponse).ToList());
+    private static ConfirmedGenerationResponse ToResponse(GenerationConfirmation confirmation) => new(
+        confirmation.Stills.Select(ToResponse).ToList(), confirmation.Clips.Select(ToResponse).ToList(),
+        confirmation.Speech.Select(ToResponse).ToList());
+
+    private static SpeechResponse ToResponse(SpeechRecord record)
+    {
+        var (speech, cost) = record;
+        return new(
+            speech.Id,
+            speech.ProjectId,
+            speech.Text,
+            speech.Language,
+            speech.Voice,
+            speech.State,
+            speech.Provider,
+            speech.Model,
+            speech.Fake,
+            speech.DurationMs,
+            speech.EstimatedAmount,
+            speech.Currency,
+            speech.Attempt,
+            speech.RetryAt,
+            speech is { State: SpeechState.Failed, FailureKind: { } kind, FailureMessage: { } message }
+                ? new SpeechFailureResponse(kind, message, speech.Billed)
+                : null,
+            cost is null
+                ? null
+                : new SpeechCostResponse(cost.EstimatedAmount, cost.Currency, speech.Provider, cost.Model, cost.RatesVersion, cost.RecordedAt),
+            speech.CreatedAt,
+            speech.UpdatedAt);
+    }
 
     private static ClipResponse ToResponse(ClipRecord record)
     {

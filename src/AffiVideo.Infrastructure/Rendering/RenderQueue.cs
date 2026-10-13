@@ -85,12 +85,25 @@ internal sealed class RenderQueue(
             .Where(c => shownClips.Contains(c.Id) && c.State == ClipState.Approved)
             .ToListAsync(cancellationToken);
         var audio = await database.VariantAudio.AsNoTracking().Where(a => a.VariantId == storyboard.VariantId).ToListAsync(cancellationToken);
-        var productId = await (
+        var of = await (
             from variant in database.Variants
             join project in database.Projects on variant.ProjectId equals project.Id
             where variant.Id == storyboard.VariantId
-            select project.ProductId).SingleAsync(cancellationToken);
-        return new RenderWork(job, leaseId, storyboard, assets, stills, clips, [.. audio.OrderBy(a => a.Kind)], productId);
+            select new { ProjectId = project.Id, project.ProductId, project.Language, project.Voice }).SingleAsync(cancellationToken);
+        // A narration the member uploaded is used in place of generated speech. Otherwise each Scene has the
+        // Project's newest speech of its narration text, made or still on its way: the render asks no provider (ADR 0003).
+        var current = audio.Any(a => a.Kind == VariantAudioKind.Narration)
+            ? []
+            : await database.Speech.AsNoTracking()
+                .Where(s => s.ProjectId == of.ProjectId && s.State != SpeechState.Failed)
+                .OrderByDescending(s => s.CreatedAt).ThenByDescending(s => s.Id)
+                .ToListAsync(cancellationToken);
+        var spoken = storyboard.Scenes
+            .Select(scene => (Scene: scene, Speech: current.FirstOrDefault(said => said.Says(scene, of.Language, of.Voice))))
+            .Where(found => found.Speech is not null)
+            .Select(found => new SpokenScene(found.Scene.Position, found.Speech!))
+            .ToList();
+        return new RenderWork(job, leaseId, storyboard, assets, stills, clips, [.. audio.OrderBy(a => a.Kind)], spoken, of.ProductId);
     }
 
     public async Task<bool> RenewAsync(RenderWork work, CancellationToken cancellationToken)

@@ -65,6 +65,9 @@ function ProjectDetails({ project }: { project: Project }) {
         <Detail label="Audience">{project.audience}</Detail>
         <Detail label="Language">{project.language === "vi" ? "Vietnamese" : project.language}</Detail>
         <Detail label="Target duration">{project.targetDurationSeconds} seconds</Detail>
+        <Detail label="Voice">
+          <span data-testid="project-voice">{project.voice}</span>
+        </Detail>
         <Detail label="Objective">
           <span className="whitespace-pre-wrap">{project.objective}</span>
         </Detail>

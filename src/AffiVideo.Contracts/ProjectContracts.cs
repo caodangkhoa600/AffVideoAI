@@ -10,13 +10,16 @@ namespace AffiVideo.Contracts;
 /// <param name="Language">The language of the videos: <c>vi</c>.</param>
 /// <param name="TargetDurationSeconds">How long each video is to be, from 15 to 30 seconds.</param>
 /// <param name="Objective">What the videos are meant to get the viewer to do.</param>
+/// <param name="Voice">The voice narration text is spoken in: one of the voices on offer, by its id. Left out, it is the Organization's.</param>
 public sealed record ProjectRequest(
     Guid ProductId,
     [Required, StringLength(Project.AudienceMaxLength)] string Audience,
     [Required, VideoLanguage] string Language,
     [Range(Project.MinTargetDurationSeconds, Project.MaxTargetDurationSeconds)] int TargetDurationSeconds,
-    [Required, StringLength(Project.ObjectiveMaxLength)] string Objective);
+    [Required, StringLength(Project.ObjectiveMaxLength)] string Objective,
+    [StringLength(Project.VoiceMaxLength)] string? Voice = null);
 
+/// <param name="Voice">The voice narration text is spoken in, by its id in the list of voices on offer.</param>
 /// <param name="ProductName">As the Product is named now.</param>
 /// <param name="VariantCount">How many Variants the Project has.</param>
 public sealed record ProjectResponse(
@@ -27,6 +30,7 @@ public sealed record ProjectResponse(
     string Language,
     int TargetDurationSeconds,
     string Objective,
+    string Voice,
     int VariantCount,
     DateTimeOffset CreatedAt);
 

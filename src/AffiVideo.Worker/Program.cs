@@ -22,6 +22,7 @@ builder.Services.AddScoped<SceneClips>();
 builder.Services.AddScoped<RenderJobRunner>();
 builder.Services.AddHostedService<RenderWorker>();
 builder.Services.AddHostedService<StillWorker>();
+builder.Services.AddHostedService<SpeechWorker>();
 // Whatever is configured to make Clips. A real provider is registered in the fake's place, never beside it.
 builder.Services.AddSingleton<IVideoGenerator>(provider =>
     provider.GetRequiredService<IOptions<GenerationOptions>>().Value switch

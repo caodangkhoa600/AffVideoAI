@@ -1,10 +1,12 @@
 using AffiVideo.Application;
 using AffiVideo.Application.Projects;
+using AffiVideo.Application.Providers;
 using AffiVideo.Application.Storage;
 using AffiVideo.Domain;
 using AffiVideo.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Npgsql;
 
 namespace AffiVideo.Infrastructure.Projects;
@@ -16,6 +18,7 @@ internal sealed class ScopedProjects(
     IObjectStorage storage,
     Caller caller,
     TimeProvider clock,
+    IOptions<GenerationOptions> generation,
     ILogger<ScopedProjects> logger) : IProjects
 {
     public async Task<ProjectRecord?> CreateAsync(Guid productId, ProjectBrief brief, CancellationToken cancellationToken)
@@ -25,7 +28,11 @@ internal sealed class ScopedProjects(
         var product = await database.Products.AsNoTracking().SingleOrDefaultAsync(p => p.Id == productId, cancellationToken);
         if (product is null) return null;
 
-        var project = new Project(Guid.CreateVersion7(), organizationId, productId, brief, clock.GetUtcNow());
+        // The voice the brief names, or the Organization's: the one its Owner chose if that is still on offer, and otherwise the first.
+        var offered = generation.Value.VoicesOnOffer;
+        var chosen = await database.Organizations.Where(o => o.Id == organizationId).Select(o => o.DefaultVoice).SingleAsync(cancellationToken);
+        var voice = brief.Voice ?? (offered.Any(voice => voice.Id == chosen) ? chosen! : offered[0].Id);
+        var project = new Project(Guid.CreateVersion7(), organizationId, productId, brief, voice, clock.GetUtcNow());
         database.Projects.Add(project);
         await database.SaveChangesAsync(cancellationToken);
         return new ProjectRecord(project, product.Name, VariantCount: 0);

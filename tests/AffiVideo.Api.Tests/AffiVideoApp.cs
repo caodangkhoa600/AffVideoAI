@@ -55,7 +55,13 @@ public sealed class AffiVideoApp : IAsyncLifetime
     public AffiVideoApp()
     {
         _network = new NetworkBuilder().Build();
-        _postgres = new PostgreSqlBuilder(PostgresImage).WithNetwork(_network).WithNetworkAliases(PostgresHost).Build();
+        _postgres = new PostgreSqlBuilder(PostgresImage)
+            .WithNetwork(_network)
+            .WithNetworkAliases(PostgresHost)
+            // Every stack a test makes is an API and workers with connections of their own, to a database of its own, and
+            // the tests run side by side: together they hold more than the hundred connections PostgreSQL allows unless told otherwise.
+            .WithCommand("-c", "max_connections=400")
+            .Build();
         _minio = new MinioBuilder(MinioImage).WithNetwork(_network).WithNetworkAliases(MinioHost).Build();
         _workerImage = new Lazy<Task>(BuildWorkerImageAsync);
         _worker = new Lazy<Task<IContainer>>(() => RunWorkerAsync(_postgres.GetConnectionString(), []));

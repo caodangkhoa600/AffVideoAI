@@ -73,6 +73,33 @@ internal sealed class Ffmpeg(IOptions<RenderingOptions> options)
     }
 
     /// <summary>
+    /// Lays each Scene's speech where its Scene starts and writes the whole as one WAV as long as the video,
+    /// silent wherever nothing is said. It is then a narration track like an uploaded one, and is mixed as one.
+    /// </summary>
+    /// <param name="pieces">Each a WAV file this system wrote.</param>
+    public async Task NarrateAsync(
+        string jobDirectory, IReadOnlyList<SpokenPiece> pieces, int durationMs, string output, CancellationToken cancellationToken)
+    {
+        var seconds = Seconds(durationMs);
+        List<string> arguments = ["-hide_banner", "-loglevel", "error", "-y"];
+        var chains = new List<string>();
+        for (var index = 0; index < pieces.Count; index++)
+        {
+            arguments.AddRange(["-f", "wav", "-i", pieces[index].File]);
+            // Sped up without its pitch changing, when that is what it takes to end with its Scene.
+            var tempo = pieces[index].Tempo > 1 ? $",atempo={Number(pieces[index].Tempo)}" : "";
+            chains.Add($"[{index}:a]{Conformed}{tempo},adelay={pieces[index].StartMs}:all=1[piece{index}]");
+        }
+        var all = string.Concat(Enumerable.Range(0, pieces.Count).Select(index => $"[piece{index}]"));
+        // The pieces are added as they are: nothing is turned down for being one of several.
+        var mixed = pieces.Count == 1 ? all : $"{all}amix=inputs={pieces.Count}:normalize=0,";
+        chains.Add($"{mixed}apad=whole_dur={seconds}[narration]");
+        arguments.AddRange(["-filter_complex", string.Join(";", chains), "-map", "[narration]", "-t", seconds, "-c:a", "pcm_s16le", "-f", "wav", output]);
+
+        await Processes.RunAsync("ffmpeg", arguments, jobDirectory, jobDirectory, _options.ProcessTimeout, cancellationToken);
+    }
+
+    /// <summary>
     /// Copies a video a provider made without whatever sound it has, and without encoding the picture again.
     /// Both files are ones the worker named itself.
     /// </summary>
@@ -158,3 +185,9 @@ internal sealed class Ffmpeg(IOptions<RenderingOptions> options)
 /// <param name="DurationMs">How long the whole of it lasts.</param>
 /// <param name="VolumePercent">How loud it is in the mix, from 0 to 100, once it is as loud as any other track.</param>
 internal sealed record AudioTrack(string File, int DurationMs, int VolumePercent);
+
+/// <summary>One Scene's speech, to be laid into the narration.</summary>
+/// <param name="File">A WAV file this system wrote, in the job's folder.</param>
+/// <param name="StartMs">Where its Scene starts in the video.</param>
+/// <param name="Tempo">How much faster than it was made it is played, so that it ends with its Scene: 1 for as it is.</param>
+internal sealed record SpokenPiece(string File, int StartMs, double Tempo);

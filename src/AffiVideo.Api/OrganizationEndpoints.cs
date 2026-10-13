@@ -1,8 +1,10 @@
 using AffiVideo.Application;
 using AffiVideo.Application.Organizations;
+using AffiVideo.Application.Providers;
 using AffiVideo.Contracts;
 using AffiVideo.Domain;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.Extensions.Options;
 
 namespace AffiVideo.Api;
 
@@ -22,11 +24,19 @@ internal static class OrganizationEndpoints
             .WithName("GetOrganization")
             .WithSummary("The Organization's settings.");
 
-        organization.MapPut("", async Task<Results<Ok<OrganizationResponse>, NotFound>> (
-                Guid organizationId, UpdateOrganizationRequest request, IOrganizations organizations, CancellationToken cancellationToken) =>
-                await organizations.RenameAsync(organizationId, request.Name, cancellationToken) is { } renamed
-                    ? TypedResults.Ok(renamed.ToResponse())
-                    : TypedResults.NotFound())
+        organization.MapPut("", async Task<Results<Ok<OrganizationResponse>, ValidationProblem, NotFound>> (
+                Guid organizationId, UpdateOrganizationRequest request, IOrganizations organizations, IOptions<GenerationOptions> generation,
+                CancellationToken cancellationToken) =>
+            {
+                if (VoiceEndpoints.NotOnOffer(request.DefaultVoice, generation.Value) is { } noSuchVoice)
+                {
+                    return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["defaultVoice"] = [noSuchVoice] });
+                }
+
+                return await organizations.UpdateAsync(organizationId, request.Name, request.DefaultVoice, cancellationToken) is { } updated
+                    ? TypedResults.Ok(updated.ToResponse())
+                    : TypedResults.NotFound();
+            })
             .RequireAuthorization(SessionSetup.OwnerPolicy)
             .WithName("UpdateOrganization")
             .WithSummary("Changes the Organization's settings. Owners only.");
@@ -62,7 +72,7 @@ internal static class OrganizationEndpoints
             .WithSummary("The sensitive actions taken in the Organization, newest first. Owners only.");
     }
 
-    public static OrganizationResponse ToResponse(this Organization organization) => new(organization.Id, organization.Name, organization.AffiliateLabEnabled);
+    public static OrganizationResponse ToResponse(this Organization organization) => new(organization.Id, organization.Name, organization.AffiliateLabEnabled, organization.DefaultVoice);
 
     private static MemberResponse ToResponse(MemberSummary member) => new(member.Id, member.Email, member.Role);
 }

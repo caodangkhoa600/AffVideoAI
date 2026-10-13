@@ -10,13 +10,18 @@ public sealed class Project : IOwnedByOrganization
     public const int ObjectiveMaxLength = 500;
     public const int MinTargetDurationSeconds = 15;
     public const int MaxTargetDurationSeconds = 30;
+    public const int VoiceMaxLength = 50;
+
+    /// <summary>The voice there is when none is configured, and the one every Project had before a brief named one.</summary>
+    public const string BuiltInVoice = "sarah";
 
     // For the data-access layer, which fills the properties itself.
     private Project()
     {
     }
 
-    public Project(Guid id, Guid organizationId, Guid productId, ProjectBrief brief, DateTimeOffset createdAt)
+    /// <param name="voice">The voice the brief names, or the Organization's when it names none.</param>
+    public Project(Guid id, Guid organizationId, Guid productId, ProjectBrief brief, string voice, DateTimeOffset createdAt)
     {
         Id = id;
         OrganizationId = organizationId;
@@ -25,6 +30,7 @@ public sealed class Project : IOwnedByOrganization
         Language = brief.Language;
         TargetDurationSeconds = brief.TargetDurationSeconds;
         Objective = brief.Objective.Trim();
+        Voice = voice;
         CreatedAt = createdAt;
     }
 
@@ -46,8 +52,12 @@ public sealed class Project : IOwnedByOrganization
     /// <summary>What the videos are meant to get the viewer to do.</summary>
     public string Objective { get; private set; } = "";
 
+    /// <summary>The voice narration text is spoken in, by its id in the list of voices on offer.</summary>
+    public string Voice { get; private set; } = BuiltInVoice;
+
     public DateTimeOffset CreatedAt { get; private set; }
 }
 
 /// <summary>Everything a member types in about a Project, apart from which Product it is for.</summary>
-public sealed record ProjectBrief(string Audience, string Language, int TargetDurationSeconds, string Objective);
+/// <param name="Voice">The voice narration text is spoken in. Left out, it is the Organization's.</param>
+public sealed record ProjectBrief(string Audience, string Language, int TargetDurationSeconds, string Objective, string? Voice = null);

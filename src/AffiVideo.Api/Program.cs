@@ -69,6 +69,7 @@ var v1 = app.MapGroup("/api/v1");
 v1.MapStatus();
 v1.MapSession();
 v1.MapOrganizations();
+v1.MapVoices();
 v1.MapProducts();
 v1.MapProductAssets();
 v1.MapFacts();

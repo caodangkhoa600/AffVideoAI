@@ -65,10 +65,15 @@ public interface IRenderQueue
 /// <param name="Stills">The Stills the Scenes refer to: each was approved, and may have been replaced by another since.</param>
 /// <param name="Clips">The Clips the Scenes refer to: each was approved.</param>
 /// <param name="Audio">The narration and music the Variant has as the job is claimed, to be mixed into the video.</param>
+/// <param name="Speech">The speech of the Scenes that have some, made from their narration text or still on its way. None when the Variant has an uploaded narration: that is used in its place.</param>
 /// <param name="ProductId">The Product the video is of, which the cost of rendering it is recorded against.</param>
 public sealed record RenderWork(
     RenderJob Job, Guid LeaseId, Storyboard Storyboard, IReadOnlyList<ProductAsset> Assets, IReadOnlyList<Still> Stills,
-    IReadOnlyList<Clip> Clips, IReadOnlyList<VariantAudio> Audio, Guid ProductId);
+    IReadOnlyList<Clip> Clips, IReadOnlyList<VariantAudio> Audio, IReadOnlyList<SpokenScene> Speech, Guid ProductId);
+
+/// <param name="ScenePosition">Of the Scene in the Storyboard version being rendered.</param>
+/// <param name="Speech">The Scene's narration text, spoken, or waiting to be.</param>
+public sealed record SpokenScene(int ScenePosition, Speech Speech);
 
 /// <summary>
 /// The job is no longer this worker's: a member cancelled it, it was deleted with
@@ -133,6 +138,19 @@ public sealed class ProductionCostOptions
     /// stands in for a real provider's, which charges for a Clip by its length.
     /// </summary>
     public decimal FakeClipPerSecond { get; set; } = 0.10m;
+
+    /// <summary>
+    /// What a character spoken by the fake speech provider is taken to cost. Like the fake Still's, the amount
+    /// stands in for a real provider's, which charges for speech by the characters of its text.
+    /// </summary>
+    public decimal FakeSpeechPerCharacter { get; set; } = 0.0001m;
+
+    /// <summary>What a character spoken by this provider is taken to cost.</summary>
+    public decimal SpeechRatePerCharacterOf(SpeechProvider provider) => provider switch
+    {
+        SpeechProvider.Fake => FakeSpeechPerCharacter,
+        _ => throw new ArgumentOutOfRangeException(nameof(provider), provider, "No rate is configured for speech by this provider."),
+    };
 
     /// <summary>What a second of a Clip by this provider is taken to cost.</summary>
     public decimal ClipRatePerSecondOf(VideoProvider provider) => provider switch

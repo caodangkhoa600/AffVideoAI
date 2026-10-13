@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { Field, TextAreaField } from "@/components/field";
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,8 @@ const schema = z.object({
     .regex(/^\d+$/, DURATION)
     .refine((seconds) => Number(seconds) >= MIN_SECONDS && Number(seconds) <= MAX_SECONDS, DURATION),
   objective: text(500, "Say what the videos are meant to get the viewer to do."),
+  // Empty for the Organization's own voice.
+  voice: z.string(),
 });
 
 type Values = z.infer<typeof schema>;
@@ -102,8 +104,19 @@ function ProjectForm({ products, more, asked }: { products: Product[]; more: boo
   const audienceOf = (productId: string) => products.find((product) => product.id === productId)?.targetAudience ?? "";
   const form = useForm<Values>({
     resolver: zodResolver(schema),
-    defaultValues: { productId: asked, audience: audienceOf(asked), targetDurationSeconds: "20", objective: "" },
+    defaultValues: { productId: asked, audience: audienceOf(asked), targetDurationSeconds: "20", objective: "", voice: "" },
   });
+  // The voices narration can be spoken in. The form works without them: the Project then gets the Organization's.
+  const voices = useQuery({
+    queryKey: ["voices"],
+    queryFn: async () => {
+      const { data, response } = await api.GET("/api/v1/voices");
+      if (!data) throw new Error(`The API answered ${response.status}`);
+      return data;
+    },
+  });
+  const chosenVoice = useWatch({ control: form.control, name: "voice" }) || voices.data?.defaultVoice;
+  const heard = voices.data?.voices.find((voice) => voice.id === chosenVoice);
 
   const product = form.register("productId", {
     // The Product's own target audience is where the brief starts, until the member has written another.
@@ -123,6 +136,7 @@ function ProjectForm({ products, more, asked }: { products: Product[]; more: boo
           language: "vi",
           targetDurationSeconds: Number(values.targetDurationSeconds),
           objective: values.objective,
+          voice: values.voice || undefined,
         },
       })
       .catch(() => ({ data: undefined, error: undefined }));
@@ -189,6 +203,46 @@ function ProjectForm({ products, more, asked }: { products: Product[]; more: boo
         error={errors.objective?.message}
         {...form.register("objective")}
       />
+      {voices.data && (
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="voice">Voice</Label>
+          <select
+            id="voice"
+            aria-invalid={errors.voice ? true : undefined}
+            className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm dark:bg-input/30"
+            {...form.register("voice")}
+          >
+            <option value="">
+              The Organization&apos;s voice (
+              {voices.data.voices.find((voice) => voice.id === voices.data.defaultVoice)?.name ?? voices.data.defaultVoice})
+            </option>
+            {voices.data.voices.map((voice) => (
+              <option key={voice.id} value={voice.id}>
+                {voice.name}
+              </option>
+            ))}
+          </select>
+          {errors.voice ? (
+            <p role="alert" className="text-sm text-destructive">
+              {errors.voice.message}
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground">The voice narration text is spoken in, when you have it spoken.</p>
+          )}
+          {heard?.hasSample && (
+            // Keyed by the voice, so the player starts again with the sample of the one now chosen. Playing it costs nothing.
+            <audio
+              key={heard.id}
+              src={`/api/v1/voices/${encodeURIComponent(heard.id)}/sample`}
+              controls
+              preload="none"
+              aria-label={`A sample of the voice ${heard.name}`}
+              className="w-full max-w-md"
+              data-testid="voice-sample"
+            />
+          )}
+        </div>
+      )}
       <p className="text-sm text-muted-foreground">The brief is fixed once the Project is created.</p>
       {errors.root && (
         <p role="alert" className="text-sm text-destructive">

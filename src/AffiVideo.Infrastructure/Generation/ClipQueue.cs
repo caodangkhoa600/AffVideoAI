@@ -177,9 +177,9 @@ internal sealed class ClipQueue(
             await database.Database.ExecuteSqlAsync(
                 $"""
                 INSERT INTO "GenerationCostRecords" (
-                    "Id", "OrganizationId", "ProductId", "StillId", "ClipId", "Provider", "Model", "EstimatedAmount", "Currency", "RatesVersion", "RecordedAt")
+                    "Id", "OrganizationId", "ProductId", "StillId", "ClipId", "SpeechId", "Provider", "Model", "EstimatedAmount", "Currency", "RatesVersion", "RecordedAt")
                 VALUES (
-                    {id}, {clip.OrganizationId}, {clip.ProductId}, NULL, {clip.ClipId}, {clip.Provider}, NULL, {clip.EstimatedAmount},
+                    {id}, {clip.OrganizationId}, {clip.ProductId}, NULL, {clip.ClipId}, NULL, {clip.Provider}, NULL, {clip.EstimatedAmount},
                     {clip.Currency}, {clip.RatesVersion}, {now})
                 """,
                 cancellationToken);

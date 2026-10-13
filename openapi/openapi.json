@@ -506,6 +506,120 @@
         }
       }
     },
+    "/api/v1/projects/{projectId}/speech": {
+      "get": {
+        "tags": [
+          "Generation"
+        ],
+        "summary": "The speech made for the Project, newest first, failed pieces included.",
+        "operationId": "ListSpeech",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResponseOfSpeechResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/speech/{speechId}": {
+      "get": {
+        "tags": [
+          "Generation"
+        ],
+        "summary": "One piece of speech and the state it is in.",
+        "operationId": "GetSpeech",
+        "parameters": [
+          {
+            "name": "speechId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpeechResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/speech/{speechId}/content": {
+      "get": {
+        "tags": [
+          "Generation"
+        ],
+        "summary": "The sound of speech that has been made, as a WAV, to listen to before rendering. Answers 404 until it is made.",
+        "operationId": "GetSpeechContent",
+        "parameters": [
+          {
+            "name": "speechId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "404": {
+            "description": "Not Found"
+          },
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/v1/render-jobs/in-progress": {
       "get": {
         "tags": [
@@ -697,6 +811,16 @@
               }
             }
           },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Not Found"
           }
@@ -854,6 +978,54 @@
           },
           "404": {
             "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/voices": {
+      "get": {
+        "tags": [
+          "Voices"
+        ],
+        "summary": "The voices narration text can be spoken in, and which of them a Project of the caller's Organization is given when its brief names none.",
+        "operationId": "ListVoices",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoicesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/voices/{voiceId}/sample": {
+      "get": {
+        "tags": [
+          "Voices"
+        ],
+        "summary": "A recording of the voice, to play before choosing it. It is a file kept with the application: playing it asks no provider for anything and costs nothing. Answers 404 for a voice that has none.",
+        "operationId": "GetVoiceSample",
+        "parameters": [
+          {
+            "name": "voiceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "404": {
+            "description": "Not Found"
+          },
+          "200": {
+            "description": "OK"
           }
         }
       }
@@ -5203,7 +5375,8 @@
       "ConfirmedGenerationResponse": {
         "required": [
           "stills",
-          "clips"
+          "clips",
+          "speech"
         ],
         "type": "object",
         "properties": {
@@ -5217,6 +5390,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ClipResponse"
+            }
+          },
+          "speech": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SpeechResponse"
             }
           }
         }
@@ -5370,6 +5549,39 @@
           }
         }
       },
+      "EstimatedSpeechResponse": {
+        "required": [
+          "scenePosition",
+          "narrationText",
+          "estimatedAmount",
+          "estimatedDurationMs",
+          "warning"
+        ],
+        "type": "object",
+        "properties": {
+          "scenePosition": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "narrationText": {
+            "type": "string"
+          },
+          "estimatedAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "estimatedDurationMs": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "warning": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "EstimatedStillResponse": {
         "required": [
           "scenePosition",
@@ -5501,14 +5713,18 @@
           "unavailable",
           "stills",
           "clips",
+          "speech",
           "total",
           "currency",
           "spent",
           "ceiling",
           "imageProvider",
           "videoProvider",
+          "speechProvider",
+          "voice",
           "sceneStills",
           "sceneClips",
+          "sceneSpeech",
           "anotherStillAmount"
         ],
         "type": "object",
@@ -5534,6 +5750,12 @@
               "$ref": "#/components/schemas/EstimatedClipResponse"
             }
           },
+          "speech": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EstimatedSpeechResponse"
+            }
+          },
           "total": {
             "type": "number",
             "format": "double"
@@ -5555,6 +5777,12 @@
           "videoProvider": {
             "$ref": "#/components/schemas/VideoProvider"
           },
+          "speechProvider": {
+            "$ref": "#/components/schemas/SpeechProvider"
+          },
+          "voice": {
+            "type": "string"
+          },
           "sceneStills": {
             "type": "array",
             "items": {
@@ -5565,6 +5793,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/SceneClipResponse"
+            }
+          },
+          "sceneSpeech": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SceneSpeechResponse"
             }
           },
           "anotherStillAmount": {
@@ -5964,7 +6198,8 @@
         "required": [
           "id",
           "name",
-          "affiliateLabEnabled"
+          "affiliateLabEnabled",
+          "defaultVoice"
         ],
         "type": "object",
         "properties": {
@@ -5977,6 +6212,12 @@
           },
           "affiliateLabEnabled": {
             "type": "boolean"
+          },
+          "defaultVoice": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -6457,6 +6698,35 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/SocialAccountResponse"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PagedResponseOfSpeechResponse": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SpeechResponse"
             }
           },
           "page": {
@@ -7027,6 +7297,12 @@
           },
           "objective": {
             "type": "string"
+          },
+          "voice": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -7039,6 +7315,7 @@
           "language",
           "targetDurationSeconds",
           "objective",
+          "voice",
           "variantCount",
           "createdAt"
         ],
@@ -7066,6 +7343,9 @@
             "format": "int32"
           },
           "objective": {
+            "type": "string"
+          },
+          "voice": {
             "type": "string"
           },
           "variantCount": {
@@ -7822,6 +8102,22 @@
           }
         }
       },
+      "SceneSpeechResponse": {
+        "required": [
+          "scenePosition",
+          "speech"
+        ],
+        "type": "object",
+        "properties": {
+          "scenePosition": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "speech": {
+            "$ref": "#/components/schemas/SpeechResponse"
+          }
+        }
+      },
       "SceneStillResponse": {
         "required": [
           "scenePosition",
@@ -7915,6 +8211,192 @@
           "Instagram",
           "YouTube",
           "Shopee"
+        ]
+      },
+      "SpeechCostResponse": {
+        "required": [
+          "estimatedAmount",
+          "currency",
+          "provider",
+          "model",
+          "ratesVersion",
+          "recordedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "estimatedAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/SpeechProvider"
+          },
+          "model": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ratesVersion": {
+            "type": "string"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SpeechFailureKind": {
+        "enum": [
+          "Refused",
+          "Technical",
+          "WorkerLost"
+        ]
+      },
+      "SpeechFailureResponse": {
+        "required": [
+          "kind",
+          "message",
+          "billed"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/SpeechFailureKind"
+          },
+          "message": {
+            "type": "string"
+          },
+          "billed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SpeechProvider": {
+        "enum": [
+          "None",
+          "Fake"
+        ]
+      },
+      "SpeechResponse": {
+        "required": [
+          "id",
+          "projectId",
+          "narrationText",
+          "language",
+          "voice",
+          "state",
+          "provider",
+          "model",
+          "fake",
+          "durationMs",
+          "estimatedAmount",
+          "currency",
+          "attempt",
+          "retryAt",
+          "failure",
+          "cost",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "projectId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "narrationText": {
+            "type": "string"
+          },
+          "language": {
+            "type": "string"
+          },
+          "voice": {
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/SpeechState"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/SpeechProvider"
+          },
+          "model": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "fake": {
+            "type": "boolean"
+          },
+          "durationMs": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "estimatedAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "attempt": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "retryAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "failure": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SpeechFailureResponse"
+              }
+            ]
+          },
+          "cost": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SpeechCostResponse"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SpeechState": {
+        "enum": [
+          "Queued",
+          "Generating",
+          "Made",
+          "Failed"
         ]
       },
       "StatusResponse": {
@@ -8233,6 +8715,12 @@
         "properties": {
           "name": {
             "type": "string"
+          },
+          "defaultVoice": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -8367,6 +8855,43 @@
           "None",
           "Fake"
         ]
+      },
+      "VoiceResponse": {
+        "required": [
+          "id",
+          "name",
+          "hasSample"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "hasSample": {
+            "type": "boolean"
+          }
+        }
+      },
+      "VoicesResponse": {
+        "required": [
+          "voices",
+          "defaultVoice"
+        ],
+        "type": "object",
+        "properties": {
+          "voices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VoiceResponse"
+            }
+          },
+          "defaultVoice": {
+            "type": "string"
+          }
+        }
       }
     }
   },
@@ -8385,6 +8910,9 @@
     },
     {
       "name": "Organizations"
+    },
+    {
+      "name": "Voices"
     },
     {
       "name": "Products"

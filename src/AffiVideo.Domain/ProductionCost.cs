@@ -145,6 +145,11 @@ public static class ProductionCosts
     public static decimal ClipEstimate(decimal perSecond, int durationMs) =>
         Math.Round(perSecond * Math.Max(0, durationMs) / 1000m, AmountDecimals, MidpointRounding.AwayFromZero);
 
+    /// <summary>What speaking a text is estimated to cost: the rate for a character, for each character a reader would count in it.</summary>
+    public static decimal SpeechEstimate(decimal perCharacter, string text) =>
+        Math.Round(
+            perCharacter * new System.Globalization.StringInfo(text).LengthInTextElements, AmountDecimals, MidpointRounding.AwayFromZero);
+
     /// <summary>
     /// The records added up, one total for each currency they are in, by currency
     /// code. Amounts in different currencies are never added to each other, and no

@@ -19,12 +19,13 @@ internal sealed class ScopedOrganizations(
     public Task<Organization?> FindAsync(Guid organizationId, CancellationToken cancellationToken) =>
         database.Organizations.SingleOrDefaultAsync(o => o.Id == organizationId, cancellationToken);
 
-    public async Task<Organization?> RenameAsync(Guid organizationId, string name, CancellationToken cancellationToken)
+    public async Task<Organization?> UpdateAsync(Guid organizationId, string name, string? defaultVoice, CancellationToken cancellationToken)
     {
         var organization = await FindAsync(organizationId, cancellationToken);
         if (organization is null) return null;
 
         organization.Rename(name.Trim());
+        if (defaultVoice is not null) organization.SpeakIn(defaultVoice);
         await database.SaveChangesAsync(cancellationToken);
         return organization;
     }

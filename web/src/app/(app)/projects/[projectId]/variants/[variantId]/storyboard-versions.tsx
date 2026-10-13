@@ -165,10 +165,8 @@ export function StoryboardVersions({
                 onAdded={added}
                 onFlagCleared={() => queryClient.invalidateQueries({ queryKey: key })}
               />
-              {/* Paid generation comes before rendering, and only Hybrid has any. */}
-              {shown.renderMode === "Hybrid" && (
-                <StoryboardGeneration key={`generation-${shown.id}`} variant={variant} storyboard={shown} onAdded={added} />
-              )}
+              {/* Paid generation comes before rendering. Hybrid has pictures; any version may have its narration spoken. */}
+              <StoryboardGeneration key={`generation-${shown.id}`} variant={variant} storyboard={shown} onAdded={added} />
               {/* Keyed by the version, so a job being watched is never shown under another version. */}
               {render && <StoryboardRender key={`render-${shown.id}`} variant={variant} storyboard={shown} />}
             </>

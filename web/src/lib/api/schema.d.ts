@@ -210,6 +210,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{projectId}/speech": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The speech made for the Project, newest first, failed pieces included. */
+        get: operations["ListSpeech"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/speech/{speechId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One piece of speech and the state it is in. */
+        get: operations["GetSpeech"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/speech/{speechId}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The sound of speech that has been made, as a WAV, to listen to before rendering. Answers 404 until it is made. */
+        get: operations["GetSpeechContent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/render-jobs/in-progress": {
         parameters: {
             query?: never;
@@ -306,6 +357,40 @@ export interface paths {
         };
         /** The sensitive actions taken in the Organization, newest first. Owners only. */
         get: operations["ReadAuditLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/voices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The voices narration text can be spoken in, and which of them a Project of the caller's Organization is given when its brief names none. */
+        get: operations["ListVoices"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/voices/{voiceId}/sample": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A recording of the voice, to play before choosing it. It is a file kept with the application: playing it asks no provider for anything and costs nothing. Answers 404 for a voice that has none. */
+        get: operations["GetVoiceSample"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1438,6 +1523,7 @@ export interface components {
         ConfirmedGenerationResponse: {
             stills: components["schemas"]["StillResponse"][];
             clips: components["schemas"]["ClipResponse"][];
+            speech: components["schemas"]["SpeechResponse"][];
         };
         ConfirmGenerationRequest: {
             /** Format: double */
@@ -1484,6 +1570,16 @@ export interface components {
             /** Format: double */
             estimatedAmount: number;
         };
+        EstimatedSpeechResponse: {
+            /** Format: int32 */
+            scenePosition: number;
+            narrationText: string;
+            /** Format: double */
+            estimatedAmount: number;
+            /** Format: int32 */
+            estimatedDurationMs: number;
+            warning: null | string;
+        };
         EstimatedStillResponse: {
             /** Format: int32 */
             scenePosition: number;
@@ -1523,6 +1619,7 @@ export interface components {
             unavailable: null | string;
             stills: components["schemas"]["EstimatedStillResponse"][];
             clips: components["schemas"]["EstimatedClipResponse"][];
+            speech: components["schemas"]["EstimatedSpeechResponse"][];
             /** Format: double */
             total: number;
             currency: string;
@@ -1532,8 +1629,11 @@ export interface components {
             ceiling: number;
             imageProvider: components["schemas"]["ImageProvider"];
             videoProvider: components["schemas"]["VideoProvider"];
+            speechProvider: components["schemas"]["SpeechProvider"];
+            voice: string;
             sceneStills: components["schemas"]["SceneStillResponse"][];
             sceneClips: components["schemas"]["SceneClipResponse"][];
+            sceneSpeech: components["schemas"]["SceneSpeechResponse"][];
             /** Format: double */
             anotherStillAmount: null | number;
         };
@@ -1640,6 +1740,7 @@ export interface components {
             id: string;
             name: string;
             affiliateLabEnabled: boolean;
+            defaultVoice: null | string;
         };
         PagedResponseOfAffiliateLinkResponse: {
             items: components["schemas"]["AffiliateLinkResponse"][];
@@ -1787,6 +1888,15 @@ export interface components {
         };
         PagedResponseOfSocialAccountResponse: {
             items: components["schemas"]["SocialAccountResponse"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+            /** Format: int32 */
+            total: number;
+        };
+        PagedResponseOfSpeechResponse: {
+            items: components["schemas"]["SpeechResponse"][];
             /** Format: int32 */
             page: number;
             /** Format: int32 */
@@ -1947,6 +2057,7 @@ export interface components {
             /** Format: int32 */
             targetDurationSeconds: number;
             objective: string;
+            voice?: null | string;
         };
         ProjectResponse: {
             /** Format: uuid */
@@ -1959,6 +2070,7 @@ export interface components {
             /** Format: int32 */
             targetDurationSeconds: number;
             objective: string;
+            voice: string;
             /** Format: int32 */
             variantCount: number;
             /** Format: date-time */
@@ -2168,6 +2280,11 @@ export interface components {
             /** Format: uuid */
             clipId: null | string;
         };
+        SceneSpeechResponse: {
+            /** Format: int32 */
+            scenePosition: number;
+            speech: components["schemas"]["SpeechResponse"];
+        };
         SceneStillResponse: {
             /** Format: int32 */
             scenePosition: number;
@@ -2195,6 +2312,55 @@ export interface components {
         };
         /** @enum {unknown} */
         SocialPlatform: "TikTok" | "Facebook" | "Instagram" | "YouTube" | "Shopee";
+        SpeechCostResponse: {
+            /** Format: double */
+            estimatedAmount: number;
+            currency: string;
+            provider: components["schemas"]["SpeechProvider"];
+            model: null | string;
+            ratesVersion: string;
+            /** Format: date-time */
+            recordedAt: string;
+        };
+        /** @enum {unknown} */
+        SpeechFailureKind: "Refused" | "Technical" | "WorkerLost";
+        SpeechFailureResponse: {
+            kind: components["schemas"]["SpeechFailureKind"];
+            message: string;
+            billed: boolean;
+        };
+        /** @enum {unknown} */
+        SpeechProvider: "None" | "Fake";
+        SpeechResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            projectId: null | string;
+            narrationText: string;
+            language: string;
+            voice: string;
+            state: components["schemas"]["SpeechState"];
+            provider: components["schemas"]["SpeechProvider"];
+            model: null | string;
+            fake: boolean;
+            /** Format: int32 */
+            durationMs: number;
+            /** Format: double */
+            estimatedAmount: number;
+            currency: string;
+            /** Format: int32 */
+            attempt: number;
+            /** Format: date-time */
+            retryAt: null | string;
+            failure: null | components["schemas"]["SpeechFailureResponse"];
+            cost: null | components["schemas"]["SpeechCostResponse"];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        /** @enum {unknown} */
+        SpeechState: "Queued" | "Generating" | "Made" | "Failed";
         StatusResponse: {
             database: components["schemas"]["DependencyStatusResponse"];
             objectStorage: components["schemas"]["DependencyStatusResponse"];
@@ -2278,6 +2444,7 @@ export interface components {
         };
         UpdateOrganizationRequest: {
             name: string;
+            defaultVoice?: null | string;
         };
         /** @enum {unknown} */
         VariantAudioKind: "Narration" | "Music";
@@ -2323,6 +2490,15 @@ export interface components {
         };
         /** @enum {unknown} */
         VideoProvider: "None" | "Fake";
+        VoiceResponse: {
+            id: string;
+            name: string;
+            hasSample: boolean;
+        };
+        VoicesResponse: {
+            voices: components["schemas"]["VoiceResponse"][];
+            defaultVoice: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -2741,6 +2917,94 @@ export interface operations {
             };
         };
     };
+    ListSpeech: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagedResponseOfSpeechResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GetSpeech: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                speechId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpeechResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GetSpeechContent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                speechId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     ListRenderJobsInProgress: {
         parameters: {
             query?: {
@@ -2884,6 +3148,15 @@ export interface operations {
                     "application/json": components["schemas"]["OrganizationResponse"];
                 };
             };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -2989,6 +3262,53 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["PagedResponseOfAuditLogEntryResponse"];
                 };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ListVoices: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoicesResponse"];
+                };
+            };
+        };
+    };
+    GetVoiceSample: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                voiceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Not Found */
             404: {

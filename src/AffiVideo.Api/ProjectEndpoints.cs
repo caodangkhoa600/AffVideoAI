@@ -1,8 +1,10 @@
 using AffiVideo.Application;
 using AffiVideo.Application.Projects;
+using AffiVideo.Application.Providers;
 using AffiVideo.Contracts;
 using AffiVideo.Domain;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.Extensions.Options;
 
 namespace AffiVideo.Api;
 
@@ -25,9 +27,14 @@ internal static class ProjectEndpoints
             .WithSummary("The Organization's Projects, newest first. A Product narrows the list to the Projects made from it.");
 
         group.MapPost("", async Task<Results<Created<ProjectResponse>, ValidationProblem>> (
-                ProjectRequest request, IProjects projects, CancellationToken cancellationToken) =>
+                ProjectRequest request, IProjects projects, IOptions<GenerationOptions> generation, CancellationToken cancellationToken) =>
             {
-                var brief = new ProjectBrief(request.Audience, request.Language, request.TargetDurationSeconds, request.Objective);
+                if (VoiceEndpoints.NotOnOffer(request.Voice, generation.Value) is { } noSuchVoice)
+                {
+                    return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["voice"] = [noSuchVoice] });
+                }
+
+                var brief = new ProjectBrief(request.Audience, request.Language, request.TargetDurationSeconds, request.Objective, request.Voice);
                 return await projects.CreateAsync(request.ProductId, brief, cancellationToken) is { } created
                     ? TypedResults.Created($"/api/v1/projects/{created.Project.Id}", ToResponse(created))
                     : TypedResults.ValidationProblem(
@@ -69,6 +76,7 @@ internal static class ProjectEndpoints
         record.Project.Language,
         record.Project.TargetDurationSeconds,
         record.Project.Objective,
+        record.Project.Voice,
         record.VariantCount,
         record.Project.CreatedAt);
 }

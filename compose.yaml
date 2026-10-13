@@ -12,6 +12,8 @@ x-app-environment: &app-environment
   Generation__ImageProvider: ${IMAGE_PROVIDER:-None}
   # What makes Clips from Stills, for generated footage: None or Fake. It needs an image provider too. Not required: None when it is not set.
   Generation__VideoProvider: ${VIDEO_PROVIDER:-None}
+  # What speaks a Scene's narration text: None or Fake. It needs no other provider. Not required: None when it is not set.
+  Generation__SpeechProvider: ${SPEECH_PROVIDER:-None}
 
 x-app-depends-on: &app-depends-on
   postgres:

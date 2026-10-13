@@ -271,8 +271,8 @@ dashboard (ticket 23). Every ticket of month one is done or set aside.
 
 Hybrid video (`.scratch/hybrid-video`): the provider test (ticket 01), a
 Still for a generated backdrop (ticket 02), a render with one (ticket 03) and
-generated footage (ticket 04) are done. Asking for a Clip again, and using
-Stills and Clips again, is ticket 05.
+generated footage (ticket 04) are done, and so is spoken narration (ticket
+06). Asking for a Clip again, and using Stills and Clips again, is ticket 05.
 
 Notes from the Affiliate Lab dashboard:
 
@@ -970,6 +970,56 @@ Notes from generated footage (Hybrid video, ticket 04):
   a Clip cites the Facts the Clip rests on, and withdrawing one of them flags
   those versions and the Rendered Videos made from them, as it does for text.
   A version planned afterwards cites other Facts, and needs footage of its own.
+
+Notes from spoken narration (Hybrid video, ticket 06):
+
+- A Scene's narration text can be spoken. What speaks is a setting of the API
+  and the worker, `Generation__SpeechProvider` (`SPEECH_PROVIDER` in `.env`):
+  `None` or `Fake`. It needs no image provider and works in Product Lock too.
+  There is no real provider yet (ticket 09). The fake (`FakeTextToSpeech`)
+  makes a 220 Hz tone as long as the text is estimated to take, and what it
+  made is labelled as fake in the data and on the page. It misbehaves on
+  request like the other fakes, with `Generation__FakeSpeech__Refuses` and the
+  rest.
+- Speech is part of the one estimate and the one confirmation (ADR 0003):
+  `GET .../generation` lists `speech`, one piece for each narration text of the
+  version that has none yet, at `ProductionCost__FakeSpeechPerCharacter`
+  (0.0001) for each character, and its total counts against the Project's
+  ceiling with the Stills and the Clips. Nobody approves speech: it is used as
+  soon as it is made, and a member who wants it said otherwise changes the
+  text.
+- Speech is a record of its own (`Speech`), owned by the Organization, kept as
+  a WAV at `organizations/{id}/speech/{id}.wav` and reachable only through
+  `GET /api/v1/speech/{id}/content`. It belongs to its Project and is found
+  again by its text, language and voice: a Scene whose narration text did not
+  change is not spoken again, and a second Variant that says the same pays
+  nothing. It waits in a queue of its own (`SpeechWorker`), under the same
+  lease, attempts and waits as a Still, and has one production cost record.
+- How long narration text will take is estimated before anything is paid
+  (`SpeechLength` in the domain): its words at the pace of its language,
+  `Generation__WordsPerSecond__vi` (4), and a pause at each mark inside it. The
+  estimate carries a `warning` for text that would not fit its Scene even sped
+  up. The pace is a guess until a real provider has been listened to.
+- A render calls no provider. The worker lays each Scene's speech where its
+  Scene starts and mixes the result as it mixes an uploaded narration: brought
+  to the same loudness, with the music under it. Speech longer than its Scene
+  is sped up, by a tenth at most (`SpeechFit`); beyond that the job fails while
+  validating, with a reason that names the Scene. A version of which some
+  Scenes have speech and others have narration text that was never spoken fails
+  the same way. With no speech at all the video is silent, as before, and an
+  uploaded narration is used in place of the speech.
+- The voices are a short list in configuration, `Generation__Voices__0__Id`,
+  `__Name` and `__Sample`, the same for every Organization (`GET
+  /api/v1/voices`). With none configured there is one, `sarah`. `Sample` is the
+  path of an MP3 or WAV recorded for the voice, served by `GET
+  /api/v1/voices/{id}/sample`: playing it asks no provider for anything. A
+  Project's brief names a voice (`voice`); left out, it is the Organization's,
+  which an Owner sets with `defaultVoice` on `PUT /api/v1/organizations/{id}`
+  and which is the first of the list until then. Projects made before this
+  have `sarah`. The API and the worker have to be given the same list.
+- The first render after the worker image is rebuilt has twice stayed in
+  `GeneratingAssets` until the tests gave up, and passed when run again on the
+  same image. The cause is not known.
 
 Notes from production cost records:
 

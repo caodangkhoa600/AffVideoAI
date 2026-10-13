@@ -20,6 +20,16 @@ public enum VideoProvider
     Fake,
 }
 
+/// <summary>What speaks narration text.</summary>
+public enum SpeechProvider
+{
+    /// <summary>Nothing does.</summary>
+    None,
+
+    /// <summary>The fake: it returns a tone as long as the text would take to say and calls nobody. What it made is labelled as fake.</summary>
+    Fake,
+}
+
 /// <summary>
 /// The Production cost record of one generated thing: what making it is estimated
 /// to have cost, by which provider and model. One is written as the thing is made
@@ -68,6 +78,22 @@ public sealed class GenerationCostRecord : IOwnedByOrganization
         RecordedAt = recordedAt;
     }
 
+    /// <summary>The record of a piece of speech as it stands now: made, or failed.</summary>
+    public GenerationCostRecord(Guid id, Speech speech, DateTimeOffset recordedAt)
+    {
+        Id = id;
+        OrganizationId = speech.OrganizationId;
+        ProductId = speech.ProductId;
+        SpeechId = speech.Id;
+        Provider = speech.Provider.ToString();
+        Model = speech.Model;
+        // What the provider did not charge for cost nothing.
+        EstimatedAmount = speech.Billed ? speech.EstimatedAmount : 0m;
+        Currency = speech.Currency;
+        RatesVersion = speech.RatesVersion;
+        RecordedAt = recordedAt;
+    }
+
     public Guid Id { get; private set; }
 
     public Guid OrganizationId { get; private set; }
@@ -80,6 +106,9 @@ public sealed class GenerationCostRecord : IOwnedByOrganization
 
     /// <summary>The Clip the record is of, when it is of one.</summary>
     public Guid? ClipId { get; private set; }
+
+    /// <summary>The speech the record is of, when it is of some.</summary>
+    public Guid? SpeechId { get; private set; }
 
     /// <summary>What generated it, by name.</summary>
     public string Provider { get; private set; } = "";

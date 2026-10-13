@@ -80,6 +80,34 @@ internal sealed class RenderJobRunner(
         var problems = StoryboardRules.RenderProblems(
             storyboard, work.Assets, work.Stills.Select(still => still.Id).ToHashSet(), work.Clips.Select(clip => clip.Id).ToHashSet());
         if (problems.Count > 0) throw new RenderFailedException(string.Join(" ", problems));
+        // Speech is for the whole video or for none of it: once a Scene of the version has some, a Scene left
+        // unspoken would be a silence nobody chose. With no speech at all the video is silent, as it always was.
+        if (work.Speech.Count > 0)
+        {
+            var made = work.Speech.Where(spoken => spoken.Speech.State == SpeechState.Made).Select(spoken => spoken.ScenePosition).ToHashSet();
+            var unspoken = storyboard.Scenes
+                .Where(scene => !string.IsNullOrWhiteSpace(scene.NarrationText) && !made.Contains(scene.Position))
+                .Select(scene => $"The narration text of Scene {scene.Position} has not been spoken.")
+                .ToList();
+            if (unspoken.Count > 0)
+            {
+                throw new RenderFailedException(
+                    $"{string.Join(" ", unspoken)} Other Scenes of this version have their speech. Confirm the estimate at Storyboard review " +
+                    "and wait for the speech to be made, or upload a narration, then render again.");
+            }
+            var tooLong = work.Speech
+                .Select(spoken => (spoken.ScenePosition, spoken.Speech.DurationMs, SceneMs: storyboard.Scenes.Single(scene => scene.Position == spoken.ScenePosition).DurationMs))
+                .Where(fit => SpeechFit.TempoFor(fit.DurationMs, fit.SceneMs) is null)
+                .Select(fit =>
+                    $"The speech of Scene {fit.ScenePosition} lasts {fit.DurationMs / 1000m:0.#} seconds and the Scene {fit.SceneMs / 1000m:0.#}: " +
+                    "speeding it up by a tenth, which is the most that is done, does not make it fit.")
+                .ToList();
+            if (tooLong.Count > 0)
+            {
+                throw new RenderFailedException(
+                    $"{string.Join(" ", tooLong)} Shorten the narration text or give the Scene more time, generate the speech again, then render.");
+            }
+        }
 
         // What each Scene is drawn from: its photo, and the Scene before it, whose Product it carries on from.
         await queue.MoveAsync(work, RenderJobState.Planning, cancellationToken);
@@ -203,6 +231,31 @@ internal sealed class RenderJobRunner(
                 await kept.CopyToAsync(written, cancellationToken);
             }
             tracks.Add(new AudioTrack(file, audio.DurationMs, audio.VolumePercent));
+        }
+        // Speech made from narration text is the narration: each Scene's piece laid where its Scene starts, as one track.
+        if (work.Speech.Count > 0)
+        {
+            var pieces = new List<SpokenPiece>();
+            foreach (var spoken in work.Speech)
+            {
+                var file = Path.Combine(jobDirectory, $"speech-{spoken.ScenePosition}.wav");
+                await using (var kept = await storage.OpenAsync(spoken.Speech.StorageKey, cancellationToken))
+                {
+                    if (kept is null)
+                    {
+                        throw new RenderFailedException(
+                            $"The speech of Scene {spoken.ScenePosition} is no longer stored. Generate again, then render.");
+                    }
+                    await using var written = File.Create(file);
+                    await kept.CopyToAsync(written, cancellationToken);
+                }
+                var startMs = scenes.TakeWhile(scene => scene.Position != spoken.ScenePosition).Sum(scene => scene.DurationMs);
+                var sceneMs = scenes.Single(scene => scene.Position == spoken.ScenePosition).DurationMs;
+                pieces.Add(new SpokenPiece(file, startMs, SpeechFit.TempoFor(spoken.Speech.DurationMs, sceneMs) ?? 1));
+            }
+            var narration = Path.Combine(jobDirectory, "spoken-narration.wav");
+            await ffmpeg.NarrateAsync(jobDirectory, pieces, durationMs, narration, cancellationToken);
+            tracks.Insert(0, new AudioTrack(narration, durationMs, VariantAudio.MaxVolumePercent));
         }
         await ffmpeg.JoinAsync(jobDirectory, clips, tracks, durationMs, video, cancellationToken);
 

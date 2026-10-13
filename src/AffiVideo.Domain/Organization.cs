@@ -27,7 +27,15 @@ public sealed class Organization
     /// </summary>
     public decimal GenerationCeiling { get; private set; } = DefaultGenerationCeiling;
 
+    /// <summary>
+    /// The voice a Project of the Organization is given when its brief names none. Absent until an Owner
+    /// chooses one: it is then the first of the voices on offer.
+    /// </summary>
+    public string? DefaultVoice { get; private set; }
+
     public void Rename(string name) => Name = name;
+
+    public void SpeakIn(string voice) => DefaultVoice = voice;
 
     public void EnableAffiliateLab() => AffiliateLabEnabled = true;
 }

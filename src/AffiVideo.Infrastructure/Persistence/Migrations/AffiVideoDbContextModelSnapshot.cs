@@ -490,6 +490,9 @@ namespace AffiVideo.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("RecordedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("SpeechId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("StillId")
                         .HasColumnType("uuid");
 
@@ -501,6 +504,9 @@ namespace AffiVideo.Infrastructure.Persistence.Migrations
                     b.HasIndex("OrganizationId");
 
                     b.HasIndex("ProductId");
+
+                    b.HasIndex("SpeechId")
+                        .IsUnique();
 
                     b.HasIndex("StillId")
                         .IsUnique();
@@ -516,6 +522,10 @@ namespace AffiVideo.Infrastructure.Persistence.Migrations
 
                     b.Property<bool>("AffiliateLabEnabled")
                         .HasColumnType("boolean");
+
+                    b.Property<string>("DefaultVoice")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<decimal>("GenerationCeiling")
                         .ValueGeneratedOnAdd()
@@ -812,6 +822,13 @@ namespace AffiVideo.Infrastructure.Persistence.Migrations
                     b.Property<int>("TargetDurationSeconds")
                         .HasColumnType("integer");
 
+                    b.Property<string>("Voice")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("sarah");
+
                     b.HasKey("Id");
 
                     b.HasIndex("OrganizationId", "CreatedAt");
@@ -1039,6 +1056,137 @@ namespace AffiVideo.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("SocialAccounts");
+                });
+
+            modelBuilder.Entity("AffiVideo.Domain.Speech", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Attempt")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("AttemptStartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("AvailableAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("Billed")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<int>("DurationMs")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("EstimatedAmount")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
+
+                    b.Property<string>("FailureDetail")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<string>("FailureKind")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("FailureMessage")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Language")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTimeOffset?>("LeaseExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("LeaseId")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Model")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("Ordinal")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("RatesVersion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<Guid>("RequestedByMemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("SizeInBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("State")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Voice")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("RequestedByMemberId");
+
+                    b.HasIndex("ProjectId", "CreatedAt");
+
+                    b.HasIndex("State", "CreatedAt");
+
+                    b.HasIndex("ProjectId", "IdempotencyKey", "Ordinal")
+                        .IsUnique();
+
+                    b.ToTable("Speech", (string)null);
                 });
 
             modelBuilder.Entity("AffiVideo.Domain.Still", b =>
@@ -1653,6 +1801,11 @@ namespace AffiVideo.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("AffiVideo.Domain.Speech", null)
+                        .WithMany()
+                        .HasForeignKey("SpeechId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("AffiVideo.Domain.Still", null)
                         .WithMany()
                         .HasForeignKey("StillId")
@@ -1805,6 +1958,32 @@ namespace AffiVideo.Infrastructure.Persistence.Migrations
                     b.HasOne("AffiVideo.Domain.Organization", null)
                         .WithMany()
                         .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("AffiVideo.Domain.Speech", b =>
+                {
+                    b.HasOne("AffiVideo.Domain.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("AffiVideo.Domain.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("AffiVideo.Domain.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("AffiVideo.Infrastructure.Identity.Member", null)
+                        .WithMany()
+                        .HasForeignKey("RequestedByMemberId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

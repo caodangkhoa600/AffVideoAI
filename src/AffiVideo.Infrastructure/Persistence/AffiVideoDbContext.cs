@@ -43,6 +43,8 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
 
     public DbSet<Clip> Clips => Set<Clip>();
 
+    public DbSet<Speech> Speech => Set<Speech>();
+
     public DbSet<GenerationCostRecord> GenerationCostRecords => Set<GenerationCostRecord>();
 
     public DbSet<RenderJob> RenderJobs => Set<RenderJob>();
@@ -81,6 +83,7 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
         builder.Entity<Organization>(organization =>
         {
             organization.Property(o => o.Name).HasMaxLength(Organization.NameMaxLength);
+            organization.Property(o => o.DefaultVoice).HasMaxLength(Project.VoiceMaxLength);
             organization.Property(o => o.GenerationCeiling)
                 .HasPrecision(ProductionCosts.AmountPrecision, ProductionCosts.AmountDecimals)
                 .HasDefaultValue(Organization.DefaultGenerationCeiling);
@@ -163,6 +166,8 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
             project.Property(p => p.Audience).HasMaxLength(Project.AudienceMaxLength);
             project.Property(p => p.Language).HasMaxLength(ContentLanguages.CodeMaxLength);
             project.Property(p => p.Objective).HasMaxLength(Project.ObjectiveMaxLength);
+            // A Project made before a brief named a voice has the one there was.
+            project.Property(p => p.Voice).HasMaxLength(Project.VoiceMaxLength).HasDefaultValue(Project.BuiltInVoice);
             project.HasIndex(p => new { p.OrganizationId, p.CreatedAt });
             project.HasIndex(p => new { p.ProductId, p.CreatedAt });
         });
@@ -304,6 +309,42 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
             clip.HasIndex(c => new { c.ProjectId, c.CreatedAt });
         });
 
+        builder.Entity<Speech>(speech =>
+        {
+            speech.ToTable("Speech");
+            speech.HasOne<Organization>().WithMany().HasForeignKey(s => s.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            // Speech is kept so it can be used again: it outlives the Project it was made for.
+            speech.HasOne<Project>().WithMany().HasForeignKey(s => s.ProjectId).OnDelete(DeleteBehavior.SetNull);
+            speech.HasOne<Product>().WithMany().HasForeignKey(s => s.ProductId).OnDelete(DeleteBehavior.Restrict);
+            speech.HasOne<Member>().WithMany().HasForeignKey(s => s.RequestedByMemberId).OnDelete(DeleteBehavior.Restrict);
+            speech.Property(s => s.Text).HasMaxLength(StoryboardRules.NarrationMaxLength);
+            speech.Property(s => s.Language).HasMaxLength(ContentLanguages.CodeMaxLength);
+            speech.Property(s => s.Voice).HasMaxLength(Project.VoiceMaxLength);
+            speech.Property(s => s.Provider).HasConversion<string>().HasMaxLength(20);
+            speech.Property(s => s.Model).HasMaxLength(Still.ModelMaxLength);
+            // As with a Still: speech is only written by whoever still has it as it was read.
+            speech.Property(s => s.State).HasConversion<string>().HasMaxLength(20).IsConcurrencyToken();
+            speech.Property(s => s.LeaseId).IsConcurrencyToken();
+            speech.Property(s => s.EstimatedAmount).HasPrecision(ProductionCosts.AmountPrecision, ProductionCosts.AmountDecimals);
+            speech.Property(s => s.Currency).HasMaxLength(Product.CurrencyLength);
+            speech.Property(s => s.RatesVersion).HasMaxLength(RenderRates.VersionMaxLength);
+            speech.Property(s => s.IdempotencyKey).HasMaxLength(RenderJob.IdempotencyKeyMaxLength);
+            speech.Property(s => s.FailureKind).HasConversion<string>().HasMaxLength(20);
+            speech.Property(s => s.FailureMessage).HasMaxLength(RenderJob.FailureMessageMaxLength);
+            speech.Property(s => s.FailureDetail).HasMaxLength(RenderJob.FailureDetailMaxLength);
+            speech.Ignore(s => s.RetryAt);
+            speech.Ignore(s => s.StorageKey);
+            speech.Ignore(s => s.Fake);
+            speech.Ignore(s => s.IsCurrent);
+            speech.Ignore(s => s.HasSound);
+            speech.Ignore(s => s.CountsAsSpent);
+            // One piece of speech for one click and one narration text, even when the click arrives twice at the same moment.
+            speech.HasIndex(s => new { s.ProjectId, s.IdempotencyKey, s.Ordinal }).IsUnique();
+            // The queue: the worker takes the speech that has been queued longest.
+            speech.HasIndex(s => new { s.State, s.CreatedAt });
+            speech.HasIndex(s => new { s.ProjectId, s.CreatedAt });
+        });
+
         builder.Entity<GenerationCostRecord>(cost =>
         {
             cost.HasOne<Organization>().WithMany().HasForeignKey(c => c.OrganizationId).OnDelete(DeleteBehavior.Restrict);
@@ -312,6 +353,7 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
             // The record outlives what it is of.
             cost.HasOne<Still>().WithMany().HasForeignKey(c => c.StillId).OnDelete(DeleteBehavior.SetNull);
             cost.HasOne<Clip>().WithMany().HasForeignKey(c => c.ClipId).OnDelete(DeleteBehavior.SetNull);
+            cost.HasOne<Speech>().WithMany().HasForeignKey(c => c.SpeechId).OnDelete(DeleteBehavior.SetNull);
             cost.Property(c => c.Provider).HasMaxLength(GenerationCostRecord.ProviderMaxLength);
             cost.Property(c => c.Model).HasMaxLength(Still.ModelMaxLength);
             cost.Property(c => c.EstimatedAmount).HasPrecision(ProductionCosts.AmountPrecision, ProductionCosts.AmountDecimals);
@@ -321,6 +363,8 @@ public sealed class AffiVideoDbContext(DbContextOptions<AffiVideoDbContext> opti
             cost.HasIndex(c => c.StillId).IsUnique();
             // And a Clip has one: what it cost is recorded once, however many videos use it.
             cost.HasIndex(c => c.ClipId).IsUnique();
+            // And so has each piece of speech.
+            cost.HasIndex(c => c.SpeechId).IsUnique();
             cost.HasIndex(c => c.ProductId);
         });
 

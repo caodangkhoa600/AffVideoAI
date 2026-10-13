@@ -3,7 +3,18 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { api, problemDetail, type Clip, type ClipState, type Still, type StillState, type Storyboard, type Variant } from "@/lib/api/client";
+import {
+  api,
+  problemDetail,
+  type Clip,
+  type ClipState,
+  type Speech,
+  type SpeechState,
+  type Still,
+  type StillState,
+  type Storyboard,
+  type Variant,
+} from "@/lib/api/client";
 
 /** Where a Still is (StillState in the domain), as a member reads it. There is no percentage to show. */
 const STATES: Record<StillState, string> = {
@@ -30,6 +41,16 @@ const CLIP_STATES: Record<ClipState, string> = {
 // A Clip that waits for its Still is not on its way: it starts when a member approves the Still.
 const CLIP_WAITING: ClipState[] = ["Queued", "Generating"];
 
+/** Where a piece of speech is (SpeechState in the domain), as a member reads it. Nobody approves speech. */
+const SPEECH_STATES: Record<SpeechState, string> = {
+  Queued: "Queued",
+  Generating: "Being made",
+  Made: "Made",
+  Failed: "Failed",
+};
+
+const SPEECH_WAITING: SpeechState[] = ["Queued", "Generating"];
+
 /** A length in seconds, to the tenth a Scene is timed to. */
 const seconds = (durationMs: number) => `${(durationMs / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })} s`;
 
@@ -41,9 +62,10 @@ const money = (amount: number, currency: string) =>
   `${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })} ${currency}`;
 
 /**
- * Paid generation for one Hybrid Storyboard version: what it would make and cost, the member's
- * one confirmation, the Still of each generated Scene, to approve or to replace with another, and
- * the Clip of each Scene of generated footage, to watch and approve.
+ * Paid generation for one Storyboard version: what it would make and cost, the member's one
+ * confirmation, the Still of each generated Scene, to approve or to replace with another, the
+ * Clip of each Scene of generated footage, to watch and approve, and the speech of each Scene's
+ * narration text, to listen to. Only Hybrid has pictures; any version may be spoken.
  * Nothing is generated before the member confirms (ADR 0003).
  */
 export function StoryboardGeneration({
@@ -71,7 +93,8 @@ export function StoryboardGeneration({
     },
     refetchInterval: (query) =>
       query.state.data?.sceneStills.some((has) => WAITING.includes(has.still.state)) ||
-      query.state.data?.sceneClips.some((has) => CLIP_WAITING.includes(has.clip.state))
+      query.state.data?.sceneClips.some((has) => CLIP_WAITING.includes(has.clip.state)) ||
+      query.state.data?.sceneSpeech.some((has) => SPEECH_WAITING.includes(has.speech.state))
         ? POLL_MS
         : false,
   });
@@ -133,10 +156,23 @@ export function StoryboardGeneration({
 
   const generated = storyboard.scenes.filter((scene) => scene.description !== null);
   const data = estimate.data;
+  const hybrid = storyboard.renderMode === "Hybrid";
+  const speaks = data !== undefined && data.speechProvider !== "None";
+  // A Product Lock version has no pictures to generate: without a speech provider there is nothing here for it.
+  if (!hybrid && !speaks) return null;
 
   return (
     <section className="flex flex-col gap-3" data-testid="generation">
-      <h3 className="text-lg font-semibold tracking-tight">Generated pictures</h3>
+      <h3 className="text-lg font-semibold tracking-tight">{hybrid ? "Generated pictures and narration" : "Spoken narration"}</h3>
+      {speaks && (
+        <p className="text-sm text-muted-foreground" data-testid="generation-speech-intro">
+          Each Scene&apos;s narration text can be spoken, in the voice of the Project&apos;s brief ({data.voice}). Speech costs
+          money, so none is made until you have seen the estimate and confirmed it. It is made once for the Project:
+          only a Scene whose narration text changes is spoken again. Listen to each piece before rendering. A narration
+          you upload is used in place of the speech.
+        </p>
+      )}
+      {hybrid && (
       <p className="text-sm text-muted-foreground">
         In Hybrid up to two Scenes are generated: a backdrop behind the Product, or footage with no Product in it. The
         Product itself is always its photo. A backdrop is a Still. Footage is a Clip, made from its Still once you
@@ -145,6 +181,7 @@ export function StoryboardGeneration({
         the Clips together. Approving a backdrop&apos;s Still, or a Clip, makes the next Storyboard version, which uses
         it: that version is the one to render. A render generates nothing and no provider is paid for it.
       </p>
+      )}
       {estimate.isError ? (
         <p role="alert" className="text-sm text-destructive">
           The estimate could not be loaded.
@@ -153,7 +190,7 @@ export function StoryboardGeneration({
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : (
         <>
-          {!data.available && (
+          {hybrid && !data.available && (
             <p className="w-fit rounded-md border bg-muted px-2 py-1 text-sm" data-testid="generation-unavailable">
               {data.unavailable}
             </p>
@@ -170,9 +207,15 @@ export function StoryboardGeneration({
               called and nobody is charged; the amounts stand in for a real provider&apos;s.
             </p>
           )}
-          {data.available && generated.length === 0 && (
+          {hybrid && data.available && generated.length === 0 && (
             <p className="text-sm text-muted-foreground" data-testid="generation-nothing">
               No Scene of this version is generated.
+            </p>
+          )}
+          {data.available && data.speechProvider === "Fake" && (
+            <p className="w-fit rounded-md border bg-muted px-2 py-1 text-sm" data-testid="generation-fake-speech">
+              Speech here comes from the fake speech provider: a tone as long as the text would take to say, not a
+              voice. No provider is called and nobody is charged; the amounts stand in for a real provider&apos;s.
             </p>
           )}
           <p className="text-sm" data-testid="generation-spent">
@@ -184,7 +227,7 @@ export function StoryboardGeneration({
               count.
             </span>
           </p>
-          {(data.stills.length > 0 || data.clips.length > 0) && (
+          {(data.stills.length > 0 || data.clips.length > 0 || data.speech.length > 0) && (
             <div className="flex flex-col gap-2 rounded-lg border p-4" data-testid="generation-estimate">
               <p className="text-sm font-medium">Confirming will generate:</p>
               <ul className="list-disc pl-5 text-sm">
@@ -198,6 +241,17 @@ export function StoryboardGeneration({
                     A Clip of {seconds(clip.durationMs)} for Scene {clip.scenePosition}, estimated at{" "}
                     {money(clip.estimatedAmount, data.currency)}. It is made from the Scene&apos;s Still once you have
                     approved that, with no further confirmation.
+                  </li>
+                ))}
+                {data.speech.map((speech) => (
+                  <li key={`speech-${speech.scenePosition}`} data-testid="generation-speech">
+                    Speech for Scene {speech.scenePosition}, about {seconds(speech.estimatedDurationMs)}, estimated at{" "}
+                    {money(speech.estimatedAmount, data.currency)}
+                    {speech.warning && (
+                      <span role="alert" className="block text-destructive" data-testid="generation-speech-warning">
+                        {speech.warning}
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -241,6 +295,18 @@ export function StoryboardGeneration({
               ))}
             </ul>
           )}
+          {data.sceneSpeech.length > 0 && (
+            <ul className="flex flex-col divide-y rounded-lg border">
+              {data.sceneSpeech.map(({ scenePosition, speech }) => (
+                <SpeechRow
+                  key={`${scenePosition}-${speech.id}`}
+                  scenePosition={scenePosition}
+                  sceneDurationMs={storyboard.scenes.find((scene) => scene.position === scenePosition)?.durationMs}
+                  speech={speech}
+                />
+              ))}
+            </ul>
+          )}
         </>
       )}
       {refused && (
@@ -248,7 +314,8 @@ export function StoryboardGeneration({
           {refused}
         </p>
       )}
-      <FailedStills variant={variant} descriptions={generated.map((scene) => scene.description!)} />
+      {hybrid && <FailedStills variant={variant} descriptions={generated.map((scene) => scene.description!)} />}
+      {speaks && <FailedSpeech variant={variant} texts={storyboard.scenes.map((scene) => scene.narrationText).filter((text) => text.trim() !== "")} />}
       <FailedClips
         variant={variant}
         descriptions={generated.filter((scene) => scene.technique === "GeneratedFootage").map((scene) => scene.description!)}
@@ -412,6 +479,106 @@ function ClipRow({
         )}
       </div>
     </li>
+  );
+}
+
+/** The speech of a Scene's narration text: where it is, and once it is made the sound itself, to listen to before rendering. */
+function SpeechRow({
+  scenePosition,
+  sceneDurationMs,
+  speech,
+}: {
+  scenePosition: number;
+  /** How long the Scene lasts. Absent when the version has no such Scene. */
+  sceneDurationMs?: number;
+  speech: Speech;
+}) {
+  // Speech longer than its Scene is sped up at render, by a tenth at most. Beyond that the render fails.
+  const tooLong = speech.state === "Made" && sceneDurationMs !== undefined && speech.durationMs * 10 > sceneDurationMs * 11;
+  return (
+    <li className="flex flex-col gap-2 p-4" data-testid="speech">
+      <p className="text-sm" aria-live="polite">
+        <span className="text-muted-foreground">
+          Speech for Scene {scenePosition}
+          {speech.state === "Made" ? ` · ${seconds(speech.durationMs)}` : ""} · {speech.voice} ·{" "}
+        </span>
+        <span className="font-medium" data-testid="speech-state">
+          {SPEECH_STATES[speech.state]}
+        </span>
+      </p>
+      {speech.fake && (
+        <p className="w-fit rounded-md border bg-muted px-2 py-1 text-sm" data-testid="speech-fake">
+          Fake: made by the fake speech provider. It is a tone and says nothing of the text.
+        </p>
+      )}
+      <p className="break-words text-sm">
+        <span className="text-muted-foreground">Narration text: </span>
+        {speech.narrationText}
+      </p>
+      {speech.state === "Made" && (
+        // The file comes from the API, which only serves it to a signed-in member of the Organization.
+        <audio
+          src={`/api/v1/speech/${speech.id}/content`}
+          controls
+          preload="none"
+          aria-label={`The speech of Scene ${scenePosition}`}
+          className="w-full max-w-md"
+        />
+      )}
+      {tooLong && (
+        <p role="alert" className="text-sm text-destructive" data-testid="speech-too-long">
+          This speech lasts {seconds(speech.durationMs)} and the Scene {seconds(sceneDurationMs)}. Speech is sped up by a
+          tenth at most, so a render of this version will fail. Shorten the narration text or give the Scene more time.
+        </p>
+      )}
+      {speech.state === "Queued" && speech.retryAt && (
+        <p className="text-sm text-muted-foreground" data-testid="speech-retry">
+          Attempt {speech.attempt} failed without being charged for. It will be tried again after{" "}
+          {new Date(speech.retryAt).toLocaleTimeString()}.
+        </p>
+      )}
+      {speech.cost && (
+        <p className="text-sm text-muted-foreground" data-testid="speech-cost">
+          Estimated cost: {money(speech.cost.estimatedAmount, speech.cost.currency)}
+          {speech.cost.model ? ` · ${speech.cost.provider} · ${speech.cost.model}` : ""}
+        </p>
+      )}
+    </li>
+  );
+}
+
+/**
+ * Why the newest speech of a narration text of this version was not made, when it was not: the
+ * Scene then has no speech, and the estimate above offers it again.
+ */
+function FailedSpeech({ variant, texts }: { variant: Variant; texts: string[] }) {
+  const speech = useQuery({
+    queryKey: ["projects", "one", variant.projectId, "speech"],
+    queryFn: async () => {
+      const { data, response } = await api.GET("/api/v1/projects/{projectId}/speech", {
+        params: { path: { projectId: variant.projectId }, query: { pageSize: 50 } },
+      });
+      if (!data) throw new Error(`The API answered ${response.status}`);
+      return data;
+    },
+    enabled: texts.length > 0,
+    refetchInterval: POLL_MS * 5,
+  });
+  // Newest first: only the latest speech of each text says where it stands.
+  const failed = [...new Set(texts)]
+    .map((text) => speech.data?.items.find((said) => said.narrationText === text))
+    .filter((said): said is Speech => said?.state === "Failed");
+  if (failed.length === 0) return null;
+
+  return (
+    <ul className="flex flex-col gap-2">
+      {failed.map((said) => (
+        <li key={said.id} role="alert" className="text-sm text-destructive" data-testid="speech-failure">
+          {said.failure?.message ?? "The speech could not be made."}
+          {said.failure?.billed ? " The provider charged for the attempt all the same." : ""}
+        </li>
+      ))}
+    </ul>
   );
 }
 

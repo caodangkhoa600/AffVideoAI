@@ -11,7 +11,8 @@ public interface IOrganizations
 {
     Task<Organization?> FindAsync(Guid organizationId, CancellationToken cancellationToken);
 
-    Task<Organization?> RenameAsync(Guid organizationId, string name, CancellationToken cancellationToken);
+    /// <param name="defaultVoice">The voice its Projects are given when their brief names none. Left out, it stays as it is.</param>
+    Task<Organization?> UpdateAsync(Guid organizationId, string name, string? defaultVoice, CancellationToken cancellationToken);
 
     Task<Page<MemberSummary>?> ListMembersAsync(Guid organizationId, PageRequest page, CancellationToken cancellationToken);
 

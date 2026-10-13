@@ -114,6 +114,14 @@ public static class InfrastructureSetup
                 { ImageProvider: ImageProvider.Fake, Fake: var fake } => new FakeImageGenerator(fake),
                 _ => new NoImageGenerator(),
             });
+        // Speech waits in a queue of its own too, and the fake that makes it needs nothing the API lacks.
+        services.AddScoped<ISpeechQueue, SpeechQueue>();
+        services.AddSingleton<ITextToSpeech>(provider =>
+            provider.GetRequiredService<IOptions<GenerationOptions>>().Value switch
+            {
+                { SpeechProvider: SpeechProvider.Fake } options => new FakeTextToSpeech(options),
+                _ => new NoTextToSpeech(),
+            });
         return services.AddScoped<IRenderQueue, RenderQueue>();
     }
 

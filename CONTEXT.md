@@ -61,8 +61,12 @@ _Avoid_: Deleted, rejected, retracted
 ### Creative work
 
 **Project**:
-One Product plus one brief (audience, language, duration, objective).
+One Product plus one brief (audience, language, duration, objective, voice).
 _Avoid_: Creative project, job
+
+**Voice**:
+One of the short list of voices narration text can be spoken in. A Project's brief names one; when it names none, the Project has its Organization's.
+_Avoid_: Speaker, narrator, voice model
 
 **Variant**:
 One creative treatment of a Project, defined by its creative template and its Hook. It is the unit compared in an experiment.

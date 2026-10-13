@@ -37,17 +37,19 @@ internal sealed class ScopedGeneration(
         var member = caller.MemberId ?? throw new InvalidOperationException("Only a member can confirm a generation.");
         await using var deciding = await database.HoldProjectAsync(projectId, cancellationToken);
         if (deciding is null) return null;
-        if (await FindByKeyAsync(projectId, idempotencyKey, cancellationToken) is var already && already.Stills.Count + already.Clips.Count > 0)
+        if (await FindByKeyAsync(projectId, idempotencyKey, cancellationToken) is var already
+            && already.Stills.Count + already.Clips.Count + already.Speech.Count > 0)
         {
-            return new GenerationConfirmation(already.Stills, already.Clips, Queued: false, null);
+            return new GenerationConfirmation(already.Stills, already.Clips, already.Speech, Queued: false, null);
         }
 
         var estimate = await EstimateAsync(projectId, storyboard, cancellationToken);
         if (estimate.Unavailable is { } unavailable) return GenerationConfirmation.Refuse(unavailable);
-        if (estimate.Stills.Count == 0 && estimate.Clips.Count == 0)
+        if (estimate.Stills.Count == 0 && estimate.Clips.Count == 0 && estimate.Speech.Count == 0)
         {
             return GenerationConfirmation.Refuse(
-                "There is nothing to generate for this Storyboard version: no Scene of it is generated, or each already has its Still and its Clip.");
+                "There is nothing to generate for this Storyboard version: each generated Scene already has its Still and its Clip, " +
+                "and there is no narration text left to speak.");
         }
         if (confirmedTotal != estimate.Total)
         {
@@ -61,7 +63,10 @@ internal sealed class ScopedGeneration(
             return GenerationConfirmation.Refuse($"{pastCeiling} {RaiseTheCeiling}");
         }
 
-        var productId = await database.Projects.Where(p => p.Id == projectId).Select(p => p.ProductId).SingleAsync(cancellationToken);
+        var (productId, language) = await database.Projects
+            .Where(p => p.Id == projectId)
+            .Select(p => new ValueTuple<Guid, string>(p.ProductId, p.Language))
+            .SingleAsync(cancellationToken);
         var now = clock.GetUtcNow();
         var stills = estimate.Stills
             .Select((asked, index) => new Still(
@@ -76,13 +81,21 @@ internal sealed class ScopedGeneration(
                 estimate.VideoProvider, new EstimatedAmount(asked.EstimatedAmount, estimate.Currency), costs.Value.RatesVersion,
                 idempotencyKey, index + 1, member, now))
             .ToList();
+        // And the speech: it waits for nothing, and nobody approves it.
+        var speech = estimate.Speech
+            .Select((asked, index) => new Speech(
+                Guid.CreateVersion7(), organizationId, projectId, productId, asked.NarrationText, language, estimate.Voice, estimate.SpeechProvider,
+                new EstimatedAmount(asked.EstimatedAmount, estimate.Currency), costs.Value.RatesVersion, idempotencyKey, index + 1, member, now))
+            .ToList();
         database.Stills.AddRange(stills);
         database.Clips.AddRange(clips);
+        database.Speech.AddRange(speech);
         await database.SaveChangesAsync(cancellationToken);
         await deciding.CommitAsync(cancellationToken);
         // Nothing has been made yet, so none has a cost.
         return new GenerationConfirmation(
-            [.. stills.Select(still => new StillRecord(still, null))], [.. clips.Select(clip => new ClipRecord(clip, null))], Queued: true, null);
+            [.. stills.Select(still => new StillRecord(still, null))], [.. clips.Select(clip => new ClipRecord(clip, null))],
+            [.. speech.Select(said => new SpeechRecord(said, null))], Queued: true, null);
     }
 
     public async Task<Page<StillRecord>?> ListStillsAsync(Guid projectId, PageRequest page, CancellationToken cancellationToken)
@@ -255,6 +268,29 @@ internal sealed class ScopedGeneration(
         return clip is { HasFootage: true } ? await storage.OpenAsync(clip.StorageKey, cancellationToken) : null;
     }
 
+    public async Task<Page<SpeechRecord>?> ListSpeechAsync(Guid projectId, PageRequest page, CancellationToken cancellationToken)
+    {
+        if (!await database.Projects.AnyAsync(p => p.Id == projectId, cancellationToken)) return null;
+
+        var all = database.Speech.AsNoTracking().Where(s => s.ProjectId == projectId);
+        var items = await all
+            .OrderByDescending(s => s.CreatedAt).ThenByDescending(s => s.Id)
+            .Skip(page.Skip).Take(page.PageSize)
+            .ToListAsync(cancellationToken);
+        return new Page<SpeechRecord>(await WithCostsAsync(items, cancellationToken), page.Page, page.PageSize, await all.CountAsync(cancellationToken));
+    }
+
+    public async Task<SpeechRecord?> FindSpeechAsync(Guid speechId, CancellationToken cancellationToken) =>
+        await database.Speech.AsNoTracking().SingleOrDefaultAsync(s => s.Id == speechId, cancellationToken) is { } speech
+            ? (await WithCostsAsync([speech], cancellationToken))[0]
+            : null;
+
+    public async Task<Stream?> OpenSpeechAsync(Guid speechId, CancellationToken cancellationToken)
+    {
+        var speech = await database.Speech.AsNoTracking().SingleOrDefaultAsync(s => s.Id == speechId, cancellationToken);
+        return speech is { HasSound: true } ? await storage.OpenAsync(speech.StorageKey, cancellationToken) : null;
+    }
+
     // The Project's Clip that was confirmed with a Still of this picture and waits for one to be approved. When a
     // Scene was made longer and confirmed again there are two: the longer is long enough for both, and only it is made.
     private async Task<IReadOnlyList<Clip>> ClipsWaitingForAsync(Still approved, CancellationToken cancellationToken)
@@ -322,12 +358,26 @@ internal sealed class ScopedGeneration(
         return [.. clips.Select(clip => new ClipRecord(clip, costs.GetValueOrDefault(clip.Id)))];
     }
 
+    private async Task<IReadOnlyList<SpeechRecord>> WithCostsAsync(IReadOnlyList<Speech> speech, CancellationToken cancellationToken)
+    {
+        var ids = speech.Select(said => (Guid?)said.Id).ToList();
+        var costs = await database.GenerationCostRecords.AsNoTracking()
+            .Where(cost => ids.Contains(cost.SpeechId))
+            .ToDictionaryAsync(cost => cost.SpeechId!.Value, cancellationToken);
+        return [.. speech.Select(said => new SpeechRecord(said, costs.GetValueOrDefault(said.Id)))];
+    }
+
     private async Task<GenerationEstimate> EstimateAsync(Guid projectId, Storyboard storyboard, CancellationToken cancellationToken)
     {
         var ceiling = await CeilingAsync(cancellationToken);
+        var (language, voice) = await database.Projects
+            .Where(p => p.Id == projectId)
+            .Select(p => new ValueTuple<string, string>(p.Language, p.Voice))
+            .SingleAsync(cancellationToken);
         var stillsOfProject = await database.Stills.AsNoTracking().Where(s => s.ProjectId == projectId).ToListAsync(cancellationToken);
         var clipsOfProject = await database.Clips.AsNoTracking().Where(c => c.ProjectId == projectId).ToListAsync(cancellationToken);
-        var spent = Spent(stillsOfProject, clipsOfProject);
+        var speechOfProject = await database.Speech.AsNoTracking().Where(s => s.ProjectId == projectId).ToListAsync(cancellationToken);
+        var spent = Spent(stillsOfProject, clipsOfProject, speechOfProject);
         var options = generation.Value;
         var currency = costs.Value.Currency;
 
@@ -356,21 +406,40 @@ internal sealed class ScopedGeneration(
             .Select(found => new SceneClip(found.Scene.Position, clipRecords.Single(record => record.Clip.Id == found.Clip!.Id)))
             .ToList();
 
-        GenerationEstimate Unavailable(string reason) => new(
-            reason, [], [], 0m, 0m, currency, spent, ceiling, options.ImageProvider, options.VideoProvider, sceneStills, sceneClips, AnotherStillAmount: null);
+        // A Scene has the Project's speech of its narration text, whichever Scene or Variant asked for it first.
+        var says = storyboard.Scenes
+            .Where(scene => !string.IsNullOrWhiteSpace(scene.NarrationText))
+            .Select(scene => (
+                Scene: scene,
+                Speech: speechOfProject
+                    .Where(said => said.IsCurrent && said.Says(scene, language, voice))
+                    .OrderByDescending(said => said.CreatedAt).ThenByDescending(said => said.Id)
+                    .FirstOrDefault()))
+            .ToList();
+        var speechRecords = await WithCostsAsync([.. says.Where(found => found.Speech is not null).Select(found => found.Speech!).Distinct()], cancellationToken);
+        var sceneSpeech = says
+            .Where(found => found.Speech is not null)
+            .Select(found => new SceneSpeech(found.Scene.Position, speechRecords.Single(record => record.Speech.Id == found.Speech!.Id)))
+            .ToList();
 
-        if (!options.CanGenerateStills) return Unavailable(NoImageProvider);
+        GenerationEstimate Unavailable(string reason) => new(
+            reason, [], [], [], 0m, 0m, currency, spent, ceiling, options.ImageProvider, options.VideoProvider, options.SpeechProvider,
+            voice, sceneStills, sceneClips, sceneSpeech, AnotherStillAmount: null);
+
+        // Speech needs no picture: with a speech provider alone, a version that has no generated Scene can still be spoken.
+        if (!options.CanGenerateStills && (has.Count > 0 || !options.CanSpeak)) return Unavailable(NoImageProvider);
         var needClip = has.Where(found => found.Scene.Technique == Technique.GeneratedFootage && found.Clip is null).ToList();
         if (needClip.Count > 0 && !options.CanGenerateClips) return Unavailable(NoVideoProvider);
 
-        var stillRate = costs.Value.StillRateOf(options.ImageProvider);
+        // Null with a speech provider alone: then no Scene is generated, and no Still is asked for.
+        var stillRate = options.CanGenerateStills ? costs.Value.StillRateOf(options.ImageProvider) : (decimal?)null;
         var stills = has
             // A Still is the backdrop itself, or what a Clip starts from: a Scene whose Clip has started needs none.
             .Where(found => found.Still is null && (found.Clip is null || found.Clip.State == ClipState.WaitingForStill))
             // Two Scenes that describe the same picture share its Still.
             .DistinctBy(found => PictureOf(found.Scene))
             .Select(found => new EstimatedStill(
-                found.Scene.Position, found.Scene.Technique, found.Scene.Description ?? "", stillRate, found.Scene.CitedFactIds))
+                found.Scene.Position, found.Scene.Technique, found.Scene.Description ?? "", stillRate ?? 0m, found.Scene.CitedFactIds))
             .ToList();
         var clips = needClip
             // Two Scenes that describe the same footage share its Clip, which is as long as the longer of them.
@@ -388,9 +457,39 @@ internal sealed class ScopedGeneration(
             .Where(found => found is { Still: null, Clip.State: ClipState.WaitingForStill })
             .Select(found => found.Clip!).Distinct()
             .Sum(clip => clip.EstimatedAmount);
+        var speechRate = options.CanSpeak ? costs.Value.SpeechRatePerCharacterOf(options.SpeechProvider) : 0m;
+        // A narration the member uploaded is used in place of speech, so there is nothing to speak.
+        var uploaded = await database.VariantAudio.AnyAsync(
+            audio => audio.VariantId == storyboard.VariantId && audio.Kind == VariantAudioKind.Narration, cancellationToken);
+        List<EstimatedSpeech> speech = !options.CanSpeak || uploaded
+            ? []
+            :
+            [
+                .. says
+                    .Where(found => found.Speech is null)
+                    // Two Scenes that say the same share the speech.
+                    .DistinctBy(found => found.Scene.NarrationText)
+                    .Select(found => Estimated(found.Scene, speechRate, options.PaceOf(language))),
+            ];
         return new GenerationEstimate(
-            null, stills, clips, stills.Sum(still => still.EstimatedAmount) + clips.Sum(clip => clip.EstimatedAmount), resumed, currency, spent,
-            ceiling, options.ImageProvider, options.VideoProvider, sceneStills, sceneClips, AnotherStillAmount: stillRate);
+            null, stills, clips, speech,
+            stills.Sum(still => still.EstimatedAmount) + clips.Sum(clip => clip.EstimatedAmount) + speech.Sum(said => said.EstimatedAmount),
+            resumed, currency, spent, ceiling, options.ImageProvider, options.VideoProvider, options.SpeechProvider, voice, sceneStills, sceneClips,
+            sceneSpeech, AnotherStillAmount: stillRate);
+    }
+
+    // The speech of a Scene's narration text as it is estimated: what it costs, how long it lasts, and whether that looks too long.
+    private static EstimatedSpeech Estimated(Scene scene, decimal ratePerCharacter, SpeakingPace pace)
+    {
+        var durationMs = SpeechLength.EstimateMs(scene.NarrationText, pace);
+        // Speech a little longer than its Scene is sped up at render, by a tenth at most. Only what that would not fit is worth a warning.
+        var warning = SpeechFit.TempoFor(durationMs, scene.DurationMs) is null
+            ? $"The narration text of Scene {scene.Position} is estimated to take {durationMs / 1000m:0.#} seconds to say, and the Scene lasts " +
+              $"{scene.DurationMs / 1000m:0.#} seconds. Speech is sped up by a tenth at most, so a render would fail on it. " +
+              "Shorten the text or give the Scene more time before generating."
+            : null;
+        return new EstimatedSpeech(
+            scene.Position, scene.NarrationText, ProductionCosts.SpeechEstimate(ratePerCharacter, scene.NarrationText), durationMs, warning);
     }
 
     // What makes two Scenes ask for the same picture: its Technique, what it shows and the Facts it rests on.
@@ -406,19 +505,21 @@ internal sealed class ScopedGeneration(
     private async Task<decimal> SpentAsync(Guid projectId, CancellationToken cancellationToken) =>
         Spent(
             await database.Stills.AsNoTracking().Where(s => s.ProjectId == projectId).ToListAsync(cancellationToken),
-            await database.Clips.AsNoTracking().Where(c => c.ProjectId == projectId).ToListAsync(cancellationToken));
+            await database.Clips.AsNoTracking().Where(c => c.ProjectId == projectId).ToListAsync(cancellationToken),
+            await database.Speech.AsNoTracking().Where(s => s.ProjectId == projectId).ToListAsync(cancellationToken));
 
     // What is on its way counts as spent already: it was confirmed, and will be charged for. A Clip that waits
     // for a Still is on its way only while a Still of its picture is: when that Still was not made, or a longer
     // Clip of the same picture waits beside it, nothing will be charged for it, and it is not counted.
-    private static decimal Spent(IReadOnlyList<Still> stills, IReadOnlyList<Clip> clips) =>
+    private static decimal Spent(IReadOnlyList<Still> stills, IReadOnlyList<Clip> clips, IReadOnlyList<Speech> speech) =>
         stills.Where(still => still.CountsAsSpent).Sum(still => still.EstimatedAmount)
+        + speech.Where(said => said.CountsAsSpent).Sum(said => said.EstimatedAmount)
         + clips.Where(clip => clip.State != ClipState.WaitingForStill && clip.CountsAsSpent).Sum(clip => clip.EstimatedAmount)
         + Longest(clips.Where(clip => clip.State == ClipState.WaitingForStill))
             .Where(clip => stills.Any(still => still.IsCurrent && IsOf(still, clip)))
             .Sum(clip => clip.EstimatedAmount);
 
-    private async Task<(IReadOnlyList<StillRecord> Stills, IReadOnlyList<ClipRecord> Clips)> FindByKeyAsync(
+    private async Task<(IReadOnlyList<StillRecord> Stills, IReadOnlyList<ClipRecord> Clips, IReadOnlyList<SpeechRecord> Speech)> FindByKeyAsync(
         Guid projectId, string idempotencyKey, CancellationToken cancellationToken) => (
         await WithCostsAsync(
             await database.Stills.AsNoTracking()
@@ -430,6 +531,12 @@ internal sealed class ScopedGeneration(
             await database.Clips.AsNoTracking()
                 .Where(c => c.ProjectId == projectId && c.IdempotencyKey == idempotencyKey)
                 .OrderBy(c => c.Ordinal)
+                .ToListAsync(cancellationToken),
+            cancellationToken),
+        await WithCostsAsync(
+            await database.Speech.AsNoTracking()
+                .Where(s => s.ProjectId == projectId && s.IdempotencyKey == idempotencyKey)
+                .OrderBy(s => s.Ordinal)
                 .ToListAsync(cancellationToken),
             cancellationToken));
 
